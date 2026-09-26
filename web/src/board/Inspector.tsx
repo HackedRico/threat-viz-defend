@@ -3,7 +3,7 @@ import { useId } from "react";
 import type { ElementKind, ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
 import { CloseIcon, TrashIcon } from "../shell/icons.tsx";
 import { SeverityBadge } from "../shell/SeverityBadge.tsx";
-import { flowLabel } from "./elements.ts";
+import { flowLabel, isInferred } from "./elements.ts";
 import { flowsTouching, removeElement, updateFlow, updateNode } from "./mapEdit.ts";
 import { rankThreats, STRIDE } from "./severity.ts";
 import { useBoardUi } from "./store.ts";
@@ -276,7 +276,7 @@ function FlowDetails({ map, flow, editable, onChange }: { map: SystemMap; flow: 
 
 function Evidence({ text }: { text: string | null }) {
   if (!text) return null;
-  const inferred = text.startsWith("inferred:");
+  const inferred = isInferred(text);
   return (
     <section className="inspector-section">
       <h3 className="inspector-label">{inferred ? "Inferred, not quoted" : "Evidence"}</h3>

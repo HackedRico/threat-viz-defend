@@ -77,7 +77,7 @@ export function Workspace({
   }, [board.revision, serverMap, dirty]);
 
   const map = review ? draft : serverMap;
-  const { layout, key, error } = useMapLayout(map);
+  const { layouts, key, error } = useMapLayout(map);
   const diff = useMemo(() => (review && board.previous_map ? diffMaps(board.previous_map, map) : null), [review, board.previous_map, map]);
   const analysis = board.status === "ready" ? board.analysis : null;
   const threats = analysis?.threats ?? [];
@@ -116,10 +116,10 @@ export function Workspace({
       <div className="workspace-stage">
         {top}
         <div className="workspace-canvas">
-          {layout && key ? (
+          {layouts && key ? (
             <MapCanvas
               map={map}
-              layout={layout}
+              layouts={layouts}
               layoutKey={key}
               threats={threats}
               exposure={board.exposure}

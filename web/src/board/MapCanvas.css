@@ -3,7 +3,8 @@
    =============================================================================
    The whiteboard canvas: dotted board surface, marker strokes for nodes and
    flows, dashed trust boundaries, highlighter marks for lit elements, threat
-   pins, the lethal trifecta ring, the view controls and the map key. */
+   pins, the lethal trifecta ring, the view controls and the map key. Only a
+   trust boundary is dashed, so a dashed line always means trust changes there. */
 
 .canvas {
   position: relative;
@@ -59,6 +60,16 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   fill: var(--ink-faint);
+}
+
+/* A halo in the board's color masks any flow passing behind the name, so the
+   line breaks around the text instead of striking through it. */
+.boundary-name text {
+  paint-order: stroke;
+  stroke: var(--board);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
 /* ---------- nodes ---------- */
@@ -173,17 +184,22 @@
   fill: none;
   stroke: var(--danger);
   stroke-width: 2.2;
-  stroke-dasharray: 2 5;
   stroke-linecap: round;
   animation: trifecta-pulse 2.4s ease-in-out infinite;
 }
 
+/* Flows leave an AI part through the side this caption sits on, so it carries
+   the same board colored halo as a boundary name. */
 .trifecta-label {
   font-family: var(--font-hand);
   font-weight: 700;
   font-size: 16px;
   fill: var(--danger);
   text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--board);
+  stroke-width: 5px;
+  stroke-linejoin: round;
 }
 
 @keyframes trifecta-pulse {
@@ -272,7 +288,6 @@
 
 .is-crossing .flow-chip rect {
   stroke: var(--crossing);
-  stroke-dasharray: 3 2;
 }
 
 .map-flow.is-selected .flow-chip rect {
@@ -345,6 +360,15 @@
   stroke: var(--marker-green);
 }
 
+/* ---------- inferred parts, marked only while the map is checked ---------- */
+
+/* Faint rather than dashed: dashes belong to trust boundaries alone. */
+.is-inferred .node-stroke,
+.is-inferred .node-glyph,
+.is-inferred .flow-line {
+  stroke-opacity: 0.5;
+}
+
 /* ---------- pins ---------- */
 
 .pin {
@@ -364,14 +388,30 @@
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
-  fill: #fff;
   text-anchor: middle;
   dominant-baseline: middle;
   pointer-events: none;
 }
 
+/* Each fill gets the digit color that reads on it at 4.5:1 or better. */
+.sev-critical .pin-number {
+  fill: var(--pin-digit-critical);
+}
+.sev-high .pin-number {
+  fill: var(--pin-digit-high);
+}
 .sev-medium .pin-number {
-  fill: #1b1600;
+  fill: var(--pin-digit-medium);
+}
+.sev-low .pin-number {
+  fill: var(--pin-digit-low);
+}
+
+.pin-halo {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  opacity: 0.75;
 }
 
 .pin:hover .pin-shape,
@@ -460,6 +500,10 @@
 .canvas-controls .btn[aria-pressed="true"] {
   background: var(--accent-wash);
   color: var(--accent);
+}
+
+.canvas-controls .icon-upright {
+  transform: rotate(90deg);
 }
 
 .canvas-zoom {
@@ -562,8 +606,11 @@
   fill: none;
   stroke: var(--danger);
   stroke-width: 2;
-  stroke-dasharray: 2 4;
   stroke-linecap: round;
+}
+
+.legend-inferred {
+  stroke-opacity: 0.5;
 }
 
 .legend-pins {
