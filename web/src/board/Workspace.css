@@ -52,8 +52,16 @@
   flex-direction: column;
 }
 
+/* The review, busy or threat panel, which the inspector covers without unmounting. */
+.workspace-panel-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Top right of the canvas, beside the panel it opens and clear of the view controls
-   and the ask bar at the bottom. The inspector card starts just below it. */
+   and the ask bar at the bottom. */
 .panel-toggle {
   position: absolute;
   top: 14px;

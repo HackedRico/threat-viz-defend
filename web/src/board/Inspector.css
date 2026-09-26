@@ -1,34 +1,61 @@
 /* =============================================================================
    Module Overview
    =============================================================================
-   The floating details card over the canvas: element summary or edit form,
-   evidence as a quote, exposure for AI parts, and pinned threats. */
+   The details laid over the side panel: the bar back to the panel's lists,
+   then the element summary or edit form, evidence as a quote, exposure for AI
+   parts, and pinned threats. */
 
+/* Covers the panel's lists, which stay mounted underneath. The panel's resize
+   handle sits higher, so the panel still resizes with the details open. */
 .inspector {
   position: absolute;
-  /* Below the panel toggle, which holds the canvas's top right corner. */
-  top: 56px;
-  right: 14px;
-  z-index: 5;
-  width: min(340px, calc(100% - 28px));
-  max-height: calc(100% - 70px);
-  overflow: auto;
+  inset: 0;
+  z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: var(--shadow-3);
   animation: inspector-in var(--dur-med) var(--ease-out);
+}
+
+/* Focus lands on the whole card only when the link that opened it went away;
+   the next Tab reaches the back button, which shows its own ring. */
+.inspector:focus {
+  outline: none;
 }
 
 @keyframes inspector-in {
   from {
     opacity: 0;
-    transform: translateX(10px);
+    transform: translateX(12px);
   }
+}
+
+/* Scrolling the bar into view also brings up this much of the details under it:
+   on a narrow window, enough to read the element's name and tags. */
+.inspector-nav {
+  flex: none;
+  scroll-margin-bottom: 10rem;
+}
+
+.inspector-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-left: var(--space-2);
+}
+
+.inspector-back:hover {
+  color: var(--ink);
+}
+
+.inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 .inspector-head {

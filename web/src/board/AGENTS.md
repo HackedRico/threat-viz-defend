@@ -13,7 +13,7 @@ The target is a map a reviewer checks in under five minutes, the review step of 
    - `placeLabels` sets flow labels clear of nodes, other lines, other labels and the top right corner where pins land; a flow sharing a track labels its outer side. Then boundary names slide along their top band to a spot no line crosses.
    - `layoutProblems` judges the result: nodes nearer than `MIN_CLEARANCE` (40px) or colliding labels. A cramped layout is laid out again with every gap spread a quarter wider (`SPREAD`), and the least cramped try wins.
 3. **The canvas draws it.** `MapCanvas.tsx` picks the direction that shows the map larger in its space (`pickDirection`), again whenever the canvas changes shape, until the reader pans, zooms or turns the map. A new map keeps the direction, so an agent's update never turns the board around under the reader. It renders boundaries, flows, boundary names, nodes, then threat pins (`pins.ts`), so names and pins sit over lines. `shapes.ts` produces the hand-drawn outlines with roughjs path data only, seeded by id so shapes do not shimmer between renders.
-4. **Everything around it**: `Inspector.tsx` and `mapEdit.ts` edit a draft map, `mapDiff.ts` marks what changed since `previous_map`, `MapLegend.tsx` explains every mark, and `store.ts` holds what is selected or lit, so the quiz, the ask bar, attack paths and the voice coach can all light the map.
+4. **Everything around it**: `Inspector.tsx` shows the selected node or flow in the side panel, never over the canvas, and with `mapEdit.ts` edits a draft map, `mapDiff.ts` marks what changed since `previous_map`, `MapLegend.tsx` explains every mark, and `store.ts` holds what is selected or lit, so the quiz, the ask bar, attack paths and the voice coach can all light the map.
 
 ## Levers for better diagrams
 
@@ -31,6 +31,7 @@ The target is a map a reviewer checks in under five minutes, the review step of 
 
 - **ELK swaps a boundary's minimum size top to bottom.** With `INCLUDE_CHILDREN`, ELK applies a compound node's `elk.nodeSize.minimum` before it turns a `DOWN` layout upright, so `toElkGraph` passes `(0, width)` in that direction. The boundary width test fails if an ELK upgrade changes this.
 - **Labels are estimated, never measured.** Widths come from per-character constants for Caveat and Plex Mono, so layout stays testable in Node. A new font or size means new constants.
+- **Selection means details in the panel.** `Workspace.tsx` lays the inspector over the panel's lists whenever `selected` names a node or flow, and shows a hidden panel for it. So anything that opens a list item must not select: pins, threat cards and the inspector's own threat links call `openThreat`, which lights the threat instead. The lists stay mounted and `inert` underneath; unmounting them would end a quiz or voice session every time someone clicks a node.
 - **Pins arrive after layout.** Threats are not known when ELK runs, so `placeLabels` keeps every node's top right corner free whether or not a pin lands there.
 
 ## Known problems worth your time
