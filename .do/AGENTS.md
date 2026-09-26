@@ -34,8 +34,8 @@ After a deploy: `curl https://api.<domain>/api/health` answers `{"ok":true}`, `c
 
 ## Accounts and credits
 
-You hold the DigitalOcean, GoDaddy, ElevenLabs, Backboard and Snowflake accounts. Hand a teammate a key directly for their local `.env`; never paste one into a PR, issue or chat. Keep a list of every key issued so teardown in [docs/deploy.md](../docs/deploy.md) can revoke them all.
+You hold the DigitalOcean, GoDaddy, ElevenLabs and Backboard accounts. Hand a teammate a key directly for their local `.env`; never paste one into a PR, issue or chat. Keep a list of every key issued so teardown in [docs/deploy.md](../docs/deploy.md) can revoke them all.
 
-## Adding a platform such as Snowflake
+## Adding a platform
 
-Nothing uses Snowflake yet. Before building, pick its seam with Ricky, as [docs/team.md](../docs/team.md) describes. A model service becomes a provider adapter in `api/app/llm/`; a data service becomes a module that reads the tables and never uploaded content. Its keys arrive as new settings in `api/app/config.py`, and its hosting pieces land here.
+Before building a new platform, pick its seam with Ricky, as [docs/team.md](../docs/team.md) describes. A model service becomes a provider adapter in `api/app/llm/`; a data service becomes a module that reads the tables and never uploaded content. Its keys arrive as new settings in `api/app/config.py`, and its hosting pieces land here.
