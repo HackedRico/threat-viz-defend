@@ -79,9 +79,9 @@ export function DictateButton({ onText, onError, disabled = false }: DictateProp
       return;
     }
     setPhase("starting");
-    let stream: MediaStream;
+    let mic: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch (caught) {
       const denied = caught instanceof DOMException && (caught.name === "NotAllowedError" || caught.name === "SecurityError");
       setPhase("idle");
@@ -93,20 +93,20 @@ export function DictateButton({ onText, onError, disabled = false }: DictateProp
       return;
     }
     if (!alive.current) {
-      stream.getTracks().forEach((track) => track.stop());
+      mic.getTracks().forEach((track) => track.stop());
       return;
     }
     const mimeType = preferredRecordingType((type) => MediaRecorder.isTypeSupported(type));
     let recorder: MediaRecorder;
     try {
-      recorder = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: DICTATION_BITS_PER_SECOND });
+      recorder = new MediaRecorder(mic, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: DICTATION_BITS_PER_SECOND });
     } catch {
-      stream.getTracks().forEach((track) => track.stop());
+      mic.getTracks().forEach((track) => track.stop());
       setPhase("idle");
       onError("This browser cannot record audio here. Type your question instead.");
       return;
     }
-    const current: Take = { recorder, stream, chunks: [], keep: true, timer: 0 };
+    const current: Take = { recorder, stream: mic, chunks: [], keep: true, timer: 0 };
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) current.chunks.push(event.data);
     };
@@ -123,7 +123,7 @@ export function DictateButton({ onText, onError, disabled = false }: DictateProp
       if (seconds >= DICTATION_MAX_SECONDS) finish(true);
     }, 250);
     take.current = current;
-    setStream(stream);
+    setStream(mic);
     setElapsed(0);
     recorder.start();
     setPhase("recording");
@@ -180,7 +180,8 @@ export function DictateButton({ onText, onError, disabled = false }: DictateProp
         aria-label={label}
         aria-pressed={recording}
         title={hint}
-        disabled={disabled || phase === "starting" || phase === "sending"}
+        // A recording in progress can always be stopped, even while the caller is busy.
+        disabled={(disabled && !recording) || phase === "starting" || phase === "sending"}
         onClick={() => (recording ? finish(true) : void start())}
       >
         {phase === "starting" || phase === "sending" ? (
