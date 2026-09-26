@@ -22,6 +22,7 @@ from app.domain.briefing import brief
 from app.domain.briefing import describe_element as describe_one
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.quiz import build_quiz
+from app.domain.rules import flow_label
 from app.errors import AppError
 from app.schemas import AnswerIn
 
@@ -110,8 +111,10 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
                 if system is None:
                     return f"Board {row.title} has no map yet. Its status is {row.status}."
                 analysis = read_analysis(row)
-                elements = "\n".join(f"- {n.id}: {n.label} ({n.kind})" for n in system.nodes)
-                return f"{brief(system, analysis, max_threats=6)}\n\nStatus: {row.status}.\nElements:\n{elements}"
+                nodes = [f"- {n.id}: {n.label} ({n.kind})" for n in system.nodes]
+                flows = [f"- {f.id}: {flow_label(system, f)}" for f in system.flows]
+                lines = [f"Status: {row.status}.", "Nodes:", *nodes, "Flows:", *flows]
+                return f"{brief(system, analysis, max_threats=6)}\n\n" + "\n".join(lines)
 
         return await _as_user(work)
 
@@ -126,7 +129,8 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
                 text = describe_one(*_board_parts(services, session, user_id, board_id), element_id)
             if text is None:
                 raise ToolError(
-                    f"There is no node or flow with id {element_id} on this map. Call get_board for its node ids."
+                    f"There is no node or flow with id {element_id} on this map. "
+                    "Call get_board for its node and flow ids."
                 )
             return text
 
