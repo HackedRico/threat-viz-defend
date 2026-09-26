@@ -8,6 +8,50 @@ It is a hosted, invite-only web app. Coding agents such as Claude Code and Curso
 
 **Live:** `<deployed URL goes here>`
 
+## hackUMBC 2026
+
+ThreatViz Defend is our entry for [hackUMBC 2026](https://hackumbc-2026.devpost.com/). We wrote all of its code during the event, from Sat 2026-09-26 12:00 ET to Sun 2026-09-27 11:45 ET.
+
+**Demo video:** `<video link goes here>`
+
+### Submission checklist
+
+| Requirement | Where |
+|---|---|
+| Public GitHub repository | This repo |
+| Demo video, at least 30 seconds | Linked above and on the Devpost entry |
+| In-person demo, 3 to 5 minutes | A judge signs in and answers the voice quiz about the app's own threat model |
+| Devpost entry created by Sun 11:00 ET, final by 11:45 ET | [hackumbc-2026.devpost.com](https://hackumbc-2026.devpost.com/) |
+| One submission, at most four members | See [Team](#team) |
+
+### Tracks
+
+| Track | How ThreatViz Defend enters it | Status |
+|---|---|---|
+| Cybersecurity Application | A defensive tool for developers: evidence-cited threat models, STRIDE, boundary and lethal trifecta coverage decided by code, and a quiz that checks the developer understood them. The app's own threat model, every control and the known limits are in [docs/security.md](docs/security.md). | Built |
+| Best Use of ElevenLabs | The voice coach runs the Defend quiz out loud through a private ElevenLabs agent, and dictation turns spoken questions into text with ElevenLabs Speech to Text. The server mints a short-lived conversation token per signed-in user, so the agent id alone is useless to a scraper. | Built |
+| Best Use of DigitalOcean | The API, the web app and a Managed Postgres database run on App Platform from [.do/app.yaml](.do/app.yaml). [docs/deploy.md](docs/deploy.md) covers the setup. | Built |
+| Best Domain Name from GoDaddy Registry | The domain is registered through GoDaddy Registry, with DNS pointing at App Platform. | `<domain goes here>` |
+| Best Use of Backboard | Any user can route analysis through Backboard, and add Backboard memory to any provider so progress carries across sessions. | Built |
+| Best Use of Snowflake API | A model provider adapter behind the `Llm` protocol in [api/app/llm/](api/app/llm/). | Planned |
+| Most Engaging Demo | A judge speaks with the voice coach, live, about how this app could be attacked. | Demo day |
+| Best Overall, 1st and 2nd | The whole path runs end to end: material in, map confirmed, threats found, quiz passed, and coding agents keep the map current. | Demo day |
+
+### Access and teardown
+
+The hosted app is for event attendees only. Sign up takes a username, a password and an invite code we hand out in person, and every model and voice route spends from a daily budget per user, so bots cannot burn the credits. After judging we destroy the deployment, its database with every attendee account, the DNS records and every key. The repo stays public.
+
+### Team
+
+| Member | Area |
+|---|---|
+| Ricky | Core engine: the API, static and dynamic workflows, coding agent and model provider integrations |
+| MD | Diagrams: how the model draws the map and how the canvas shows it |
+| Eman | Voice: the ElevenLabs coach |
+| Jonathan | Hosting and credits: DigitalOcean, the GoDaddy domain, platform accounts |
+
+[docs/team.md](docs/team.md) maps each area to its folders.
+
 ## How it works
 
 1. **Add material.** Paste design notes, add files, pick a whole code folder, or paste a public GitHub repository URL. Files that may hold credentials are skipped in the browser, and credential-shaped values are masked on the server.
