@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
-import { FitIcon, FlowDirectionIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
+import { FitIcon, FlowDirectionIcon, PinIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
+import { isInferred } from "./elements.ts";
 import { STRIDE } from "./severity.ts";
 import {
   clip,
@@ -77,6 +78,7 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [direction, setDirection] = useState<Direction | null>(null);
+  const [pinsShown, setPinsShown] = useState(true);
   const moved = useRef(false);
   const drag = useRef<{ id: number; startX: number; startY: number; view: View; dragging: boolean } | null>(null);
   const selected = useBoardUi((s) => s.selected);
@@ -342,6 +344,7 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
                   sourceLabel={nodeLabels.get(flow.source) ?? flow.source}
                   targetLabel={nodeLabels.get(flow.target) ?? flow.target}
                   crossing={crossingSet.has(flow.id)}
+                  inferred={draft && isInferred(flow.evidence)}
                   selected={selected === flow.id}
                   state={litState(flow.id)}
                   diffTag={added.has(flow.id) ? "new" : changed.has(flow.id) ? "edited" : null}
@@ -367,6 +370,7 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
                   node={node}
                   box={box}
                   lethal={lethal.has(node.id)}
+                  inferred={draft && isInferred(node.evidence)}
                   selected={selected === node.id}
                   state={litState(node.id)}
                   diffTag={added.has(node.id) ? "new" : changed.has(node.id) ? "edited" : null}
@@ -377,17 +381,18 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
               );
             })}
 
-            {pins.map((pin) => (
-              <PinButton
-                key={pin.threat.id}
-                pin={pin}
-                state={litState(pin.threat.id) || litState(pin.threat.element)}
-                onOpen={() => {
-                  showThreat(pin.threat.id);
-                  select(pin.threat.element);
-                }}
-              />
-            ))}
+            {pinsShown &&
+              pins.map((pin) => (
+                <PinButton
+                  key={pin.threat.id}
+                  pin={pin}
+                  state={litState(pin.threat.id) || litState(pin.threat.element)}
+                  onOpen={() => {
+                    showThreat(pin.threat.id);
+                    select(pin.threat.element);
+                  }}
+                />
+              ))}
           </g>
         )}
       </svg>
@@ -411,11 +416,23 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
         <button type="button" className="btn btn-icon" aria-label={turnLabel} title={turnLabel} onClick={turn}>
           <FlowDirectionIcon className={direction === "RIGHT" ? "icon-upright" : undefined} />
         </button>
+        {threats.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-icon"
+            aria-label="Show threat pins"
+            title="Show threat pins"
+            aria-pressed={pinsShown}
+            onClick={() => setPinsShown((shown) => !shown)}
+          >
+            <PinIcon />
+          </button>
+        )}
         <span className="canvas-zoom mono" aria-live="off">
           {Math.round(view.k * 100)}%
         </span>
       </div>
-      <MapLegend />
+      <MapLegend draft={draft} />
     </div>
   );
 }
@@ -455,6 +472,7 @@ interface NodeShapeProps {
   node: MapNode;
   box: Box;
   lethal: boolean;
+  inferred: boolean;
   selected: boolean;
   state: LitState;
   diffTag: "new" | "edited" | null;
@@ -463,7 +481,7 @@ interface NodeShapeProps {
   onReveal: (box: Box) => void;
 }
 
-const NodeShape = memo(function NodeShape({ node, box, lethal, selected, state, diffTag, threatCount, onActivate, onReveal }: NodeShapeProps) {
+const NodeShape = memo(function NodeShape({ node, box, lethal, inferred, selected, state, diffTag, threatCount, onActivate, onReveal }: NodeShapeProps) {
   const fill = useMemo(() => nodeFill(node.kind, box), [node.kind, box]);
   const strokes = useMemo(() => nodeOutline(node.kind, box, node.id), [node.kind, box, node.id]);
   const text = useMemo(() => nodeText(node), [node]);
@@ -483,6 +501,7 @@ const NodeShape = memo(function NodeShape({ node, box, lethal, selected, state, 
     node.ai ? "uses AI" : null,
     node.sensitive ? "holds sensitive data" : null,
     lethal ? "has the lethal trifecta" : null,
+    inferred ? "inferred, check it" : null,
     threatCount > 0 ? `${threatCount} threat${threatCount === 1 ? "" : "s"}` : null,
     diffTag === "new" ? "new in this update" : diffTag === "edited" ? "changed in this update" : null,
   ]
@@ -491,7 +510,7 @@ const NodeShape = memo(function NodeShape({ node, box, lethal, selected, state, 
 
   return (
     <g
-      className={`map-node kind-${node.kind} ${selected ? "is-selected" : ""} ${state ? `is-${state}` : ""} ${diffTag ? `diff-${diffTag}` : ""}`}
+      className={`map-node kind-${node.kind} ${selected ? "is-selected" : ""} ${state ? `is-${state}` : ""} ${diffTag ? `diff-${diffTag}` : ""} ${inferred ? "is-inferred" : ""}`}
       data-el={node.id}
       role="button"
       tabIndex={0}
@@ -573,6 +592,7 @@ interface FlowShapeProps {
   sourceLabel: string;
   targetLabel: string;
   crossing: boolean;
+  inferred: boolean;
   selected: boolean;
   state: LitState;
   diffTag: "new" | "edited" | null;
@@ -588,6 +608,7 @@ const FlowShape = memo(function FlowShape({
   sourceLabel,
   targetLabel,
   crossing,
+  inferred,
   selected,
   state,
   diffTag,
@@ -603,6 +624,7 @@ const FlowShape = memo(function FlowShape({
     `Flow from ${sourceLabel} to ${targetLabel}: ${flow.label}`,
     flow.data ? `carries ${flow.data}` : null,
     crossing ? "crosses a trust boundary" : null,
+    inferred ? "inferred, check it" : null,
     threatCount > 0 ? `${threatCount} threat${threatCount === 1 ? "" : "s"}` : null,
     diffTag === "new" ? "new in this update" : diffTag === "edited" ? "changed in this update" : null,
   ]
@@ -612,7 +634,7 @@ const FlowShape = memo(function FlowShape({
 
   return (
     <g
-      className={`map-flow ${crossing ? "is-crossing" : ""} ${selected ? "is-selected" : ""} ${state ? `is-${state}` : ""} ${diffTag ? `diff-${diffTag}` : ""}`}
+      className={`map-flow ${crossing ? "is-crossing" : ""} ${selected ? "is-selected" : ""} ${state ? `is-${state}` : ""} ${diffTag ? `diff-${diffTag}` : ""} ${inferred ? "is-inferred" : ""}`}
       data-el={flow.id}
       role="button"
       tabIndex={0}

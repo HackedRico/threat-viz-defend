@@ -360,6 +360,15 @@
   stroke: var(--marker-green);
 }
 
+/* ---------- inferred parts, marked only while the map is checked ---------- */
+
+/* Faint rather than dashed: dashes belong to trust boundaries alone. */
+.is-inferred .node-stroke,
+.is-inferred .node-glyph,
+.is-inferred .flow-line {
+  stroke-opacity: 0.5;
+}
+
 /* ---------- pins ---------- */
 
 .pin {
@@ -598,6 +607,10 @@
   stroke: var(--danger);
   stroke-width: 2;
   stroke-linecap: round;
+}
+
+.legend-inferred {
+  stroke-opacity: 0.5;
 }
 
 .legend-pins {

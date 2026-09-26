@@ -28,6 +28,11 @@ export function findElement(id: string, map: SystemMap | null, analysis: ThreatA
   return null;
 }
 
+/** True when evidence says the model inferred an element rather than quoting the material. */
+export function isInferred(evidence: string | null): boolean {
+  return evidence?.startsWith("inferred:") ?? false;
+}
+
 /** Name a flow by its ends and label, as in `Browser to API: sign in`. */
 export function flowLabel(map: SystemMap, flow: Flow): string {
   const name = (id: string) => map.nodes.find((n) => n.id === id)?.label ?? id;

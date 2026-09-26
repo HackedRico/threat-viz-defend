@@ -59,5 +59,7 @@ export const CopyIcon = (p: IconProps) => <Icon {...p}><rect x="9" y="9" width="
 export const BookIcon = (p: IconProps) => <Icon {...p}><path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" /><path d="M5 16a4 4 0 0 1 4-4h10" /></Icon>;
 /** A spark, for the model provider. */
 export const SparkIcon = (p: IconProps) => <Icon {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" /></Icon>;
+/** A map pin, for showing and hiding threat pins. */
+export const PinIcon = (p: IconProps) => <Icon {...p}><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></Icon>;
 /** Two boxes joined left to right, for a layout's direction; rotate it a quarter turn for top to bottom. */
 export const FlowDirectionIcon = (p: IconProps) => <Icon {...p}><rect x="2.5" y="8" width="7" height="8" rx="1.5" /><rect x="14.5" y="8" width="7" height="8" rx="1.5" /><path d="M9.5 12h4.5M12 9.8l2.2 2.2-2.2 2.2" /></Icon>;

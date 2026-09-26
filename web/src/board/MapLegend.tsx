@@ -8,12 +8,26 @@ import { SEVERITIES } from "./severity.ts";
 // =============================================================================
 // The map key: what each shape, line and mark on the whiteboard means, so no
 // part of the drawing relies on color alone. It always sits on the canvas; a
-// reader can fold it down to its title when it covers part of the map.
+// reader can fold it down to its title when it covers part of the map, and it
+// stays folded on later boards. On a draft it also explains inferred parts.
 
-/** The map key card, open by default and foldable, never removed. */
-export function MapLegend() {
-  const [folded, setFolded] = useState(false);
+const FOLDED_KEY = "legend-folded";
+
+/** The map key card, open until a reader folds it, never removed. */
+export function MapLegend({ draft }: { draft: boolean }) {
+  // Someone who folded it once has read it; later boards open with the map in full view.
+  const [folded, setFolded] = useState(readFolded);
   const listId = useId();
+  const toggle = () => {
+    setFolded((was) => {
+      try {
+        localStorage.setItem(FOLDED_KEY, was ? "0" : "1");
+      } catch {
+        // Not remembering the choice is harmless.
+      }
+      return !was;
+    });
+  };
   return (
     <aside className={`map-legend${folded ? " is-folded" : ""}`} aria-label="Map key">
       <div className="map-legend-head">
@@ -23,7 +37,7 @@ export function MapLegend() {
           className="btn btn-ghost btn-sm"
           aria-expanded={!folded}
           aria-controls={listId}
-          onClick={() => setFolded((was) => !was)}
+          onClick={toggle}
         >
           {folded ? "Show" : "Fold"}
         </button>
@@ -77,6 +91,14 @@ export function MapLegend() {
             </svg>
             Ring: AI part with the lethal trifecta
           </li>
+          {draft && (
+            <li>
+              <svg viewBox="0 0 40 24" aria-hidden="true">
+                <rect x="2" y="3" width="36" height="18" rx="8" className="legend-stroke legend-inferred" />
+              </svg>
+              Faint outline: inferred, check it
+            </li>
+          )}
           <li className="legend-pins">
             {SEVERITIES.map((severity, i) => (
               <span key={severity} className="legend-pin">
@@ -90,4 +112,13 @@ export function MapLegend() {
       </div>
     </aside>
   );
+}
+
+function readFolded(): boolean {
+  try {
+    return localStorage.getItem(FOLDED_KEY) === "1";
+  } catch {
+    // Storage can be blocked in private windows; the key just starts open.
+    return false;
+  }
 }
