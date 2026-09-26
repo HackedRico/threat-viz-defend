@@ -2,15 +2,17 @@ import type { Ref } from "react";
 
 import type { ConfigOut } from "../api/types.ts";
 import { ArrowRightIcon, ArrowUpRightIcon, SparkIcon } from "../shell/icons.tsx";
+import { Pitch } from "./Pitch.tsx";
 import { ViewLink } from "./ViewLink.tsx";
 import "./Landing.css";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
-// The home page a signed-out visitor sees first: the pitch, the ways in, and
-// `SampleScan`, a picture of a scan that finds a command injection path. The
-// sample is fixed markup, never a live scan, and says so on the page.
+// The home page a signed-out visitor sees first: the hero with the ways in and
+// `SampleScan`, a picture of a scan that finds a command injection path, then
+// the longer `Pitch` below it. The sample is fixed markup, never a live scan,
+// and says so on the page.
 
 type Tone = "keyword" | "declare" | "string";
 
@@ -31,39 +33,45 @@ const SAMPLE: CodeLine[] = [
 export function Landing({ config, headingRef }: { config: ConfigOut; headingRef: Ref<HTMLHeadingElement> }) {
   const open = config.signup_open;
   return (
-    <section className="landing" aria-labelledby="landing-title">
-      <div className="landing-copy">
-        <p className="auth-caps auth-eyebrow">
-          <span className="auth-eyebrow-line" aria-hidden="true" />
-          Make code risks visible
-        </p>
-        <h1 id="landing-title" ref={headingRef} tabIndex={-1} className="landing-title">
-          See the code.
-          <br />
-          <em>Understand the threat.</em>
-        </h1>
-        <p className="landing-lead">
-          Give it your code or design docs and see a clear diagram of what it does. Follow how data moves through the
-          system, where a possible vulnerability appears, and what could happen next. Then answer questions until you
-          can defend it.
-        </p>
-        <div className="landing-actions">
-          {open && (
-            <ViewLink view="signup" className="btn auth-button auth-button-primary">
-              Create an account <ArrowUpRightIcon />
+    <>
+      <section className="landing" aria-labelledby="landing-title">
+        <div className="landing-copy">
+          <p className="auth-caps auth-eyebrow">
+            <span className="auth-eyebrow-line" aria-hidden="true" />
+            Threat models for AI-written code
+          </p>
+          <h1 id="landing-title" ref={headingRef} tabIndex={-1} className="landing-title">
+            See the code.
+            <br />
+            <em>Understand the threat.</em>
+          </h1>
+          <p className="landing-lead">
+            Your coding agent wrote it. Now see how it works: a map of how data moves through your system, the threats
+            pinned to it, and a quiz that checks you can defend it at a whiteboard. Add your code once, or connect Claude
+            Code or Cursor so the map keeps up as you build.
+          </p>
+          <div className="landing-actions">
+            {open && (
+              <ViewLink view="signup" className="btn auth-button auth-button-primary">
+                Create an account <ArrowUpRightIcon />
+              </ViewLink>
+            )}
+            <ViewLink view="signin" className={`btn auth-button ${open ? "" : "auth-button-primary"}`}>
+              Sign in {!open && <ArrowUpRightIcon />}
             </ViewLink>
-          )}
-          <ViewLink view="signin" className={`btn auth-button ${open ? "" : "auth-button-primary"}`}>
-            Sign in {!open && <ArrowUpRightIcon />}
-          </ViewLink>
+          </div>
+          <p className="landing-note">
+            <SparkIcon className="landing-note-icon" />
+            {open ? "Create an account with the invite code from the organizers." : "New accounts are closed right now."}
+          </p>
+          <a className="landing-more" href="#how">
+            See how it works <ArrowRightIcon className="landing-more-icon" />
+          </a>
         </div>
-        <p className="landing-note">
-          <SparkIcon className="landing-note-icon" />
-          {open ? "Create an account with the invite code from the organizers." : "New accounts are closed right now."}
-        </p>
-      </div>
-      <SampleScan />
-    </section>
+        <SampleScan />
+      </section>
+      <Pitch config={config} />
+    </>
   );
 }
 

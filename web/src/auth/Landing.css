@@ -384,3 +384,24 @@
     animation: none;
   }
 }
+
+.landing-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.landing-more:hover {
+  text-decoration: underline;
+}
+
+.landing-more-icon {
+  width: 14px;
+  height: 14px;
+  transform: rotate(90deg);
+}
