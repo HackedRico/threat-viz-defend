@@ -144,7 +144,10 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
 
         def work(user_id: str) -> str:
             answer = services.boards.ask(user_id, board_id, question[:2000], None)
-            return answer.answer + (f"\nRelated ids: {', '.join(answer.highlight)}" if answer.highlight else "")
+            # A line break in the model's answer could forge the `Related ids` line, so the agent gets it on one
+            # line. The web app gets the answer with its breaks, since it shows them as plain text paragraphs.
+            ids = f"\nRelated ids: {', '.join(answer.highlight)}" if answer.highlight else ""
+            return " ".join(answer.answer.split()) + ids
 
         return await _as_user(work)
 
