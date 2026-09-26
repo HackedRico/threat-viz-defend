@@ -116,7 +116,11 @@ class OpenAICompatibleLlm:
         choice = response.choices[0] if response.choices else None
         content = choice.message.content if choice else None
         if choice is not None and choice.finish_reason == "length":
-            raise LlmError("bad_output", f"{self._label} ran out of output tokens. Try less material at once.")
+            # The user cannot change the cap, so the operator hint goes to the log and the user gets what they can do.
+            log.warning(
+                "[llm] %s hit the output cap of %s tokens; raise `LLM_MAX_TOKENS`.", self._label, self._max_tokens
+            )
+            raise LlmError("bad_output", f"{self._label} ran out of output tokens. Try again, or pick another model.")
         if choice is not None and getattr(choice.message, "refusal", None):
             raise LlmError("refused", f"{self._label} declined to answer. Rephrase, or try another model.")
         if not content:

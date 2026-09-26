@@ -7,6 +7,7 @@ import pytest
 
 from app.analysis.analyst import LlmAnalyst
 from app.analysis.prompts import fence, find_threats_content, neutralize
+from app.config import load_settings
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.llm.base import LlmError, LlmRequest, parse_json, strict_schema
 from app.llm.openai_compat import OpenAICompatibleLlm
@@ -27,6 +28,8 @@ class _Completions:
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
+        if isinstance(reply, SimpleNamespace):
+            return reply
         message = SimpleNamespace(content=reply, refusal=None)
         return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
 
@@ -99,6 +102,19 @@ def test_no_cap_sends_neither_field() -> None:
     llm.generate(REQUEST)
     assert "max_tokens" not in calls.calls[0]
     assert "max_completion_tokens" not in calls.calls[0]
+
+
+def test_a_blank_cap_defaults_to_16k_and_zero_leaves_it_to_the_provider() -> None:
+    assert load_settings({}).llm_max_tokens == 16_384
+    assert load_settings({"LLM_MAX_TOKENS": "0"}).llm_max_tokens is None
+    assert load_settings({"LLM_MAX_TOKENS": "8000"}).llm_max_tokens == 8000
+
+
+def test_hitting_the_cap_does_not_blame_the_material() -> None:
+    truncated = SimpleNamespace(content='{"verdict": "cut', refusal=None)
+    llm, _ = scripted(SimpleNamespace(choices=[SimpleNamespace(message=truncated, finish_reason="length")]))
+    with pytest.raises(LlmError, match="Try again, or pick another model"):
+        llm.generate(REQUEST)
 
 
 def test_auth_errors_name_the_variable_to_fix() -> None:

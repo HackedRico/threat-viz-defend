@@ -52,7 +52,7 @@ class Settings:
     llm_model: str | None = None
     llm_json_mode: JsonMode = "json_schema"
     llm_timeout_s: float = 120.0
-    llm_max_tokens: int | None = None
+    llm_max_tokens: int | None = 16_384
     daily_model_calls: int = 60
     model_calls_per_minute: int = 6
     global_daily_model_calls: int = 3000
@@ -188,7 +188,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         llm_model=_text(env, "LLM_MODEL"),
         llm_json_mode=json_mode,
         llm_timeout_s=float(_int(env, "LLM_TIMEOUT_S", 120, low=5, high=600)),
-        llm_max_tokens=_int(env, "LLM_MAX_TOKENS", 0, low=0, high=200_000) or None,
+        # Some providers stop at 4096 unless asked, which a reasoning model can spend before it finishes a threat list.
+        llm_max_tokens=_int(env, "LLM_MAX_TOKENS", 16_384, low=0, high=200_000) or None,
         daily_model_calls=_int(env, "DAILY_MODEL_CALLS", 60, low=0, high=100_000),
         model_calls_per_minute=_int(env, "MODEL_CALLS_PER_MINUTE", 6, low=1, high=1000),
         global_daily_model_calls=_int(env, "GLOBAL_DAILY_MODEL_CALLS", 3000, low=0, high=10_000_000),
