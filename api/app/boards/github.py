@@ -1,7 +1,7 @@
 import io
 import re
 import tarfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import httpx
@@ -62,7 +62,11 @@ def fetch_repo(ref: RepoRef, now: datetime, client: httpx.Client | None = None) 
     finally:
         if own_client:
             http.close()
-    return build_material(_text_files(archive), now)
+    material = build_material(_text_files(archive), now)
+    # The sidebar lists the repository once, by name, rather than as an anonymous code folder.
+    total = sum(int(source["bytes"]) for source in material.sources)
+    source = {**material.sources[0], "name": ref.label, "kind": "github", "bytes": total} if material.sources else None
+    return replace(material, sources=[source] if source else [])
 
 
 def _download(http: httpx.Client, ref: RepoRef) -> bytes:
