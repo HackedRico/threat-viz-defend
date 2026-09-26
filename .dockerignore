@@ -1,0 +1,41 @@
+# Only api/ and web/ go into the images. Everything else stays out of the build context.
+
+# Version control and tooling
+.git
+.github
+.do
+.claude
+.idea
+.vscode
+**/.DS_Store
+*.log
+
+# Secrets and local data
+.env
+.env.*
+**/.env
+**/.env.*
+**/data
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+api/tests
+
+# Node
+**/node_modules
+web/dist
+web/public/vendor
+
+# Not part of the images
+docs
+integrations
+scripts
+docker-compose.yml

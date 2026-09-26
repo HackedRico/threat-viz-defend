@@ -1,0 +1,142 @@
+# DigitalOcean App Platform spec for ThreatViz Defend.
+#
+# Replace every example.com with your domain before creating the app.
+# Secrets (type: SECRET) have no value here on purpose: set them in the
+# control panel, never in this file, because the repo is public.
+# See docs/deploy.md for the full walkthrough.
+#
+#   doctl apps spec validate .do/app.yaml
+#   doctl apps create --spec .do/app.yaml
+
+name: threatviz-defend
+region: nyc
+
+domains:
+  - domain: api.example.com
+    type: PRIMARY
+  - domain: app.example.com
+    type: ALIAS
+
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+ingress:
+  rules:
+    # api.example.com goes to the API, app.example.com to the static site.
+    - match:
+        authority:
+          exact: api.example.com
+        path:
+          prefix: /
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        authority:
+          exact: app.example.com
+        path:
+          prefix: /
+      component:
+        name: web
+    # Anything else, such as the default *.ondigitalocean.app hostname, gets the static site.
+    - match:
+        path:
+          prefix: /
+      component:
+        name: web
+
+services:
+  - name: api
+    github:
+      repo: HackedRico/threat-viz-defend
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    dockerfile_path: Dockerfile
+    http_port: 8080
+    instance_size_slug: apps-s-1vcpu-1gb
+    instance_count: 1
+    health_check:
+      http_path: /api/health
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 3
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      # Server
+      - key: APP_ENV
+        scope: RUN_TIME
+        value: production
+      - key: PUBLIC_ORIGIN
+        scope: RUN_TIME
+        value: https://api.example.com
+      - key: CORS_ORIGINS
+        scope: RUN_TIME
+        value: https://app.example.com
+      - key: TRUST_PROXY
+        scope: RUN_TIME
+        value: "true"
+      - key: COOKIE_SAMESITE
+        scope: RUN_TIME
+        value: lax
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+      # Security and accounts
+      - key: APP_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: INVITE_CODES
+        scope: RUN_TIME
+        type: SECRET
+      - key: MAX_USERS
+        scope: RUN_TIME
+        value: "300"
+      # Model provider default; users can also bring their own in the app
+      - key: LLM_BASE_URL
+        scope: RUN_TIME
+        value: https://inference.do-ai.run/v1
+      - key: LLM_MODEL
+        scope: RUN_TIME
+        value: openai-gpt-oss-120b
+      - key: LLM_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      # Backboard
+      - key: BACKBOARD_BASE_URL
+        scope: RUN_TIME
+        value: https://app.backboard.io/api
+      # Voice coach
+      - key: ELEVENLABS_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: ELEVENLABS_AGENT_ID
+        scope: RUN_TIME
+        value: ""
+      # Budgets
+      - key: DAILY_MODEL_CALLS
+        scope: RUN_TIME
+        value: "60"
+
+static_sites:
+  - name: web
+    github:
+      repo: HackedRico/threat-viz-defend
+      branch: main
+      deploy_on_push: true
+    source_dir: web
+    build_command: npm run build
+    output_dir: dist
+    catchall_document: index.html
+    envs:
+      - key: VITE_API_BASE_URL
+        scope: BUILD_TIME
+        value: https://api.example.com
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    production: false
