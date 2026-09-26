@@ -33,7 +33,13 @@ It is a hosted, invite-only web app. Coding agents such as Claude Code and Curso
 
 You need Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 24.
 
-Start the API on port 8000:
+One command starts both halves, creates `.env` on the first run and installs what is missing:
+
+```sh
+./scripts/dev.sh
+```
+
+Or run each half in its own terminal. Start the API on port 8000:
 
 ```sh
 cp .env.example .env          # once; the API reads the repo-root .env on its own

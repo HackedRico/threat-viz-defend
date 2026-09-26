@@ -5,6 +5,8 @@ ThreatViz Defend is two programs in two languages. `api/` is a Python FastAPI se
 ## Commands
 
 ```bash
+./scripts/dev.sh                                               # from the repo root: API on :8000 and web on :5173, Ctrl+C stops both
+
 # api/ (Python 3.12, uv)
 uv sync                                                        # install
 uv run uvicorn app.main:app_from_env --factory --port 8000     # dev server, demo mode, invite code local-dev
