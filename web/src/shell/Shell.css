@@ -11,6 +11,14 @@
   overflow: hidden;
 }
 
+/* The sidebar's drag handle lives in the shell, beside the sidebar, so the sidebar's
+   overflow cannot clip it. */
+.shell > .resize-handle {
+  left: calc(var(--sidebar-width) - 8px);
+  right: auto;
+  z-index: 41;
+}
+
 .shell-main {
   flex: 1;
   min-width: 0;

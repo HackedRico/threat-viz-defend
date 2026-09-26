@@ -1,0 +1,62 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The draggable edge on the sidebar and the side panel. It is a thin strip over
+   the pane's border that shows an accent line on hover, focus and drag. */
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resize-handle.edge-right {
+  right: 0;
+}
+
+.resize-handle.edge-left {
+  left: 0;
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.resize-handle.edge-right::after {
+  right: 0;
+}
+
+.resize-handle.edge-left::after {
+  left: 0;
+}
+
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after,
+.resize-handle.is-dragging::after {
+  opacity: 1;
+}
+
+.resize-handle:focus-visible {
+  outline: none;
+}
+
+body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* Width follows the pointer directly while dragging, not through the collapse animation. */
+body.is-resizing .sidebar {
+  transition: none;
+}

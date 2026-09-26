@@ -125,7 +125,7 @@ export function Sidebar({
   };
 
   return (
-    <nav className={`sidebar ${collapsed ? "is-collapsed" : ""}`} aria-label="Boards">
+    <nav id="sidebar" className={`sidebar ${collapsed ? "is-collapsed" : ""}`} aria-label="Boards">
       <div className="sidebar-head">
         {!collapsed && (
           <a
