@@ -7,6 +7,8 @@ import { parseRoute, routePath, type Route } from "./route.ts";
 // =============================================================================
 // Binds `Route` to the browser history. `useRoute` re-renders on back and
 // forward and on `navigate`, which pushes a new entry without a page load.
+// `usePathname` and `navigatePath` do the same with a bare path, for the
+// screens shown before signing in.
 
 const CHANGE = "routechange";
 
@@ -29,9 +31,19 @@ export function useRoute(): Route {
   return parseRoute(pathname ?? "/", search ? `?${search}` : "");
 }
 
+/** The URL path without its query string, kept in step with the URL. */
+export function usePathname(): string {
+  const url = useSyncExternalStore(subscribe, snapshot);
+  return url.split("?")[0] ?? "/";
+}
+
 /** Go to `route`; `replace` swaps the current history entry instead of adding one. */
 export function navigate(route: Route, replace = false): void {
-  const path = routePath(route);
+  navigatePath(routePath(route), replace);
+}
+
+/** Go to a path such as `/signin`; `replace` swaps the current history entry instead of adding one. */
+export function navigatePath(path: string, replace = false): void {
   if (path === snapshot()) return;
   if (replace) history.replaceState(null, "", path);
   else history.pushState(null, "", path);

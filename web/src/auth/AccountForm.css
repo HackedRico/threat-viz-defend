@@ -1,0 +1,160 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   An account form: the form on the left, and on the right a panel with a big
+   bracket glyph and a motto. The panel drops away on narrow screens. */
+
+.account {
+  width: 100%;
+  max-width: 1550px;
+  min-height: calc(100vh - 151px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: 8vw;
+  padding: clamp(30px, 5vw, 75px) clamp(var(--space-5), 6vw, 104px);
+}
+
+.account-panel {
+  width: 100%;
+  max-width: 490px;
+}
+
+.account-title {
+  margin-bottom: var(--space-4);
+  font-size: clamp(38px, 4vw, 60px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.account-lead {
+  max-width: 460px;
+  margin-bottom: 38px;
+  color: var(--ink-soft);
+  line-height: 1.75;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.account-form .field-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.account-form .input {
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+}
+
+.account-password {
+  position: relative;
+}
+
+.account-password .input {
+  padding-right: 72px;
+}
+
+/* Centered by offset, not transform, so the pressed nudge every button gets does not move it. */
+.account-reveal {
+  position: absolute;
+  top: 12px;
+  right: 8px;
+}
+
+.account-error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--danger);
+  background: var(--marker-red-wash);
+  font-size: var(--text-sm);
+}
+
+.account-submit {
+  width: 100%;
+  margin-top: 3px;
+}
+
+.account-switch {
+  margin-top: 23px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.account-switch a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.account-switch a:hover {
+  text-decoration: underline;
+}
+
+.account-side {
+  position: relative;
+  min-height: 490px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(circle at 50% 42%, var(--accent-wash), transparent 62%),
+    var(--surface);
+  box-shadow: var(--shadow-2);
+}
+
+.account-side-index {
+  color: var(--accent);
+}
+
+.account-side-glyph {
+  color: var(--accent);
+  font-size: clamp(78px, 11vw, 180px);
+  font-weight: 700;
+  letter-spacing: -0.15em;
+  text-align: center;
+  text-shadow: 0 0 80px color-mix(in srgb, var(--accent) 45%, transparent);
+  white-space: nowrap;
+}
+
+.account-side-motto {
+  color: var(--ink-soft);
+  font-size: 18px;
+}
+
+.honeypot {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 850px) {
+  .account {
+    grid-template-columns: 1fr;
+  }
+  .account-side {
+    display: none;
+  }
+  .account-panel {
+    margin: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .account {
+    padding-top: 60px;
+    padding-bottom: 60px;
+  }
+}

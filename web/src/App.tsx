@@ -11,8 +11,8 @@ import "./App.css";
 // Module Overview
 // =============================================================================
 // The top of the app: loads the deployment config and the current user, then
-// shows the sign in screen or the signed-in `Shell`. Any call that finds the
-// session gone drops back to sign in.
+// shows the signed-out screens or the signed-in `Shell`. Any call that finds
+// the session gone drops back to sign in; signing out goes to the home page.
 
 type Load = { state: "loading" } | { state: "failed"; message: string } | { state: "ready"; config: ConfigOut };
 
@@ -56,6 +56,8 @@ export function App() {
     try {
       await api.logout();
     } finally {
+      // Only a deliberate sign out goes home; an expired session keeps its path, so signing in again returns there.
+      history.replaceState(null, "", "/");
       setMe(null);
     }
   }, []);
