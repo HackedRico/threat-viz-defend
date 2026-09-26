@@ -1,13 +1,14 @@
 import type { Threat } from "../api/types.ts";
-import type { MapLayout } from "./layout.ts";
+import type { Box, MapLayout } from "./layout.ts";
 import { rankThreats } from "./severity.ts";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
-// Where each threat's numbered pin sits: along the top right edge of its node,
-// or just after its flow's label. Pins on one element line up worst first, so
-// the most severe pin is always the one nearest the corner.
+// Where each threat's numbered pin sits: on the top right corner of its node,
+// or beside its flow's label, on whichever side is clear of nodes, labels and
+// other pins. Pins on one element line up worst first, so the most severe pin
+// is always the one nearest the corner or the label.
 
 /** One pin on the canvas. */
 export interface Pin {
@@ -18,29 +19,61 @@ export interface Pin {
 }
 
 /** Spacing between pins that share an element. */
-export const PIN_STEP = 22;
+export const PIN_STEP = 28;
 
-/** Pin positions for every threat whose element is on the canvas. */
+/** Gap between a flow's label and the center of its first pin, so a pin never covers the label. */
+export const LABEL_GAP = 16;
+
+// How far a pin reaches from its center: the widest severity shape plus its outline.
+const PIN_REACH = 13;
+// Pins sit just inside a node's corner, so the corner itself still shows which node they are on.
+const CORNER_INSET = 4;
+
+/** Pin positions for every threat whose element is on the canvas, worst first, as the threat list orders them. */
 export function placePins(threats: readonly Threat[], layout: MapLayout): Pin[] {
-  const perElement = new Map<string, number>();
-  const pins: Pin[] = [];
-  for (const threat of rankThreats(threats)) {
-    const slot = perElement.get(threat.element) ?? 0;
-    const node = layout.nodes[threat.element];
-    const label = layout.edges[threat.element]?.label;
-    let x: number;
-    let y: number;
+  const ranked = rankThreats(threats);
+  const byElement = new Map<string, Threat[]>();
+  for (const threat of ranked) byElement.set(threat.element, [...(byElement.get(threat.element) ?? []), threat]);
+
+  const taken: Box[] = [
+    ...Object.values(layout.nodes),
+    ...Object.values(layout.boundaryLabels),
+    ...Object.values(layout.edges).flatMap((route) => (route.label ? [route.label] : [])),
+  ];
+  const placed = new Map<string, Pin>();
+  for (const [element, onIt] of byElement) {
+    const node = layout.nodes[element];
+    const label = layout.edges[element]?.label;
+    let spots: Array<{ x: number; y: number }>;
     if (node) {
-      x = node.x + node.width - 6 - slot * PIN_STEP;
-      y = node.y - 2;
+      spots = onIt.map((_, slot) => ({ x: node.x + node.width - CORNER_INSET - slot * PIN_STEP, y: node.y }));
     } else if (label) {
-      x = label.x + label.width + 12 + slot * PIN_STEP;
-      y = label.y + label.height / 2;
+      const y = label.y + label.height / 2;
+      const after = onIt.map((_, slot) => ({ x: label.x + label.width + LABEL_GAP + slot * PIN_STEP, y }));
+      const before = onIt.map((_, slot) => ({ x: label.x - LABEL_GAP - slot * PIN_STEP, y }));
+      // After the label reads first, so it wins a tie; the side before it is for when that is crowded.
+      spots = clash(before, taken) < clash(after, taken) ? before : after;
     } else {
       continue;
     }
-    perElement.set(threat.element, slot + 1);
-    pins.push({ threat, x, y, number: threat.id.replace(/\D/g, "") || threat.id });
+    onIt.forEach((threat, slot) => {
+      const spot = spots[slot]!;
+      placed.set(threat.id, { threat, ...spot, number: threat.id.replace(/\D/g, "") || threat.id });
+      taken.push(reachOf(spot));
+    });
   }
-  return pins;
+  // Tab order follows the ranking, so moving through the pins reads the threat list in order.
+  return ranked.flatMap((threat) => placed.get(threat.id) ?? []);
+}
+
+function clash(spots: ReadonlyArray<{ x: number; y: number }>, taken: readonly Box[]): number {
+  return spots.reduce((sum, spot) => sum + taken.filter((box) => overlaps(reachOf(spot), box)).length, 0);
+}
+
+function reachOf(spot: { x: number; y: number }): Box {
+  return { x: spot.x - PIN_REACH, y: spot.y - PIN_REACH, width: PIN_REACH * 2, height: PIN_REACH * 2 };
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }

@@ -1,9 +1,20 @@
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
-import { FitIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
+import { FitIcon, FlowDirectionIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
 import { STRIDE } from "./severity.ts";
-import { clip, roundedPath, TECH_MAX, trimEnd, type Box, type MapLayout } from "./layout.ts";
+import {
+  clip,
+  FLOW_LABEL_MAX,
+  LINE_HEIGHT,
+  nodeText,
+  pickDirection,
+  roundedPath,
+  trimEnd,
+  type Box,
+  type Direction,
+  type MapLayouts,
+} from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
 import { MapLegend } from "./MapLegend.tsx";
 import { placePins, type Pin } from "./pins.ts";
@@ -15,11 +26,11 @@ import "./MapCanvas.css";
 // =============================================================================
 // Module Overview
 // =============================================================================
-// The whiteboard itself: trust boundaries, nodes and flows drawn as SVG from a
-// `MapLayout`, with threat pins, lethal trifecta rings, crossing flows and
-// highlights on top. The view pans and zooms by pointer, wheel and keyboard;
-// every element is focusable and selects on Enter, so the map works without a
-// mouse.
+// The whiteboard itself: trust boundaries, nodes and flows drawn as SVG from
+// the `MapLayouts`, top to bottom or left to right, whichever shows larger in
+// the canvas, with threat pins, lethal trifecta rings, crossing flows and
+// highlights on top. The view pans and zooms by pointer, wheel and keyboard, and
+// every element is focusable and selects on Enter, so the map works without a mouse.
 
 interface View {
   x: number;
@@ -28,20 +39,23 @@ interface View {
 }
 
 const MIN_ZOOM = 0.2;
-// Below this scale node labels drop under about 11px; the opening view stops here and centers
-// on what matters instead of shrinking a wide map into an unreadable strip.
-const READABLE_ZOOM = 0.55;
+// Below this scale node labels drop under about 9px; the opening view stops here and centers
+// on what matters instead of shrinking a large map into an unreadable strip. Above it, seeing
+// the whole map at once is worth a slightly smaller hand.
+const READABLE_ZOOM = 0.45;
 const MAX_ZOOM = 2.4;
 const FIT_PAD = 36;
 const PAN_STEP = 60;
 const DRAG_THRESHOLD = 4;
+// Space between the first line of a node's name and its tech line.
+const TECH_GAP = 20;
 
 const KIND_WORD: Record<MapNode["kind"], string> = { external: "external entity", process: "process", store: "data store" };
 
 /** Everything the canvas draws. */
 export interface MapCanvasProps {
   map: SystemMap;
-  layout: MapLayout;
+  layouts: MapLayouts;
   layoutKey: string;
   threats: readonly Threat[];
   exposure: readonly ExposureOut[];
@@ -58,16 +72,18 @@ function clampZoom(k: number): number {
 }
 
 /** The map canvas with pan, zoom, selection and highlights. */
-export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings, diff, lit, draft, focus }: MapCanvasProps) {
+export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossings, diff, lit, draft, focus }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [direction, setDirection] = useState<Direction | null>(null);
   const moved = useRef(false);
   const drag = useRef<{ id: number; startX: number; startY: number; view: View; dragging: boolean } | null>(null);
   const selected = useBoardUi((s) => s.selected);
   const select = useBoardUi((s) => s.select);
   const showThreat = useBoardUi((s) => s.showThreat);
   const hintId = useId();
+  const layout = layouts[direction ?? "DOWN"];
 
   // ---------- fitting and resizing ----------
 
@@ -95,6 +111,21 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
     return () => observer.disconnect();
   }, []);
 
+  // Each new canvas size picks the direction that shows the map largest, as opening or closing
+  // the side panel reshapes it, until the reader pans, zooms or turns the map themselves. A new
+  // map keeps the direction, so an update from a coding agent never flips the board around.
+  // Layout effects run this and the fit below before the browser paints, so no frame shows the
+  // map unfitted at full size.
+  const pickedFor = useRef<{ width: number; height: number } | null>(null);
+  const turned = useRef(false);
+  useLayoutEffect(() => {
+    if (size.width === 0 || size.height === 0) return;
+    const resized = pickedFor.current?.width !== size.width || pickedFor.current?.height !== size.height;
+    if (!resized || turned.current || (direction !== null && moved.current)) return;
+    pickedFor.current = size;
+    setDirection(pickDirection(layouts, size.width - FIT_PAD * 2, size.height - FIT_PAD * 2));
+  }, [direction, layouts, size]);
+
   const openingView = useCallback((): View | null => {
     const fitted = fitView();
     if (fitted === null || fitted.k >= READABLE_ZOOM) return fitted;
@@ -105,9 +136,10 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
     return { k, x: size.width / 2 - cx * k, y: size.height / 2 - cy * k };
   }, [fitView, focus, layout, size]);
 
-  // Reset the view on a new structure or a resize, unless the user has already moved it themselves.
+  // Reset the view on a new structure, a new direction or a resize, unless the user has already moved it themselves.
   const fittedKey = useRef<string | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (direction === null) return;
     if (fittedKey.current !== layoutKey || !moved.current) {
       const next = openingView();
       if (next) {
@@ -116,7 +148,13 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
         moved.current = false;
       }
     }
-  }, [layoutKey, openingView]);
+  }, [direction, layoutKey, openingView]);
+
+  const turn = () => {
+    turned.current = true;
+    moved.current = false;
+    setDirection((was) => (was === "RIGHT" ? "DOWN" : "RIGHT"));
+  };
 
   // ---------- zoom and pan ----------
 
@@ -250,6 +288,7 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
   );
 
   const litState = (id: string): "lit" | "dim" | "" => (lit === null ? "" : lit.has(id) ? "lit" : "dim");
+  const turnLabel = direction === "RIGHT" ? "Lay out top to bottom" : "Lay out left to right";
 
   return (
     <div
@@ -283,65 +322,74 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
             <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-selected" />
           </marker>
         </defs>
-        <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-          {map.boundaries.map((boundary) => {
-            const box = layout.boundaries[boundary.id];
-            return box ? <BoundaryShape key={boundary.id} id={boundary.id} label={boundary.label} box={box} /> : null;
-          })}
+        {/* Nothing is drawn until the first measure picks a direction, so the map never flashes the other way round. */}
+        {direction !== null && (
+          <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+            {map.boundaries.map((boundary) => {
+              const box = layout.boundaries[boundary.id];
+              return box ? <BoundaryShape key={boundary.id} id={boundary.id} box={box} /> : null;
+            })}
 
-          {map.flows.map((flow) => {
-            const route = layout.edges[flow.id];
-            if (!route || route.points.length < 2) return null;
-            return (
-              <FlowShape
-                key={flow.id}
-                flow={flow}
-                points={route.points}
-                label={route.label}
-                sourceLabel={nodeLabels.get(flow.source) ?? flow.source}
-                targetLabel={nodeLabels.get(flow.target) ?? flow.target}
-                crossing={crossingSet.has(flow.id)}
-                selected={selected === flow.id}
-                state={litState(flow.id)}
-                diffTag={added.has(flow.id) ? "new" : changed.has(flow.id) ? "edited" : null}
-                threatCount={threatsOn.get(flow.id) ?? 0}
-                onActivate={activate}
-                onReveal={reveal}
+            {map.flows.map((flow) => {
+              const route = layout.edges[flow.id];
+              if (!route || route.points.length < 2) return null;
+              return (
+                <FlowShape
+                  key={flow.id}
+                  flow={flow}
+                  points={route.points}
+                  label={route.label}
+                  sourceLabel={nodeLabels.get(flow.source) ?? flow.source}
+                  targetLabel={nodeLabels.get(flow.target) ?? flow.target}
+                  crossing={crossingSet.has(flow.id)}
+                  selected={selected === flow.id}
+                  state={litState(flow.id)}
+                  diffTag={added.has(flow.id) ? "new" : changed.has(flow.id) ? "edited" : null}
+                  threatCount={threatsOn.get(flow.id) ?? 0}
+                  onActivate={activate}
+                  onReveal={reveal}
+                />
+              );
+            })}
+
+            {/* Boundary names sit over the lines, so a flow that must cross one never strikes through it. */}
+            {map.boundaries.map((boundary) => {
+              const spot = layout.boundaryLabels[boundary.id];
+              return spot ? <BoundaryName key={boundary.id} label={boundary.label} spot={spot} /> : null;
+            })}
+
+            {map.nodes.map((node) => {
+              const box = layout.nodes[node.id];
+              if (!box) return null;
+              return (
+                <NodeShape
+                  key={node.id}
+                  node={node}
+                  box={box}
+                  lethal={lethal.has(node.id)}
+                  selected={selected === node.id}
+                  state={litState(node.id)}
+                  diffTag={added.has(node.id) ? "new" : changed.has(node.id) ? "edited" : null}
+                  threatCount={threatsOn.get(node.id) ?? 0}
+                  onActivate={activate}
+                  onReveal={reveal}
+                />
+              );
+            })}
+
+            {pins.map((pin) => (
+              <PinButton
+                key={pin.threat.id}
+                pin={pin}
+                state={litState(pin.threat.id) || litState(pin.threat.element)}
+                onOpen={() => {
+                  showThreat(pin.threat.id);
+                  select(pin.threat.element);
+                }}
               />
-            );
-          })}
-
-          {map.nodes.map((node) => {
-            const box = layout.nodes[node.id];
-            if (!box) return null;
-            return (
-              <NodeShape
-                key={node.id}
-                node={node}
-                box={box}
-                lethal={lethal.has(node.id)}
-                selected={selected === node.id}
-                state={litState(node.id)}
-                diffTag={added.has(node.id) ? "new" : changed.has(node.id) ? "edited" : null}
-                threatCount={threatsOn.get(node.id) ?? 0}
-                onActivate={activate}
-                onReveal={reveal}
-              />
-            );
-          })}
-
-          {pins.map((pin) => (
-            <PinButton
-              key={pin.threat.id}
-              pin={pin}
-              state={litState(pin.threat.id) || litState(pin.threat.element)}
-              onOpen={() => {
-                showThreat(pin.threat.id);
-                select(pin.threat.element);
-              }}
-            />
-          ))}
-        </g>
+            ))}
+          </g>
+        )}
       </svg>
 
       {draft && (
@@ -351,14 +399,17 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
       )}
 
       <div className="canvas-controls" role="toolbar" aria-label="Map view">
-        <button type="button" className="btn btn-icon" aria-label="Zoom in" onClick={() => zoomAt(1.25, size.width / 2, size.height / 2)}>
+        <button type="button" className="btn btn-icon" aria-label="Zoom in" title="Zoom in" onClick={() => zoomAt(1.25, size.width / 2, size.height / 2)}>
           <ZoomInIcon />
         </button>
-        <button type="button" className="btn btn-icon" aria-label="Zoom out" onClick={() => zoomAt(0.8, size.width / 2, size.height / 2)}>
+        <button type="button" className="btn btn-icon" aria-label="Zoom out" title="Zoom out" onClick={() => zoomAt(0.8, size.width / 2, size.height / 2)}>
           <ZoomOutIcon />
         </button>
-        <button type="button" className="btn btn-icon" aria-label="Fit map to screen" onClick={fit}>
+        <button type="button" className="btn btn-icon" aria-label="Fit map to screen" title="Fit map to screen" onClick={fit}>
           <FitIcon />
+        </button>
+        <button type="button" className="btn btn-icon" aria-label={turnLabel} title={turnLabel} onClick={turn}>
+          <FlowDirectionIcon className={direction === "RIGHT" ? "icon-upright" : undefined} />
         </button>
         <span className="canvas-zoom mono" aria-live="off">
           {Math.round(view.k * 100)}%
@@ -373,7 +424,7 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
 // Shapes
 // =============================================================================
 
-const BoundaryShape = memo(function BoundaryShape({ id, label, box }: { id: string; label: string; box: Box }) {
+const BoundaryShape = memo(function BoundaryShape({ id, box }: { id: string; box: Box }) {
   const strokes = useMemo(() => boundaryOutline(box, id), [box, id]);
   return (
     <g className="boundary">
@@ -381,15 +432,22 @@ const BoundaryShape = memo(function BoundaryShape({ id, label, box }: { id: stri
       {strokes.map((d, i) => (
         <path key={i} d={d} className="boundary-stroke" />
       ))}
-      <text x={box.x + 18} y={box.y + 28} className="boundary-label">
+    </g>
+  );
+});
+
+function BoundaryName({ label, spot }: { label: string; spot: Box }) {
+  return (
+    <g className="boundary-name">
+      <text x={spot.x} y={spot.y + 18} className="boundary-label">
         {label}
       </text>
-      <text x={box.x + 18} y={box.y + 40} className="boundary-kind">
+      <text x={spot.x} y={spot.y + 30} className="boundary-kind">
         trust boundary
       </text>
     </g>
   );
-});
+}
 
 type LitState = "lit" | "dim" | "";
 
@@ -408,10 +466,14 @@ interface NodeShapeProps {
 const NodeShape = memo(function NodeShape({ node, box, lethal, selected, state, diffTag, threatCount, onActivate, onReveal }: NodeShapeProps) {
   const fill = useMemo(() => nodeFill(node.kind, box), [node.kind, box]);
   const strokes = useMemo(() => nodeOutline(node.kind, box, node.id), [node.kind, box, node.id]);
+  const text = useMemo(() => nodeText(node), [node]);
   const external = node.kind === "external";
   const textX = box.x + box.width / 2 + (external ? 10 : 0);
   const midY = box.y + box.height / 2 + (node.kind === "store" ? LID / 2 : 0);
-  const tech = node.tech ? clip(node.tech, TECH_MAX) : null;
+  // Center the name and tech as one block; Caveat sits high in its line, so the block drops 3px with a tech line under it.
+  const block = (text.label.length - 1) * LINE_HEIGHT + (text.tech ? TECH_GAP : 0);
+  const firstY = midY - block / 2 + (text.tech ? 3 : 0);
+  const cut = text.label.join(" ") !== node.label || (node.tech !== null && text.tech !== node.tech);
   const tags = [node.ai ? "AI" : null, node.sensitive ? "sensitive" : null].filter((tag): tag is string => tag !== null);
 
   const describe = [
@@ -444,6 +506,7 @@ const NodeShape = memo(function NodeShape({ node, box, lethal, selected, state, 
       }}
       onFocus={() => onReveal(box)}
     >
+      {cut && <title>{node.tech ? `${node.label} (${node.tech})` : node.label}</title>}
       {state === "lit" && <path d={fill} className="node-highlighter" />}
       {lethal && (
         <g className="trifecta">
@@ -458,12 +521,14 @@ const NodeShape = memo(function NodeShape({ node, box, lethal, selected, state, 
         <path key={i} d={d} className="node-stroke" />
       ))}
       {external && <path d={personGlyph(box.x + 12, box.y + box.height / 2 - 9)} className="node-glyph" />}
-      <text x={textX} y={tech ? midY - 7 : midY} className="node-label">
-        {node.label}
-      </text>
-      {tech && (
-        <text x={textX} y={midY + 13} className="node-tech">
-          {tech}
+      {text.label.map((line, i) => (
+        <text key={i} x={textX} y={firstY + i * LINE_HEIGHT} className="node-label">
+          {line}
+        </text>
+      ))}
+      {text.tech && (
+        <text x={textX} y={firstY + (text.label.length - 1) * LINE_HEIGHT + TECH_GAP} className="node-tech">
+          {text.tech}
         </text>
       )}
       {tags.length > 0 && <NodeTags x={box.x + 8} y={box.y - 9} tags={tags} />}
@@ -533,7 +598,7 @@ const FlowShape = memo(function FlowShape({
   const d = useMemo(() => roundedPath(points, 12), [points]);
   const inner = useMemo(() => (crossing ? roundedPath(trimEnd(points, 9), 12) : null), [crossing, points]);
   const marker = selected ? "url(#arrow-selected)" : crossing ? "url(#arrow-cross)" : "url(#arrow)";
-  const text = clip(flow.label, 28);
+  const text = clip(flow.label, FLOW_LABEL_MAX);
   const describe = [
     `Flow from ${sourceLabel} to ${targetLabel}: ${flow.label}`,
     flow.data ? `carries ${flow.data}` : null,
@@ -562,6 +627,7 @@ const FlowShape = memo(function FlowShape({
       }}
       onFocus={() => onReveal(box)}
     >
+      {text !== flow.label && <title>{flow.label}</title>}
       <path d={d} className="flow-hit" />
       {state === "lit" && <path d={d} className="flow-highlighter" />}
       <path d={d} className="flow-line" markerEnd={marker} />

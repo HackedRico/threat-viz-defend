@@ -62,6 +62,16 @@
   fill: var(--ink-faint);
 }
 
+/* A halo in the board's color masks any flow passing behind the name, so the
+   line breaks around the text instead of striking through it. */
+.boundary-name text {
+  paint-order: stroke;
+  stroke: var(--board);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 /* ---------- nodes ---------- */
 
 .map-node {
@@ -178,12 +188,18 @@
   animation: trifecta-pulse 2.4s ease-in-out infinite;
 }
 
+/* Flows leave an AI part through the side this caption sits on, so it carries
+   the same board colored halo as a boundary name. */
 .trifecta-label {
   font-family: var(--font-hand);
   font-weight: 700;
   font-size: 16px;
   fill: var(--danger);
   text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--board);
+  stroke-width: 5px;
+  stroke-linejoin: round;
 }
 
 @keyframes trifecta-pulse {
@@ -475,6 +491,10 @@
 .canvas-controls .btn[aria-pressed="true"] {
   background: var(--accent-wash);
   color: var(--accent);
+}
+
+.canvas-controls .icon-upright {
+  transform: rotate(90deg);
 }
 
 .canvas-zoom {
