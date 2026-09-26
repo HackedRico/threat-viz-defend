@@ -172,7 +172,7 @@ A ready board opens centered on the element with the worst threat.
 - **Lethal trifecta.** A ring around an AI part. Select it to see "Reads sensitive data from", "Takes untrusted input from" and "Can send data out to".
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".
 - **Highlights.** When something lights up part of the map, a chip names the source, such as "Lit by the answer", with **Clear**.
-- **Hide panel.** The button on the canvas hides or shows the side panel.
+- **Hide panel.** The button at the top right of the canvas hides or shows the side panel.
 - **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag.
 
 ### Ask
