@@ -10,6 +10,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field
+from sqlalchemy.orm import Session
 from starlette.applications import Starlette
 
 from app.boards.ingest import agent_material
@@ -19,6 +20,7 @@ from app.context import Services
 from app.db import utcnow
 from app.domain.briefing import brief
 from app.domain.briefing import describe_element as describe_one
+from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.quiz import build_quiz
 from app.errors import AppError
 from app.schemas import AnswerIn
@@ -121,11 +123,7 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
 
         def work(user_id: str) -> str:
             with services.db.session() as session:
-                row = services.boards.get(session, user_id, board_id)
-                system = read_map(row)
-                if system is None:
-                    raise ToolError("This board has no map yet.")
-                return describe_one(system, read_analysis(row), element_id)
+                return describe_one(*_board_parts(services, session, user_id, board_id), element_id)
 
         return await _as_user(work)
 
@@ -165,7 +163,11 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
 
         def work(user_id: str) -> str:
             with services.db.session() as session:
+                # `Quiz.state` gives a board without a map no questions, which would read as a finished quiz.
+                _board_parts(services, session, user_id, board_id)
                 state = services.quiz.state(session, user_id, board_id)
+            if not state.questions:
+                raise ToolError("This board has no quiz questions yet.")
             pending = [q for q in state.questions if q.id not in state.results]
             if not pending:
                 m = state.mastery
@@ -212,12 +214,17 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
         return await _as_user(work)
 
 
-def _board_parts(services: Services, session: Any, user_id: str, board_id: str) -> tuple[Any, Any]:
-    """A board's map and analysis, or a tool error when it has no map."""
+def _board_parts(
+    services: Services, session: Session, user_id: str, board_id: str
+) -> tuple[SystemMap, ThreatAnalysis | None]:
+    """A board's map and analysis, or a tool error saying how to get a map when it has none."""
     row = services.boards.get(session, user_id, board_id)
     system = read_map(row)
     if system is None:
-        raise ToolError("This board has no map yet.")
+        raise ToolError(
+            "This board has no map yet. "
+            "Try again after the developer adds material and confirms the map in the web app."
+        )
     return system, read_analysis(row)
 
 
