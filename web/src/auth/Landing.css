@@ -1,0 +1,104 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The home page hero: the pitch on the left and the demo board on the right.
+   It stacks on narrow screens. */
+
+.landing {
+  width: 100%;
+  max-width: 1550px;
+  min-height: min(780px, calc(100vh - 151px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+  padding: 50px clamp(var(--space-5), 6vw, 104px);
+  overflow: hidden;
+}
+
+.landing-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-title {
+  margin-bottom: 30px;
+  font-size: clamp(46px, 5.1vw, 82px);
+  font-weight: 700;
+  line-height: 1.07;
+  letter-spacing: -0.045em;
+}
+
+.landing-title em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.landing-lead {
+  max-width: 510px;
+  margin-bottom: 39px;
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+  line-height: 1.75;
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.landing-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 27px;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.landing-note-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--accent);
+}
+
+@media (max-width: 850px) {
+  .landing {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding-top: 75px;
+  }
+}
+
+@media (max-width: 520px) {
+  .landing-title {
+    font-size: 46px;
+  }
+  .landing-actions .auth-button {
+    width: 100%;
+  }
+}
+
+.landing-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.landing-more:hover {
+  text-decoration: underline;
+}
+
+.landing-more-icon {
+  width: 14px;
+  height: 14px;
+  transform: rotate(90deg);
+}
