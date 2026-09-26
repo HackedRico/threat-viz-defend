@@ -6,11 +6,12 @@
 
 .inspector {
   position: absolute;
-  top: 14px;
+  /* Below the panel toggle, which holds the canvas's top right corner. */
+  top: 56px;
   right: 14px;
   z-index: 5;
   width: min(340px, calc(100% - 28px));
-  max-height: calc(100% - 28px);
+  max-height: calc(100% - 70px);
   overflow: auto;
   display: flex;
   flex-direction: column;
