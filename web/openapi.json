@@ -596,6 +596,10 @@
             "title": "Demo Mode",
             "type": "boolean"
           },
+          "dictation_enabled": {
+            "title": "Dictation Enabled",
+            "type": "boolean"
+          },
           "file_policy": {
             "$ref": "#/components/schemas/FilePolicyOut"
           },
@@ -613,10 +617,54 @@
           "analyst",
           "demo_mode",
           "voice_enabled",
+          "dictation_enabled",
           "signup_open",
           "file_policy"
         ],
         "title": "ConfigOut",
+        "type": "object"
+      },
+      "DictationIn": {
+        "additionalProperties": false,
+        "description": "A short recording of a spoken question, base64 encoded because every write is JSON.",
+        "properties": {
+          "audio": {
+            "maxLength": 2000000,
+            "minLength": 1,
+            "title": "Audio",
+            "type": "string"
+          },
+          "audio_type": {
+            "enum": [
+              "audio/webm",
+              "audio/ogg",
+              "audio/mp4",
+              "audio/mpeg",
+              "audio/wav"
+            ],
+            "title": "Audio Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audio",
+          "audio_type"
+        ],
+        "title": "DictationIn",
+        "type": "object"
+      },
+      "DictationOut": {
+        "description": "What was said, for the user to check before sending.",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "DictationOut",
         "type": "object"
       },
       "ErrorBody": {
@@ -1826,6 +1874,14 @@
       "UsageOut": {
         "description": "What the user has spent today against their daily allowance.",
         "properties": {
+          "dictations_limit": {
+            "title": "Dictations Limit",
+            "type": "integer"
+          },
+          "dictations_today": {
+            "title": "Dictations Today",
+            "type": "integer"
+          },
           "model_calls_limit": {
             "title": "Model Calls Limit",
             "type": "integer"
@@ -1847,7 +1903,9 @@
           "model_calls_today",
           "model_calls_limit",
           "voice_sessions_today",
-          "voice_sessions_limit"
+          "voice_sessions_limit",
+          "dictations_today",
+          "dictations_limit"
         ],
         "title": "UsageOut",
         "type": "object"
@@ -5182,7 +5240,7 @@
     },
     "/api/config": {
       "get": {
-        "description": "The app name, what analyzes boards, whether voice and sign up are on, and the upload policy.",
+        "description": "The app name, what analyzes boards, whether voice, dictation and sign up are on, and the upload policy.",
         "operationId": "config_api_config_get",
         "responses": {
           "200": {
@@ -5309,6 +5367,148 @@
         "summary": "Config",
         "tags": [
           "meta"
+        ]
+      }
+    },
+    "/api/dictation": {
+      "post": {
+        "description": "Transcribe one short recording of a question.",
+        "operationId": "dictate_api_dictation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DictationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Dictate",
+        "tags": [
+          "dictation"
         ]
       }
     },
