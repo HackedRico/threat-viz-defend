@@ -260,7 +260,7 @@ def slug_id(raw: str, fallback: str) -> str:
 
 
 def sanitize_map(system: SystemMap) -> SystemMap:
-    """Normalize ids, drop broken references and duplicates, and cap sizes."""
+    """Normalize ids, drop broken references and duplicates, fold text onto one line, and cap sizes."""
     boundaries: list[Boundary] = []
     boundary_ids: dict[str, str] = {}
     for index, boundary in enumerate(system.boundaries[:MAX_BOUNDARIES]):
@@ -268,7 +268,7 @@ def sanitize_map(system: SystemMap) -> SystemMap:
         if new_id in boundary_ids.values():
             continue
         boundary_ids[boundary.id] = new_id
-        boundaries.append(Boundary(id=new_id, label=_clip(boundary.label, MAX_LABEL)))
+        boundaries.append(Boundary(id=new_id, label=_one_line(boundary.label, MAX_LABEL)))
 
     # Nodes and flows share one id space, because threats and highlights point at either kind.
     taken: set[str] = set()
@@ -285,10 +285,10 @@ def sanitize_map(system: SystemMap) -> SystemMap:
             node.model_copy(
                 update={
                     "id": new_id,
-                    "label": _clip(node.label, MAX_LABEL),
-                    "tech": _clip_optional(node.tech, MAX_LABEL),
+                    "label": _one_line(node.label, MAX_LABEL),
+                    "tech": _one_line_optional(node.tech, MAX_LABEL),
                     "boundary": zone,
-                    "evidence": _clip(node.evidence, MAX_TEXT),
+                    "evidence": _one_line(node.evidence, MAX_TEXT),
                 }
             )
         )
@@ -309,9 +309,9 @@ def sanitize_map(system: SystemMap) -> SystemMap:
                     "id": new_id,
                     "source": source,
                     "target": target,
-                    "label": _clip(flow.label, MAX_LABEL),
-                    "data": _clip_optional(flow.data, MAX_TEXT),
-                    "evidence": _clip_optional(flow.evidence, MAX_TEXT),
+                    "label": _one_line(flow.label, MAX_LABEL),
+                    "data": _one_line_optional(flow.data, MAX_TEXT),
+                    "evidence": _one_line_optional(flow.evidence, MAX_TEXT),
                 }
             )
         )
@@ -319,12 +319,12 @@ def sanitize_map(system: SystemMap) -> SystemMap:
     # A boundary with no members would draw as an empty box.
     used = {node.boundary for node in nodes if node.boundary is not None}
     return SystemMap(
-        name=_clip(system.name, MAX_LABEL),
-        summary=_clip(system.summary, MAX_TEXT),
+        name=_one_line(system.name, MAX_LABEL),
+        summary=_one_line(system.summary, MAX_TEXT),
         boundaries=[b for b in boundaries if b.id in used],
         nodes=nodes,
         flows=flows,
-        assumptions=[_clip(a, MAX_TEXT) for a in system.assumptions[:8]],
+        assumptions=[_one_line(a, MAX_TEXT) for a in system.assumptions[:8]],
     )
 
 
@@ -403,8 +403,15 @@ def _clip(text: str, limit: int) -> str:
     return stripped if len(stripped) <= limit else stripped[: limit - 1].rstrip() + "…"
 
 
-def _clip_optional(text: str | None, limit: int) -> str | None:
-    """`_clip` for nullable fields, turning blank text into `None`."""
+def _one_line(text: str, limit: int) -> str:
+    """`_clip` after folding every run of whitespace, line breaks included, into one space."""
+    # Agents read map text line by line in `get_board` and `describe_element`, where a line break
+    # could pose as another id or threat. `str.split()` also breaks on `\r`, `\x85` and U+2028.
+    return _clip(" ".join(text.split()), limit)
+
+
+def _one_line_optional(text: str | None, limit: int) -> str | None:
+    """`_one_line` for nullable fields, turning blank text into `None`."""
     if text is None or not text.strip():
         return None
-    return _clip(text, limit)
+    return _one_line(text, limit)
