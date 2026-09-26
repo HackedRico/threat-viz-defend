@@ -38,7 +38,7 @@ The engine turns material into a map, a confirmed map into threats, and threats 
 | Spoke | Owner | Seam into the engine | What crosses it |
 |---|---|---|---|
 | Diagrams | MD | `BoardOut` in `api/app/schemas.py`, and `DRAFT_MAP_SYSTEM` in `api/app/analysis/prompts.py` | The map to draw, the rules' findings, and the instructions that shape the map |
-| Voice | Eman | `GET /api/boards/{id}/quiz`, `POST .../quiz/answers`, `POST .../voice`, `GET .../brief` | Questions, answers, grades and a short-lived voice token |
+| Voice | Eman | `GET /api/boards/{id}/quiz`, `POST .../quiz/answers`, `POST .../voice`, `GET .../brief`, `POST /api/dictation` | Questions, answers, grades, a short-lived voice token, and dictated text |
 | Hosting | Jonathan | `api/app/config.py` settings and `/api/health` | Environment variables in, a health check out |
 | Coding agents | Ricky | `/mcp` tools and `POST /api/agent/boards/{id}/changes` | Diffs and summaries in, board facts out |
 | Model providers | Ricky | The `Llm` protocol in `api/app/llm/base.py` | One structured request in, one validated object out |

@@ -108,17 +108,23 @@ services:
       - key: BACKBOARD_BASE_URL
         scope: RUN_TIME
         value: https://app.backboard.io/api
-      # Voice coach
+      # Voice coach and dictation; the key alone turns on dictation
       - key: ELEVENLABS_API_KEY
         scope: RUN_TIME
         type: SECRET
       - key: ELEVENLABS_AGENT_ID
         scope: RUN_TIME
         value: ""
+      - key: ELEVENLABS_STT_MODEL
+        scope: RUN_TIME
+        value: scribe_v2
       # Budgets
       - key: DAILY_MODEL_CALLS
         scope: RUN_TIME
         value: "60"
+      - key: DAILY_DICTATIONS
+        scope: RUN_TIME
+        value: "30"
 
 static_sites:
   - name: web

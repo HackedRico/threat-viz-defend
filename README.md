@@ -124,7 +124,7 @@ threat-viz-defend/
 │   │   ├── limits.py             rate limiter and daily budgets
 │   │   ├── mcp_tools.py          the remote MCP server for coding agents
 │   │   ├── quiz_service.py       quiz state and grading
-│   │   ├── voice.py              ElevenLabs conversation tokens
+│   │   ├── voice.py              ElevenLabs conversation tokens and speech to text
 │   │   ├── cli.py                admin commands
 │   │   ├── routes/               one module per area of the API
 │   │   ├── domain/               pure logic: models, rules, quiz, masking, report

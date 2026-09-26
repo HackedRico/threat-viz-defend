@@ -27,11 +27,11 @@ ThreatViz Defend is one Python API and one React app. The API owns every rule, e
 | API | Model provider | The server's default model, or the provider the user saved. See [Provider seam](#provider-seam). |
 | API | Backboard | Only for users who pick Backboard as their provider. |
 | API | GitHub | Downloads one tarball per import from `codeload.github.com`. |
-| API | ElevenLabs | Asks for a one-conversation token for the private voice agent. The ElevenLabs key never leaves the server. |
+| API | ElevenLabs | Asks for a one-conversation token for the private voice agent, and sends dictated questions to Speech to Text. The ElevenLabs key never leaves the server. |
 | Browser | ElevenLabs | Starts a WebRTC voice session with that token. The agent calls tools in the browser, which call the API. |
 | Coding agent | API | The remote MCP server at `/mcp`, or the hook in [integrations/](../integrations/README.md), both with a personal token. |
 
-[main.py](../api/app/main.py) builds the app. `create_app` wires settings, the database, the analyst, the job runner and the voice client into `Services` ([context.py](../api/app/context.py)), mounts the JSON routes from [routes/](../api/app/routes/), serves the built web app when `STATIC_DIR` is set, and mounts the MCP app last because it matches every path. Every request first passes `RequestGuard` in [web.py](../api/app/web.py), which checks the Host header, the body size, cross-site writes and content type, and adds the security headers. [docs/security.md](security.md) describes each check.
+[main.py](../api/app/main.py) builds the app. `create_app` wires settings, the database, the analyst, the job runner and the voice clients into `Services` ([context.py](../api/app/context.py)), mounts the JSON routes from [routes/](../api/app/routes/), serves the built web app when `STATIC_DIR` is set, and mounts the MCP app last because it matches every path. Every request first passes `RequestGuard` in [web.py](../api/app/web.py), which checks the Host header, the body size, cross-site writes and content type, and adds the security headers. [docs/security.md](security.md) describes each check.
 
 Every error leaves the API as `{"error": {"code", "message"}}`. Routes raise `AppError` from [errors.py](../api/app/errors.py), and the handlers in `main.py` turn validation errors and unexpected exceptions into the same shape.
 
@@ -141,6 +141,8 @@ AnalystSource          Providers.for_user       the user's saved provider, else 
 
 [voice.py](../api/app/voice.py) mints a WebRTC conversation token for the private ElevenLabs agent with the server's key. `POST /api/boards/{id}/voice` spends one voice session and returns the token plus a short spoken brief of the board as dynamic variables. The browser ([web/src/voice/](../web/src/voice/AGENTS.md)) starts the session and registers four client tools: `get_next_question`, `submit_answer`, `show_on_board` and `get_board_brief`. `submit_answer` posts to the same quiz route as the text quiz, so grading happens on the server either way.
 
+Dictation uses the same key through `ElevenLabsTranscriber` in the same file. The mic beside **Ask** records a clip with `MediaRecorder` and posts it as base64 JSON to `POST /api/dictation`, which spends one dictation in its own short transaction, then sends the clip to ElevenLabs Speech to Text outside it, as asking does with the model. The text comes back to the ask box and nothing is stored. Because the browser only talks to the API, dictation needs no CSP change on either hosting layout.
+
 ## Coding agents
 
 - **MCP server.** [mcp_tools.py](../api/app/mcp_tools.py) serves stateless streamable HTTP with JSON responses at `/mcp`. A token verifier accepts personal tokens and passes the owner's user id to each tool. Tools run the same services the web app uses, as that user, on a worker thread, and turn `AppError` into a tool error the agent can read. [docs/api.md](api.md#mcp-tools) lists the tools.
@@ -159,7 +161,7 @@ AnalystSource          Providers.for_user       the user's saved provider, else 
 | `boards` | Title, status, source records, the map, the previous map, the analysis, analysis version, which model analyzed it, the last error, revision |
 | `board_events` | Activity log lines |
 | `quiz_attempts` | Each answer: picked option ids or the typed text, the result and the feedback |
-| `usage` | One row per model call or voice session, for budgets |
+| `usage` | One row per model call, voice session or dictation, for budgets |
 | `providers` | A user's provider kind, base URL, model, the API key sealed with AES-GCM, its last four characters, the memory flag and the Backboard assistant id |
 
 Stored: maps and analyses as JSON, validated again when read. A stored value that no longer validates is logged and treated as missing. Also stored: source records, activity lines, quiz answers including open answers in the user's words.

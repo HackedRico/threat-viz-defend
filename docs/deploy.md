@@ -24,7 +24,7 @@ The API creates its tables on startup. There is no separate migration step.
 - Owner or admin access to the GitHub repo `HackedRico/threat-viz-defend`, so you can authorize the DigitalOcean GitHub app on it.
 - The domain at GoDaddy, and a GoDaddy login that can edit its DNS.
 - Optional: `doctl`, the DigitalOcean CLI. Install it with `brew install doctl`, then run `doctl auth init` and paste a personal access token from API > Tokens. The control panel can do everything below without it.
-- Optional: a DigitalOcean model access key for the server's default model, and an ElevenLabs account for the voice coach. Both are covered below.
+- Optional: a DigitalOcean model access key for the server's default model, and an ElevenLabs account for the voice coach and dictation. Both are covered below.
 
 ## 1. Prepare the spec
 
@@ -65,8 +65,8 @@ In the control panel: the app > Settings > the `api` component > Environment Var
 | `APP_SECRET` | output of `python -c "import secrets; print(secrets.token_urlsafe(48))"` | yes |
 | `INVITE_CODES` | one or more codes, comma separated, 6 characters or more each. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(9))"` | yes |
 | `LLM_API_KEY` | the model access key from "Model access key" below, or leave empty for demo mode | yes |
-| `ELEVENLABS_API_KEY` | from "Voice coach" below, or leave empty to turn voice off | yes |
-| `ELEVENLABS_AGENT_ID` | from "Voice coach" below, or leave empty | no |
+| `ELEVENLABS_API_KEY` | from "Voice coach and dictation" below, or leave empty to turn voice and dictation off | yes |
+| `ELEVENLABS_AGENT_ID` | from "Voice coach and dictation" below, or leave empty | no |
 
 Keep the scope of every secret at Run time. The default scope, Run and build time, passes the value into the Docker build as a build argument, where it can end up in build logs and image layers.
 
@@ -84,7 +84,8 @@ The spec already sets the non-secret values:
 | `DATABASE_URL` | `${db.DATABASE_URL}` | App Platform fills in the dev database's connection string |
 | `LLM_BASE_URL`, `LLM_MODEL` | DigitalOcean serverless inference, `openai-gpt-oss-120b` | the server's default model |
 | `BACKBOARD_BASE_URL` | `https://app.backboard.io/api` | for users who choose Backboard as their provider |
-| `MAX_USERS`, `DAILY_MODEL_CALLS` | `300`, `60` | budgets; `.env.example` lists the rest with their defaults |
+| `ELEVENLABS_STT_MODEL` | `scribe_v2` | the ElevenLabs Speech to Text model for dictation |
+| `MAX_USERS`, `DAILY_MODEL_CALLS`, `DAILY_DICTATIONS` | `300`, `60`, `30` | budgets; `.env.example` lists the rest with their defaults |
 
 `.env.example` at the repo root documents every variable the API reads.
 
@@ -173,14 +174,16 @@ The server's default model runs on DigitalOcean serverless inference, which spea
 
 Usage bills to the DigitalOcean account. `DAILY_MODEL_CALLS`, `MODEL_CALLS_PER_MINUTE` and `GLOBAL_DAILY_MODEL_CALLS` cap how much of it users can spend. Users who save their own provider in the app spend their own key instead.
 
-## Voice coach
+## Voice coach and dictation
 
-The voice coach needs an ElevenLabs API key and an agent.
+Both run on one ElevenLabs API key, which stays on the API. Dictation, the mic beside **Ask**, needs only the key. The voice coach also needs an agent.
 
-1. In ElevenLabs, create an API key. Restrict it to the permissions the agent script and the API need, if the dashboard offers scopes.
-2. Create the agent with `scripts/elevenlabs_agent.py`. The voice teammate owns that script; its header explains how to run it and what it prints. Keep the agent ID it gives you.
-3. Set `ELEVENLABS_API_KEY` (encrypted) and `ELEVENLABS_AGENT_ID` (plain) in the `api` component. Voice stays off until both are set.
-4. `curl -fsS https://api.example.com/api/config` should now show `"voice_enabled": true`.
+1. In ElevenLabs, create an API key. If the dashboard offers scopes, allow Speech to Text for dictation, plus what the agent script and conversation tokens need for the coach.
+2. Set `ELEVENLABS_API_KEY` (encrypted) in the `api` component. After the deploy, `curl -fsS https://api.example.com/api/config` shows `"dictation_enabled": true`.
+3. For the coach, create the agent with `scripts/elevenlabs_agent.py`. The voice teammate owns that script; its header explains how to run it and what it prints. Keep the agent ID it gives you.
+4. Set `ELEVENLABS_AGENT_ID` (plain) in the `api` component. The config now also shows `"voice_enabled": true`.
+
+Dictation needs no CSP or DNS change: the browser records a clip of up to a minute and posts it to the API as JSON, and the API calls ElevenLabs. Browsers only allow the microphone over https, which the custom domains already use. `DAILY_DICTATIONS` caps each user's clips per day; `0` turns dictation off while keeping the coach. `ELEVENLABS_STT_MODEL` picks the model, `scribe_v2` by default. If the API logs "ElevenLabs refused the key", the key lacks the Speech to Text permission.
 
 ## Admin tasks
 

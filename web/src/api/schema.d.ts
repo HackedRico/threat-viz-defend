@@ -409,11 +409,31 @@ export interface paths {
         };
         /**
          * Config
-         * @description The app name, what analyzes boards, whether voice and sign up are on, and the upload policy.
+         * @description The app name, what analyzes boards, whether voice, dictation and sign up are on, and the upload policy.
          */
         get: operations["config_api_config_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dictation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dictate
+         * @description Transcribe one short recording of a question.
+         */
+        post: operations["dictate_api_dictation_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -806,11 +826,34 @@ export interface components {
             app_name: string;
             /** Demo Mode */
             demo_mode: boolean;
+            /** Dictation Enabled */
+            dictation_enabled: boolean;
             file_policy: components["schemas"]["FilePolicyOut"];
             /** Signup Open */
             signup_open: boolean;
             /** Voice Enabled */
             voice_enabled: boolean;
+        };
+        /**
+         * DictationIn
+         * @description A short recording of a spoken question, base64 encoded because every write is JSON.
+         */
+        DictationIn: {
+            /** Audio */
+            audio: string;
+            /**
+             * Audio Type
+             * @enum {string}
+             */
+            audio_type: "audio/webm" | "audio/ogg" | "audio/mp4" | "audio/mpeg" | "audio/wav";
+        };
+        /**
+         * DictationOut
+         * @description What was said, for the user to check before sending.
+         */
+        DictationOut: {
+            /** Text */
+            text: string;
         };
         /**
          * ErrorBody
@@ -1377,6 +1420,10 @@ export interface components {
          * @description What the user has spent today against their daily allowance.
          */
         UsageOut: {
+            /** Dictations Limit */
+            dictations_limit: number;
+            /** Dictations Today */
+            dictations_today: number;
             /** Model Calls Limit */
             model_calls_limit: number;
             /** Model Calls Today */
@@ -4237,6 +4284,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    dictate_api_dictation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DictationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictationOut"];
                 };
             };
             /** @description Bad Request */
