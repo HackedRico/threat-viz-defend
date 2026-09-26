@@ -270,9 +270,9 @@ Open the account menu and choose **Model provider**. Maps, threats, answers and 
 To use your own:
 
 1. Pick a **Kind**:
-   - **OpenAI compatible**: OpenAI, DigitalOcean, OpenRouter, Ollama and other services that speak the Chat Completions API.
+   - **OpenAI compatible**: OpenAI, DigitalOcean, OpenRouter, Featherless, Ollama and other services that speak the Chat Completions API.
    - **Backboard**: many models through one key, with optional memory.
-2. Choose a preset to fill the **Base URL** and suggest a model: OpenAI, DigitalOcean, OpenRouter or Ollama, or Backboard. Or type your own base URL.
+2. Choose a preset to fill the **Base URL** and suggest a model: OpenAI, DigitalOcean, OpenRouter, Featherless or Ollama, or Backboard. Or type your own base URL.
 3. Enter the **Model**. Backboard models are written as `provider/model`, such as `openai/gpt-4o`.
 4. Paste the **API key**. Local services such as Ollama may need none. Once saved, the key is never shown again; leave the field empty to keep it.
 5. For Backboard, turn on **Remember my progress across boards** if you want memory.
@@ -284,6 +284,8 @@ To use your own:
 Base URLs must use https and point at a public address. The Ollama preset uses `localhost`, which means the server's own machine, so it only works where the server allows private addresses, such as a local development server.
 
 **What memory does.** With memory on, Backboard keeps what you asked the analyst and how your quiz answers went, and uses it in later answers and grading, across boards. Drawing maps and finding threats only read memory, so your uploaded material is never written into it.
+
+**Memory with any model.** The **Memory** section below the provider form takes a Backboard key on its own, so a model from another service, such as Featherless, can remember your progress. Paste the key, choose **Test key**, then **Save**. It works only with your own OpenAI-compatible model; with a Backboard provider, use that provider's memory switch instead. Backboard receives the questions you ask and the quiz questions with each verdict, never your uploads, maps or answer text. Model calls spend your model service's credits and memory calls spend your Backboard credits. **Turn off memory** forgets the key; notes already kept stay in your Backboard account.
 
 Calls on your own key do not count against the daily allowance, only against the limit of 6 model calls per minute.
 

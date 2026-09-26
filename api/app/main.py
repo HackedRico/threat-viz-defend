@@ -23,10 +23,11 @@ from app.jobs import Jobs, ThreadJobs
 from app.limits import Budget, RateLimiter
 from app.llm.openai_compat import OpenAICompatibleLlm
 from app.mcp_tools import build_mcp
+from app.providers.memory import MemorySettings
 from app.providers.netguard import Resolver, resolve
 from app.providers.service import Providers
 from app.quiz_service import Quiz
-from app.routes import agents, auth, boards, dictation, meta, provider, quiz
+from app.routes import agents, auth, boards, dictation, memory, meta, provider, quiz
 from app.voice import ElevenLabsTranscriber, ElevenLabsVoice, Transcriber, VoiceClient
 from app.web import RequestGuard, spa_file
 
@@ -63,7 +64,15 @@ def create_app(
     budget = Budget(settings, limiter)
     chosen_analyst = analyst or _analyst_for(settings)
     job_runner = jobs or ThreadJobs()
-    providers = Providers(db, settings, chosen_analyst, demo=isinstance(chosen_analyst, DemoAnalyst), resolver=resolver)
+    memories = MemorySettings(db, settings)
+    providers = Providers(
+        db,
+        settings,
+        chosen_analyst,
+        demo=isinstance(chosen_analyst, DemoAnalyst),
+        memory=memories,
+        resolver=resolver,
+    )
     board_service = Boards(db, providers, budget, job_runner)
     services = Services(
         settings=settings,
@@ -77,6 +86,7 @@ def create_app(
         boards=board_service,
         quiz=Quiz(db, board_service, providers, budget),
         providers=providers,
+        memory=memories,
         voice=voice if voice is not None else _voice_for(settings),
         transcriber=transcriber if transcriber is not None else _transcriber_for(settings),
     )
@@ -113,7 +123,7 @@ def create_app(
     )
     app.state.services = services
     _add_error_handlers(app)
-    for module in (meta, auth, boards, quiz, dictation, provider, agents):
+    for module in (meta, auth, boards, quiz, dictation, provider, memory, agents):
         app.include_router(module.router)
 
     static_dir = settings.static_dir

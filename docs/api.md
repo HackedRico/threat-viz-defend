@@ -202,6 +202,24 @@ Cookie. Body `ProviderIn`. Checks the URL the same way, then lists the endpoint'
 
 `200` with `ProviderTestOut`: `ok`, `label`, `message` and up to 200 `models`. A rejected key, an unreachable host, or a model the endpoint does not list is `ok: false` with a message, not an HTTP error. With `api_key` null the saved key is used, but only for the same kind and base URL. Errors: `400` for a refused URL, `429` over 10 tests per 5 minutes.
 
+## Memory
+
+Backboard memory apart from the model provider. It applies only while the user has their own OpenAI-compatible provider. `MemoryOut` holds `saved`, `active` (memory applies to the user's analyses now), `key_preview`, `message` (the status in words) and `updated_at`. The key is never returned.
+
+### `GET /api/memory`
+Cookie. `200` with `MemoryOut`.
+
+### `PUT /api/memory`
+Cookie. Body `MemoryIn`: `api_key` (null keeps the saved key). `200` with `MemoryOut`. Errors: `400` when no key is saved and none is given. A different key forgets the saved assistant id.
+
+### `DELETE /api/memory`
+Cookie. Forgets the key; notes already kept stay in the user's Backboard account. `204`.
+
+### `POST /api/memory/test`
+Cookie. Body `MemoryIn`. Lists the account's Backboard assistants with the typed key, or the saved one when `api_key` is null. Nothing is saved.
+
+`200` with `MemoryTestOut`: `ok` and `message`. A rejected key is `ok: false`, not an HTTP error. Errors: `400` with no key at all, `429` over 10 tests per 5 minutes.
+
 ## Coding agents
 
 ### `GET /api/agent/boards`

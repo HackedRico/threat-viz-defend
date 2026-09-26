@@ -136,3 +136,16 @@ class ProviderRow(Base):
     # Backboard creates one assistant per user on first use; reusing it is what makes memory persist.
     assistant_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class MemoryRow(Base):
+    """A user's Backboard memory, apart from their model provider. The key is sealed like a provider key."""
+
+    __tablename__ = "memories"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete=_CASCADE), primary_key=True)
+    key_sealed: Mapped[str] = mapped_column(Text)
+    key_last4: Mapped[str] = mapped_column(String(4))
+    # Created on the first note and reused after, which is what makes memory persist.
+    assistant_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
