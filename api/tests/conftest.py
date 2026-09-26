@@ -10,14 +10,14 @@ from app.config import Settings
 from app.jobs import InlineJobs
 from app.main import create_app
 from app.providers.netguard import Resolver
-from app.voice import VoiceClient
+from app.voice import Transcriber, VoiceClient
 from tests.factories import inbox
 
 # =============================================================================
 # Module Overview
 # =============================================================================
 # Fixtures for API tests. `make_client` builds the whole app on an in-memory
-# database with jobs run inline, the demo analyst and no voice, and each
+# database with jobs run inline, the demo analyst and no voice or dictation, and each
 # option can swap one piece. `signed_in` returns a client with a fresh account.
 
 INVITE = "letmein-2026"
@@ -43,12 +43,18 @@ def make_client() -> Iterator[ClientFactory]:
         *,
         analyst: Analyst | None = None,
         voice: VoiceClient | None = None,
+        transcriber: Transcriber | None = None,
         resolver: Resolver | None = None,
         **overrides: Any,
     ) -> TestClient:
         settings = replace(BASE_SETTINGS, **overrides)
         app = create_app(
-            settings, analyst=analyst or DemoAnalyst(), jobs=InlineJobs(), voice=voice, resolver=resolver or _no_dns
+            settings,
+            analyst=analyst or DemoAnalyst(),
+            jobs=InlineJobs(),
+            voice=voice,
+            transcriber=transcriber,
+            resolver=resolver or _no_dns,
         )
         client = TestClient(app)
         client.__enter__()
