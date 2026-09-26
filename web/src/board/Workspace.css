@@ -2,8 +2,8 @@
    Module Overview
    =============================================================================
    The board workspace: canvas stage with the ask bar under it, the side
-   panel, the brief sticky note, the chip that names what is lit, and the
-   overlay while the server works. */
+   panel, the brief sticky note and the map key down the left edge, the chip
+   that names what is lit, and the overlay while the server works. */
 
 .workspace {
   flex: 1;
@@ -62,16 +62,37 @@
   box-shadow: var(--shadow-2);
 }
 
-/* ---------- brief sticky note ---------- */
+/* ---------- brief and map key ---------- */
 
-.brief {
+/* One column down the left edge: the brief at the top, the key at the bottom.
+   A long brief shrinks and scrolls rather than running into the key, however
+   long the verdict the model wrote. The width leaves room for the view
+   controls in the bottom right. */
+.canvas-notes {
   position: absolute;
   top: 16px;
-  left: 16px;
+  bottom: 14px;
+  left: 14px;
   z-index: 4;
-  width: min(340px, calc(100% - 32px));
-  max-height: calc(100% - 96px);
-  overflow-y: auto;
+  width: min(480px, calc(100% - 240px));
+  min-width: 236px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.canvas-notes > * {
+  pointer-events: auto;
+}
+
+.brief {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: min(340px, 100%);
   padding: var(--space-2) var(--space-3) var(--space-3);
   background: var(--sticky);
   color: var(--sticky-ink);
@@ -108,6 +129,8 @@
 }
 
 .brief-body {
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -193,14 +216,21 @@
 }
 
 @media (max-width: 1100px) {
+  /* The header, the canvas and the ask bar stack above the panel and the page
+     scrolls, so the canvas keeps a usable height instead of sharing one screen. */
   .workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(360px, 1fr) auto;
+    grid-template-rows: max-content auto;
+    overflow-y: auto;
+  }
+  .workspace-canvas {
+    flex: none;
+    height: max(420px, 60vh);
   }
   .workspace-panel {
     border-left: 0;
     border-top: 1.5px solid var(--line);
-    max-height: 55vh;
+    height: 55vh;
   }
   /* Stacked under the map, the panel is full width, so there is no edge to drag. */
   .workspace-panel > .resize-handle {

@@ -23,6 +23,7 @@ The spoke that turns a board's map into the whiteboard people read. Owner: MD. I
 
 - **Wide maps at laptop width.** The example lays out about 1800 by 400 pixels. The opening view fits the whole map only when that stays at 55% zoom or more; otherwise it opens at 55% on the worst threat. A taller layout, grouping, or collapsing a boundary would help.
 - **Busy boundaries.** The backend boundary holds most nodes, so its flows bunch together. Ordering, port placement or a better prompt for splitting zones are all fair game.
+- **Overlays and the opening view.** The fit and the opening view center on the whole canvas, but the brief and the map key cover its left edge, so the worst threat can open under the brief. Fitting to the canvas minus the notes column would fix it.
 - **Label clipping.** Long flow labels are cut at 28 characters (`FLOW_LABEL_MAX`), and tech lines at 30.
 
 ## Rules for this area
@@ -40,3 +41,5 @@ npm run typecheck && npm test && npm run build
 ```
 
 Then look at it: `./scripts/dev.sh` from the repo root, sign in with the development account from `.env`, and open "Example: Inbox Helper". It has 12 nodes, 18 flows, two boundaries, 7 threats and a lethal trifecta, so it exercises every mark. Check it in light and dark, at a laptop width and wide, and in review mode after a hand edit so the diff marks show.
+
+The example is hand written and a model's board is not, so never tune a change to the example alone. Every overlay and every line of copy has to hold on a board with no AI part, no store, a taller map and a verdict three times as long. The starter questions and the brief read the board's own parts for that reason.

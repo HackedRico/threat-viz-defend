@@ -12,6 +12,7 @@ import { findingsLine } from "./brief.ts";
 import { expandHighlight, labelOf } from "./elements.ts";
 import { Inspector } from "./Inspector.tsx";
 import { MapCanvas } from "./MapCanvas.tsx";
+import { MapLegend } from "./MapLegend.tsx";
 import { diffMaps } from "./mapDiff.ts";
 import { ReadyPanel } from "./ReadyPanel.tsx";
 import { ReviewPanel } from "./ReviewPanel.tsx";
@@ -135,7 +136,11 @@ export function Workspace({
             </div>
           )}
 
-          {analysis && <Brief board={board} map={map} analysis={analysis} />}
+          {/* The brief and the key share the left edge, so a long brief scrolls instead of covering the key. */}
+          <div className="canvas-notes">
+            {analysis && <Brief board={board} map={map} analysis={analysis} />}
+            {layout && key && <MapLegend />}
+          </div>
 
           {source && !activePath && highlight.length > 0 && (
             <div className="lit-chip" role="status">

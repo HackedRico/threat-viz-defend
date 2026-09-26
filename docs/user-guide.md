@@ -167,13 +167,13 @@ Choose **Looks right, find threats**. The board goes to **Finding threats**, the
 
 A ready board opens centered on the element with the worst threat.
 
-- **The short version.** The sticky note on the canvas explains the board to someone new: what the system is, how many threats were found by severity, what to fix first, and how to read the map. Fold it away with its button; it stays folded on later boards until you open it again.
+- **The short version.** The sticky note on the canvas explains the board to someone new: what the system is, how many threats were found by severity, what to fix first, and how to read the map. It sits above the map key in the left column; when there is not room for both, the note scrolls. Fold it away with its button; it stays folded on later boards until you open it again.
 - **Pins.** Each threat is a numbered pin on its node or flow. The shape shows severity without relying on color: octagon for critical, triangle for high, circle for medium, square for low. Clicking a pin selects its element and opens the threat in the list.
 - **Lethal trifecta.** A ring around an AI part. Select it to see "Reads sensitive data from", "Takes untrusted input from" and "Can send data out to".
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".
 - **Highlights.** When something lights up part of the map, a chip names the source, such as "Lit by the answer", with **Clear**.
 - **Hide panel.** The button at the top right of the canvas hides or shows the side panel.
-- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag.
+- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag, and the page scrolls down to it.
 
 ### Ask
 

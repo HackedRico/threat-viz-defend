@@ -472,16 +472,13 @@
 
 /* ---------- legend ---------- */
 
-/* Always on the canvas, bottom left, laid out wide and short so it covers little
-   of the map; the width leaves room for the view controls in the bottom right. */
+/* Always on the canvas, at the foot of the notes column in Workspace.css, laid
+   out wide and short so it covers little of the map. */
 .map-legend {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  z-index: 3;
-  width: min(480px, calc(100% - 240px));
-  min-width: 236px;
-  max-height: calc(100% - 28px);
+  flex: none;
+  width: 100%;
+  max-height: 100%;
+  margin-top: auto;
   overflow: auto;
   padding: var(--space-2) var(--space-3);
   border: 1.5px solid var(--line);
