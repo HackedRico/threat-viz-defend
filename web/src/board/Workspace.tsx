@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { BoardOut, SystemMap, ThreatAnalysis } from "../api/types.ts";
 import { CloseIcon, SidebarIcon } from "../shell/icons.tsx";
@@ -44,7 +44,16 @@ const PANEL_DEFAULT = 380;
 const PANEL_BOUNDS = { min: 320, max: 900 };
 
 /** The map and its side panel for a board in review, analysis or ready. */
-export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next: BoardOut) => void }) {
+export function Workspace({
+  board,
+  onApply,
+  top,
+}: {
+  board: BoardOut;
+  onApply: (next: BoardOut) => void;
+  /** The board's header and banners, drawn above the map so the side panel can take the full height. */
+  top: ReactNode;
+}) {
   const review = board.status === "review";
   const serverMap = board.map!;
   const [draft, setDraft] = useState<SystemMap>(serverMap);
@@ -105,6 +114,7 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
       style={{ "--panel-width": `${panelWidth}px` } as CSSProperties}
     >
       <div className="workspace-stage">
+        {top}
         <div className="workspace-canvas">
           {layout && key ? (
             <MapCanvas
