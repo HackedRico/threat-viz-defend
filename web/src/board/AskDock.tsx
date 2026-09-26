@@ -1,9 +1,11 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { Answer, BoardOut, SystemMap } from "../api/types.ts";
 import { useProvider } from "../settings/provider.ts";
 import { CloseIcon, SparkIcon } from "../shell/icons.tsx";
+import { ResizeHandle } from "../shell/ResizeHandle.tsx";
+import { clampWidth, parseWidth } from "../shell/resize.ts";
 import { useSession } from "../shell/session.tsx";
 import { labelOf } from "./elements.ts";
 import { useBoardUi } from "./store.ts";
@@ -15,13 +17,57 @@ import "./AskDock.css";
 // Ask the analyst about a finished board, from a bar docked under the canvas
 // so the question sits next to the map it lights. The selected element, if
 // any, goes along as the focus; the answer comes back as plain text plus ids
-// that light up on the map.
+// that light up on the map. The bar fits its content until the user drags its
+// top edge, and the starter questions go away once the first question is sent.
 
 const STARTERS = [
   "What should I fix first, and why?",
   "Where can untrusted input reach an AI part?",
   "What happens if the database leaks?",
 ];
+
+const HEIGHT_KEY = "ask-height";
+const HEIGHT_MIN = 100;
+const HEIGHT_MAX = 900;
+
+// Null means the bar fits its content. Storage can be blocked in private windows.
+function readHeight(): number | null {
+  try {
+    const raw = localStorage.getItem(HEIGHT_KEY);
+    return raw === null ? null : parseWidth(raw, HEIGHT_MIN, { min: HEIGHT_MIN, max: HEIGHT_MAX });
+  } catch {
+    return null;
+  }
+}
+
+function storeHeight(height: number | null) {
+  try {
+    if (height === null) localStorage.removeItem(HEIGHT_KEY);
+    else localStorage.setItem(HEIGHT_KEY, String(height));
+  } catch {
+    // Not remembering the height is harmless.
+  }
+}
+
+/** The height the user dragged the bar to, remembered in this browser, and the height it has on screen. */
+function useDockHeight() {
+  const dock = useRef<HTMLElement>(null);
+  const [height, setHeight] = useState(readHeight);
+  const [natural, setNatural] = useState(HEIGHT_MIN);
+  useEffect(() => storeHeight(height), [height]);
+  // A drag starts from the height on screen, so measure it while the bar fits its content.
+  useEffect(() => {
+    const el = dock.current;
+    if (!el || height !== null) return undefined;
+    const observer = new ResizeObserver(() => setNatural(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [height]);
+  // The bar may grow over most of the canvas but always leaves some map to look at.
+  const bounds = { min: HEIGHT_MIN, max: Math.min(HEIGHT_MAX, Math.round(window.innerHeight * 0.7)) };
+  const shown = height === null ? null : clampWidth(height, bounds);
+  return { dock, shown, size: shown ?? natural, bounds, setHeight };
+}
 
 /** The ask bar under the canvas and its latest answer. Each new `focusSignal` puts the cursor in the box. */
 export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: SystemMap; focusSignal: number }) {
@@ -39,6 +85,8 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   const [answer, setAnswer] = useState<{ question: string; reply: Answer } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [asked, setAsked] = useState(false);
+  const { dock, shown, size, bounds, setHeight } = useDockHeight();
   const input = useRef<HTMLTextAreaElement>(null);
   const id = useId();
   const analysis = board.analysis;
@@ -56,6 +104,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
     try {
       const reply = await api.ask(board.id, text, selected);
       setAnswer({ question: text, reply });
+      setAsked(true);
       setHighlight(reply.highlight, "ask");
       setQuestion("");
       refreshMe();
@@ -72,7 +121,23 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   };
 
   return (
-    <section className="ask-dock" aria-label="Ask about this board">
+    <section
+      ref={dock}
+      id={`${id}-dock`}
+      className={["ask-dock", shown !== null && "is-sized", answer && "has-answer"].filter(Boolean).join(" ")}
+      style={shown === null ? undefined : ({ height: `${shown}px` } as CSSProperties)}
+      aria-label="Ask about this board"
+    >
+      <ResizeHandle
+        label="Resize the ask bar"
+        controls={`${id}-dock`}
+        edge="top"
+        size={size}
+        bounds={bounds}
+        fallback={HEIGHT_MIN}
+        onResize={setHeight}
+        onReset={() => setHeight(null)}
+      />
       {answer && (
         <div className="ask-answer" aria-live="polite">
           <div className="ask-answer-head">
@@ -138,7 +203,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
             {busy && <span className="spinner" aria-hidden="true" />} Ask
           </button>
         </div>
-        {!answer && question === "" && (
+        {!asked && question === "" && (
           <div className="ask-starters">
             {STARTERS.map((starter) => (
               <button key={starter} type="button" className="chip ask-starter" onClick={() => pickStarter(starter)}>
