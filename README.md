@@ -56,7 +56,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and sign in with the development account from `.env` (`DEV_USERNAME` and `DEV_PASSWORD`). The server creates it at startup, with the example board, and resets it to that password if you change it. To try sign up instead, choose **Create account** with the invite code `local-dev`. Development creates a SQLite database in `api/data/app.db`.
+Open http://localhost:5173, choose **Sign in** on the home page, and use the development account from `.env` (`DEV_USERNAME` and `DEV_PASSWORD`). The server creates it at startup, with the example board, and resets it to that password if you change it. To try sign up instead, choose **Create an account** with the invite code `local-dev`. Development creates a SQLite database in `api/data/app.db`.
 
 On a deployed server, `DEV_USERNAME` is refused; an operator creates accounts without an invite code with `uv run python -m app.cli create-user <name>`, which prompts for the password.
 
@@ -139,7 +139,7 @@ threat-viz-defend/
 ├── web/                          React and TypeScript app
 │   ├── src/
 │   │   ├── api/                  typed client and generated schema types
-│   │   ├── auth/                 sign in and create account
+│   │   ├── auth/                 home page, sign in and create account
 │   │   ├── shell/                sidebar, routing, session, account menu
 │   │   ├── board/                canvas, layout, inspector, intake, panels
 │   │   ├── quiz/                 Defend tab and text quiz

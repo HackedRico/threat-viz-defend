@@ -177,12 +177,12 @@ Deleting a board deletes its events and quiz attempts. Deleting an account throu
 
 ## Frontend
 
-The web app in [web/src/](../web/src/) is React 19 with Vite. There is no router library; [shell/route.ts](../web/src/shell/route.ts) maps three screens to paths: `/`, `/boards/{id}` and `/settings` or `/settings/provider`.
+The web app in [web/src/](../web/src/) is React 19 with Vite. There is no router library; [shell/route.ts](../web/src/shell/route.ts) maps three screens to paths: `/`, `/boards/{id}` and `/settings` or `/settings/provider`. Before sign in, [auth/authView.ts](../web/src/auth/authView.ts) picks the screen instead: the home page at `/`, the account forms at `/signin` and `/signup`, and the sign in form for any other path, so a link into the app opens once the visitor signs in.
 
 | Folder | Holds |
 |---|---|
 | `api/` | The typed client (`openapi-fetch`), the generated `schema.d.ts`, aliases in `types.ts`, and error handling |
-| `auth/` | Sign in and create account |
+| `auth/` | The home page with its sample scan, sign in and create account |
 | `shell/` | App layout, sidebar, account menu with usage meters, routing, polling |
 | `board/` | The board screen: intake, the drawing state, the canvas, the ELK layout, the inspector, the ask bar under the canvas, the review panel, the ready panel with threats, paths, defend and activity |
 | `quiz/` | The Defend tab and the text quiz |

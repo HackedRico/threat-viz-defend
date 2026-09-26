@@ -6,14 +6,14 @@ This guide walks through every screen of ThreatViz Defend in the order you meet 
 
 You need an invite code from whoever runs the deployment. On a local server the code is `local-dev`.
 
-1. Open the app. The sign in screen has two tabs, **Sign in** and **Create account**.
-2. Choose **Create account**.
+1. Open the app. The home page shows a sample of code, the threat path a scan finds in it, and two buttons, **Create an account** and **Sign in**. The sample is an illustration, not a live scan.
+2. Choose **Create an account**. The form also lives at `/signup`.
 3. Pick a **Username** of 3 to 24 characters: letters, digits, dots, dashes and underscores, starting with a letter or digit. It is stored in lowercase.
 4. Pick a **Password** of at least 10 characters. It must not contain your username or be a common password. **Show** reveals what you typed.
 5. Enter the **Invite code**.
 6. Choose **Create account**. You are signed in and land on your example board.
 
-To come back later, use **Sign in** with the same username and password. If **Create account** is greyed out with "New accounts are closed right now", the deployment has no invite codes configured.
+To come back later, choose **Sign in** on the home page, or open `/signin`, and use the same username and password. A link into the app, such as a board link a coding agent prints, asks you to sign in first and then opens the board. **Sign out** returns you to the home page. If the home page has no **Create an account** button and says "New accounts are closed right now", the deployment has no invite codes configured.
 
 There is no password reset. If you forget your password, ask the operator to delete the account, then create a new one.
 

@@ -7,5 +7,5 @@
 - `src/api/` client, generated types and the API base URL
 - `src/board/` canvas, ELK layout, inspector, intake and panels
 - `src/quiz/` text quiz; `src/voice/` voice coach (see its AGENTS.md)
-- `src/auth/`, `src/settings/` (coding agents, model provider), `src/shell/` sidebar, routing, session
+- `src/auth/` home page, sign in and create account; `src/settings/` (coding agents, model provider); `src/shell/` sidebar, routing, session
 - `src/styles/tokens.css` holds every design token
