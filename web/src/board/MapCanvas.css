@@ -415,9 +415,10 @@
 
 /* ---------- draft stamp ---------- */
 
+/* Below the panel toggle, which holds the top right corner. */
 .canvas-stamp {
   position: absolute;
-  top: 14px;
+  top: 58px;
   right: 20px;
   padding: 0 12px;
   border: 3px solid var(--marker-blue);
@@ -434,9 +435,10 @@
 
 /* ---------- controls ---------- */
 
+/* Bottom right; the map key holds the bottom left. */
 .canvas-controls {
   position: absolute;
-  left: 14px;
+  right: 14px;
   bottom: 14px;
   display: flex;
   align-items: center;
@@ -470,12 +472,16 @@
 
 /* ---------- legend ---------- */
 
+/* Always on the canvas, bottom left, kept compact so it covers little of the map. */
 .map-legend {
   position: absolute;
   left: 14px;
-  bottom: 64px;
-  width: 290px;
-  padding: var(--space-3) var(--space-4);
+  bottom: 14px;
+  z-index: 3;
+  width: 236px;
+  max-height: calc(100% - 28px);
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
   border: 1.5px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -494,14 +500,18 @@
   font-size: var(--hand-md);
 }
 
+.map-legend.is-folded {
+  width: auto;
+}
+
 .map-legend ul {
   list-style: none;
   margin: var(--space-2) 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: var(--text-sm);
+  gap: 3px;
+  font-size: var(--text-xs);
 }
 
 .map-legend li {
@@ -511,8 +521,8 @@
 }
 
 .map-legend li > svg {
-  width: 40px;
-  height: 24px;
+  width: 32px;
+  height: 19px;
   flex: none;
 }
 

@@ -55,7 +55,6 @@ export const TrashIcon = (p: IconProps) => <Icon {...p}><path d="M4 7h16M9 7V4h6
 /** A copy symbol. */
 export const CopyIcon = (p: IconProps) => <Icon {...p}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" /></Icon>;
 /** A key, for the legend toggle and tokens. */
-export const LegendIcon = (p: IconProps) => <Icon {...p}><path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10" /></Icon>;
 /** A file stack, for the example board. */
 export const BookIcon = (p: IconProps) => <Icon {...p}><path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" /><path d="M5 16a4 4 0 0 1 4-4h10" /></Icon>;
 /** A spark, for the model provider. */

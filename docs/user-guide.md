@@ -122,7 +122,7 @@ When the map is drawn, the board goes to **Check the map** and the canvas shows 
 | Double line | The flow crosses a trust boundary |
 | Ring labeled "lethal trifecta" | An AI part that reads sensitive data, takes in untrusted content and can send data out |
 
-The map key button in the corner shows this legend on the board.
+The map key sits in the bottom left corner of the board. Fold it to its title when it covers part of the map, and Show brings it back. The zoom, fit and zoom level controls sit in the bottom right corner.
 
 - **Pan:** drag, scroll, or use the arrow keys.
 - **Zoom:** pinch, hold Ctrl and scroll, the zoom buttons, or `+` and `-`.

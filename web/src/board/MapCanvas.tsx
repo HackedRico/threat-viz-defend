@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
-import { FitIcon, LegendIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
+import { FitIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
 import { STRIDE } from "./severity.ts";
 import { clip, roundedPath, TECH_MAX, trimEnd, type Box, type MapLayout } from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
@@ -62,7 +62,6 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [legendOpen, setLegendOpen] = useState(false);
   const moved = useRef(false);
   const drag = useRef<{ id: number; startX: number; startY: number; view: View; dragging: boolean } | null>(null);
   const selected = useBoardUi((s) => s.selected);
@@ -361,20 +360,11 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
         <button type="button" className="btn btn-icon" aria-label="Fit map to screen" onClick={fit}>
           <FitIcon />
         </button>
-        <button
-          type="button"
-          className="btn btn-icon"
-          aria-label="Map key"
-          aria-pressed={legendOpen}
-          onClick={() => setLegendOpen((open) => !open)}
-        >
-          <LegendIcon />
-        </button>
         <span className="canvas-zoom mono" aria-live="off">
           {Math.round(view.k * 100)}%
         </span>
       </div>
-      {legendOpen && <MapLegend onClose={() => setLegendOpen(false)} />}
+      <MapLegend />
     </div>
   );
 }
