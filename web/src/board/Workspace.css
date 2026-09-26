@@ -284,6 +284,16 @@
     flex: none;
     height: max(420px, 60vh);
   }
+  /* With the panel closed nothing stacks below, so the canvas takes the full height again
+     and the map fits larger. */
+  .workspace.panel-closed {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .workspace.panel-closed .workspace-canvas {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 420px;
+  }
   .workspace-panel {
     border-left: 0;
     border-top: 1.5px solid var(--line);
