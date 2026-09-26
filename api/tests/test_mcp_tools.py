@@ -89,6 +89,19 @@ def test_a_map_with_nothing_to_ask_is_not_a_finished_quiz(signed_in: TestClient)
     assert "no quiz questions yet" in text
 
 
+def test_get_board_lists_the_node_and_flow_ids_describe_element_takes(signed_in: TestClient) -> None:
+    token = agent_token(signed_in)
+    board_id = example_board(signed_in)
+    failed, text = call_tool(signed_in, token, "get_board", {"board_id": board_id})
+    assert not failed
+    lines = text.splitlines()
+    assert "- agent: Triage agent (process)" in lines
+    assert "- f4: Web app to API: API requests" in lines
+    failed, text = call_tool(signed_in, token, "describe_element", {"board_id": board_id, "element_id": "f4"})
+    assert not failed
+    assert text.startswith("Web app to API: API requests.")
+
+
 def test_describe_element_reports_an_id_missing_from_the_map_as_an_error(signed_in: TestClient) -> None:
     token = agent_token(signed_in)
     board_id = example_board(signed_in)
