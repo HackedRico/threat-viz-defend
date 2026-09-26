@@ -167,7 +167,7 @@ Choose **Looks right, find threats**. The board goes to **Finding threats**, the
 
 A ready board opens centered on the element with the worst threat.
 
-- **Fix first.** The card on the canvas holds the verdict: what to fix first. Fold it away with its button.
+- **The short version.** The sticky note on the canvas explains the board to someone new: what the system is, how many threats were found by severity, what to fix first, and how to read the map. Fold it away with its button; it stays folded on later boards until you open it again.
 - **Pins.** Each threat is a numbered pin on its node or flow. The shape shows severity without relying on color: octagon for critical, triangle for high, circle for medium, square for low. Clicking a pin selects its element and opens the threat in the list.
 - **Lethal trifecta.** A ring around an AI part. Select it to see "Reads sensitive data from", "Takes untrusted input from" and "Can send data out to".
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".

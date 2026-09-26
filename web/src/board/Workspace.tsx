@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
-import type { BoardOut, SystemMap } from "../api/types.ts";
+import type { BoardOut, SystemMap, ThreatAnalysis } from "../api/types.ts";
 import { CloseIcon, SidebarIcon } from "../shell/icons.tsx";
 import { ResizeHandle, useStoredWidth } from "../shell/ResizeHandle.tsx";
 import { clampWidth } from "../shell/resize.ts";
@@ -8,6 +8,7 @@ import { isBusy } from "../shell/statusText.ts";
 import { ProviderLine } from "../settings/ProviderSettings.tsx";
 import { ActivityLog } from "./ActivityLog.tsx";
 import { AskDock } from "./AskDock.tsx";
+import { findingsLine } from "./brief.ts";
 import { expandHighlight, labelOf } from "./elements.ts";
 import { Inspector } from "./Inspector.tsx";
 import { MapCanvas } from "./MapCanvas.tsx";
@@ -38,6 +39,7 @@ const SOURCE_TEXT: Record<HighlightSource, string> = {
 };
 
 const PANEL_WIDTH_KEY = "panel-width";
+const BRIEF_FOLDED_KEY = "brief-folded";
 const PANEL_DEFAULT = 380;
 const PANEL_BOUNDS = { min: 320, max: 900 };
 
@@ -123,7 +125,7 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
             </div>
           )}
 
-          {analysis?.verdict && <Verdict text={analysis.verdict} />}
+          {analysis && <Brief board={board} map={map} analysis={analysis} />}
 
           {source && !activePath && highlight.length > 0 && (
             <div className="lit-chip" role="status">
@@ -223,23 +225,73 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
   );
 }
 
-function Verdict({ text }: { text: string }) {
-  const [folded, setFolded] = useState(false);
+// A reader who opens a finished board cold, with no security background, gets
+// what the system is, what was found, what to fix and how to read the drawing.
+function Brief({ board, map, analysis }: { board: BoardOut; map: SystemMap; analysis: ThreatAnalysis }) {
+  // Someone who folded it once has read it; later boards open with the map in full view.
+  const [folded, setFolded] = useState(readBriefFolded);
+  const toggle = () => {
+    setFolded((was) => {
+      try {
+        localStorage.setItem(BRIEF_FOLDED_KEY, was ? "0" : "1");
+      } catch {
+        // Not remembering the choice is harmless.
+      }
+      return !was;
+    });
+  };
   return (
-    <div className={`verdict ${folded ? "is-folded" : ""}`}>
-      <div className="verdict-head">
-        <span className="verdict-label">Fix first</span>
+    <section className={`brief ${folded ? "is-folded" : ""}`} aria-labelledby="brief-title">
+      <div className="brief-head">
+        <h2 id="brief-title" className="brief-label">
+          The short version
+        </h2>
         <button
           type="button"
           className="btn btn-ghost btn-icon btn-sm"
-          aria-label={folded ? "Show the verdict" : "Fold the verdict away"}
+          aria-label={folded ? "Show the short version" : "Fold the short version away"}
           aria-expanded={!folded}
-          onClick={() => setFolded((was) => !was)}
+          onClick={toggle}
         >
           {folded ? "+" : <CloseIcon width={14} height={14} />}
         </button>
       </div>
-      {!folded && <p className="verdict-text hand">{text}</p>}
-    </div>
+      {!folded && (
+        <div className="brief-body">
+          <div className="brief-part">
+            <h3 className="brief-label">What this is</h3>
+            <p>
+              <strong>{map.name}.</strong> {map.summary}
+            </p>
+          </div>
+          <div className="brief-part">
+            <h3 className="brief-label">What could go wrong</h3>
+            <p>{findingsLine(board.counts, analysis.paths.length)}</p>
+          </div>
+          {analysis.verdict && (
+            <div className="brief-part">
+              <h3 className="brief-label">Fix first</h3>
+              <p className="brief-verdict hand">{analysis.verdict}</p>
+            </div>
+          )}
+          <div className="brief-part">
+            <h3 className="brief-label">How to read the map</h3>
+            <p className="brief-howto">
+              Boxes are parts of the system and arrows are data moving between them. Each numbered pin is a threat:
+              select one to see what could happen and how to fix it.
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
   );
+}
+
+function readBriefFolded(): boolean {
+  try {
+    return localStorage.getItem(BRIEF_FOLDED_KEY) === "1";
+  } catch {
+    // Storage can be blocked in private windows; the brief just starts open.
+    return false;
+  }
 }
