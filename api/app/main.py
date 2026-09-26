@@ -8,7 +8,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.analysis.analyst import Analyst, DemoAnalyst, LlmAnalyst
 from app.auth.service import Accounts, Tokens
@@ -137,7 +136,6 @@ def create_app(
             allow_headers=["Content-Type"],
             max_age=600,
         )
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(settings.allowed_hosts) or ["*"])
     return app
 
 

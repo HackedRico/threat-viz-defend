@@ -97,7 +97,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     if public_origin is not None:
         public_origin = _origin(public_origin, "PUBLIC_ORIGIN")
     if production and (public_origin is None or not public_origin.startswith("https://")):
-        raise ValueError("Set `PUBLIC_ORIGIN` to the https URL users browse to, such as `https://app.example.com`.")
+        raise ValueError("Set `PUBLIC_ORIGIN` to this API's own https URL, such as `https://api.example.com`.")
 
     hosts = list(_list(env, "ALLOWED_HOSTS"))
     if public_origin is not None:

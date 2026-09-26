@@ -62,7 +62,7 @@ class RequestGuard:
             await self.app(scope, receive, send)
             return
         headers = Headers(scope=scope)
-        problem = self._reject_reason(scope, headers)
+        problem = self._host_problem(scope, headers) or self._reject_reason(scope, headers)
         if problem is not None:
             status, code, message = problem
             await _send_error(send, status, code, message, self._headers)
@@ -92,6 +92,16 @@ class RequestGuard:
             await _send_error(
                 send, 413, "payload_too_large", "That upload is too large. Send fewer files.", self._headers
             )
+
+    def _host_problem(self, scope: Scope, headers: Headers) -> tuple[int, str, str] | None:
+        """Refuse unknown Host headers, which blocks DNS rebinding; health checks from the platform are exempt."""
+        # Platform health checkers may call by internal address, and the health route reveals nothing.
+        if scope["path"] == "/api/health":
+            return None
+        host = headers.get("host", "").rsplit(":", 1)[0].strip("[]").lower()
+        if host in self._settings.allowed_hosts:
+            return None
+        return 400, "bad_request", "Invalid host header."
 
     def _reject_reason(self, scope: Scope, headers: Headers) -> tuple[int, str, str] | None:
         """Why a request must be refused before it reaches a route, or `None`."""

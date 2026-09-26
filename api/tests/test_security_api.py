@@ -37,8 +37,9 @@ def test_large_bodies_are_refused(signed_in: TestClient) -> None:
     assert signed_in.post(f"/api/boards/{board_id}/sources", json=huge).status_code == 413
 
 
-def test_unknown_hosts_are_refused(client: TestClient) -> None:
-    assert client.get("/api/health", headers={"Host": "attacker.example"}).status_code == 400
+def test_unknown_hosts_are_refused_except_for_health_checks(client: TestClient) -> None:
+    assert client.get("/api/config", headers={"Host": "attacker.example"}).status_code == 400
+    assert client.get("/api/health", headers={"Host": "10.244.0.7:8080"}).status_code == 200
 
 
 def test_agent_routes_need_a_personal_token(signed_in: TestClient) -> None:
