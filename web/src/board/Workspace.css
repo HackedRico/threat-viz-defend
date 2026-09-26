@@ -2,7 +2,7 @@
    Module Overview
    =============================================================================
    The board workspace: canvas stage with the ask bar under it, the side
-   panel, the verdict sticky note, the chip that names what is lit, and the
+   panel, the brief sticky note, the chip that names what is lit, and the
    overlay while the server works. */
 
 .workspace {
@@ -62,51 +62,75 @@
   box-shadow: var(--shadow-2);
 }
 
-/* ---------- verdict sticky note ---------- */
+/* ---------- brief sticky note ---------- */
 
-.verdict {
+.brief {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 4;
-  width: min(320px, calc(100% - 32px));
+  width: min(340px, calc(100% - 32px));
+  max-height: calc(100% - 96px);
+  overflow-y: auto;
   padding: var(--space-2) var(--space-3) var(--space-3);
   background: var(--sticky);
   color: var(--sticky-ink);
   border-bottom: 3px solid var(--sticky-edge);
   box-shadow: var(--shadow-sticky);
-  transform: rotate(-1.2deg);
+  transform: rotate(-0.8deg);
   transform-origin: top left;
   animation: sticky-in var(--dur-slow) var(--ease-out);
 }
 
-.verdict.is-folded {
+.brief.is-folded {
   width: auto;
   padding-bottom: var(--space-2);
 }
 
-.verdict-head {
+.brief-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
 
-.verdict-head .btn {
+.brief-head .btn {
   color: inherit;
   font-weight: 700;
 }
 
-.verdict-label {
+.brief-label {
+  margin: 0;
   font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.verdict-text {
-  font-size: 1.28rem;
-  line-height: 1.2;
+.brief-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.brief-part > .brief-label {
+  opacity: 0.72;
+  margin-bottom: 2px;
+}
+
+.brief-part p {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.brief-part .brief-verdict {
+  font-size: 1.18rem;
+  line-height: 1.15;
+}
+
+.brief-part .brief-howto {
+  font-size: var(--text-xs);
 }
 
 @keyframes sticky-in {
