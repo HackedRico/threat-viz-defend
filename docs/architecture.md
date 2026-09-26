@@ -83,7 +83,7 @@ Every model call goes through an `Analyst` ([analysis/analyst.py](../api/app/ana
 
 **Sanitizers.** [domain/rules.py](../api/app/domain/rules.py) makes model output consistent with the map before anything is stored:
 
-- `sanitize_map` turns ids into safe lowercase slugs, drops duplicate ids, flows whose ends are missing or equal, and boundaries with no members, and caps the map at 30 nodes, 60 flows and 10 boundaries.
+- `sanitize_map` turns ids into safe lowercase slugs, drops duplicate ids, flows whose ends are missing or equal, and boundaries with no members, and caps the map at 30 nodes, 60 flows and 10 boundaries. It folds every text field onto one line, because coding agents read map text line by line in the MCP tools' replies.
 - `sanitize_analysis` drops threats pinned to an element the map lacks, sorts by severity, keeps 10, renumbers them `T1`, `T2` and so on, keeps only attack path steps that are nodes on the map, and keeps 5 paths.
 - `only_known` drops highlight ids that are not a node, flow or threat on the board.
 
