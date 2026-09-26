@@ -33,7 +33,6 @@ ThreatViz Defend is our entry for [hackUMBC 2026](https://hackumbc-2026.devpost.
 | Best Use of DigitalOcean | The API, the web app and a Managed Postgres database run on App Platform from [.do/app.yaml](.do/app.yaml). [docs/deploy.md](docs/deploy.md) covers the setup. | Built |
 | Best Domain Name from GoDaddy Registry | The domain is registered through GoDaddy Registry, with DNS pointing at App Platform. | `<domain goes here>` |
 | Best Use of Backboard | Any user can route analysis through Backboard, and add Backboard memory to any provider so progress carries across sessions. | Built |
-| Best Use of Snowflake API | A model provider adapter behind the `Llm` protocol in [api/app/llm/](api/app/llm/). | Planned |
 | Most Engaging Demo | A judge speaks with the voice coach, live, about how this app could be attacked. | Demo day |
 | Best Overall, 1st and 2nd | The whole path runs end to end: material in, map confirmed, threats found, quiz passed, and coding agents keep the map current. | Demo day |
 
