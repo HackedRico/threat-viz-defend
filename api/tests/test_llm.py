@@ -8,7 +8,7 @@ import pytest
 from app.analysis.analyst import LlmAnalyst
 from app.analysis.prompts import fence, find_threats_content, neutralize
 from app.config import load_settings
-from app.domain.models import SystemMap, ThreatAnalysis
+from app.domain.models import Answer, SystemMap, ThreatAnalysis
 from app.llm.base import LlmError, LlmRequest, parse_json, strict_schema
 from app.llm.openai_compat import OpenAICompatibleLlm
 from tests.factories import inbox
@@ -123,6 +123,66 @@ def test_auth_errors_name_the_variable_to_fix() -> None:
     llm, _ = scripted(error)
     with pytest.raises(LlmError, match="LLM_API_KEY"):
         llm.generate(REQUEST)
+
+
+# -----------------------------------------------------------------
+# Retries: logged, and bounded for calls a person waits on
+# -----------------------------------------------------------------
+
+ANSWER = LlmRequest("answer", "system", "user", Answer)
+ANSWERED = '{"answer": "Fix T1 first.", "highlight": []}'
+
+
+def busy(retry_after: str) -> openai.RateLimitError:
+    """A 429 whose `Retry-After` asks the client to wait `retry_after` seconds."""
+    request = httpx.Request("POST", "https://x/v1/chat/completions")
+    response = httpx.Response(429, request=request, headers={"retry-after": retry_after})
+    return openai.RateLimitError("busy", response=response, body=None)  # type: ignore[arg-type]
+
+
+def paced(*replies: Any) -> tuple[OpenAICompatibleLlm, _Completions, list[float]]:
+    """A scripted client whose sleeps are recorded, not taken, on a clock that only sleeping moves."""
+    completions = _Completions(list(replies))
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    slept: list[float] = []
+    llm = OpenAICompatibleLlm(
+        model="m",
+        api_key="k",
+        client=client,  # type: ignore[arg-type]
+        sleep=slept.append,
+        clock=lambda: sum(slept),
+    )
+    return llm, completions, slept
+
+
+def test_a_background_call_waits_out_a_busy_provider_and_logs_it(caplog: pytest.LogCaptureFixture) -> None:
+    llm, calls, slept = paced(busy("20"), GOOD)
+    with caplog.at_level("WARNING", logger="app.llm.openai_compat"):
+        assert llm.generate(REQUEST) == inbox().analysis
+    assert slept == [20.0]
+    assert len(calls.calls) == 2
+    assert "find_threats" in caplog.text
+    assert "retrying in 20.0s" in caplog.text
+
+
+def test_an_answer_gives_up_rather_than_outwait_its_budget() -> None:
+    llm, calls, slept = paced(busy("60"), ANSWERED)
+    with pytest.raises(LlmError) as info:
+        llm.generate(ANSWER)
+    assert info.value.code == "rate_limited"
+    assert slept == []
+    assert len(calls.calls) == 1
+
+
+def test_an_answer_attempt_is_capped_at_the_interactive_budget() -> None:
+    llm, calls, _ = paced(ANSWERED)
+    assert llm.generate(ANSWER).answer == "Fix T1 first."
+    assert calls.calls[0]["timeout"] <= 30
+
+
+def test_the_sdk_never_retries_on_its_own() -> None:
+    llm = OpenAICompatibleLlm(model="m", api_key="k")
+    assert llm._client.max_retries == 0
 
 
 def test_strict_schema_closes_every_object() -> None:
