@@ -260,7 +260,7 @@ def slug_id(raw: str, fallback: str) -> str:
 
 
 def sanitize_map(system: SystemMap) -> SystemMap:
-    """Normalize ids, drop broken references and duplicates, and cap sizes."""
+    """Normalize ids, drop broken references and duplicates, fold text onto one line, and cap sizes."""
     boundaries: list[Boundary] = []
     boundary_ids: dict[str, str] = {}
     for index, boundary in enumerate(system.boundaries[:MAX_BOUNDARIES]):
@@ -268,7 +268,7 @@ def sanitize_map(system: SystemMap) -> SystemMap:
         if new_id in boundary_ids.values():
             continue
         boundary_ids[boundary.id] = new_id
-        boundaries.append(Boundary(id=new_id, label=_clip(boundary.label, MAX_LABEL)))
+        boundaries.append(Boundary(id=new_id, label=_one_line(boundary.label, MAX_LABEL)))
 
     # Nodes and flows share one id space, because threats and highlights point at either kind.
     taken: set[str] = set()
@@ -285,10 +285,10 @@ def sanitize_map(system: SystemMap) -> SystemMap:
             node.model_copy(
                 update={
                     "id": new_id,
-                    "label": _clip(node.label, MAX_LABEL),
-                    "tech": _clip_optional(node.tech, MAX_LABEL),
+                    "label": _one_line(node.label, MAX_LABEL),
+                    "tech": _one_line_optional(node.tech, MAX_LABEL),
                     "boundary": zone,
-                    "evidence": _clip(node.evidence, MAX_TEXT),
+                    "evidence": _one_line(node.evidence, MAX_TEXT),
                 }
             )
         )
@@ -309,9 +309,9 @@ def sanitize_map(system: SystemMap) -> SystemMap:
                     "id": new_id,
                     "source": source,
                     "target": target,
-                    "label": _clip(flow.label, MAX_LABEL),
-                    "data": _clip_optional(flow.data, MAX_TEXT),
-                    "evidence": _clip_optional(flow.evidence, MAX_TEXT),
+                    "label": _one_line(flow.label, MAX_LABEL),
+                    "data": _one_line_optional(flow.data, MAX_TEXT),
+                    "evidence": _one_line_optional(flow.evidence, MAX_TEXT),
                 }
             )
         )
@@ -319,17 +319,17 @@ def sanitize_map(system: SystemMap) -> SystemMap:
     # A boundary with no members would draw as an empty box.
     used = {node.boundary for node in nodes if node.boundary is not None}
     return SystemMap(
-        name=_clip(system.name, MAX_LABEL),
-        summary=_clip(system.summary, MAX_TEXT),
+        name=_one_line(system.name, MAX_LABEL),
+        summary=_one_line(system.summary, MAX_TEXT),
         boundaries=[b for b in boundaries if b.id in used],
         nodes=nodes,
         flows=flows,
-        assumptions=[_clip(a, MAX_TEXT) for a in system.assumptions[:8]],
+        assumptions=[_one_line(a, MAX_TEXT) for a in system.assumptions[:8]],
     )
 
 
 def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnalysis:
-    """Drop threats and path steps the map does not contain, sort by severity and renumber."""
+    """Drop threats and path steps the map does not contain, sort by severity, renumber and fold text onto one line."""
     places = element_ids(system)
     seen: set[str] = set()
     kept: list[Threat] = []
@@ -347,13 +347,13 @@ def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnal
         threat.model_copy(
             update={
                 "id": renumbered[threat.id],
-                "title": _clip(threat.title, MAX_LABEL),
-                "summary": _clip(threat.summary, MAX_TEXT),
-                "statement": _clip(threat.statement, MAX_TEXT),
-                "impact": _clip(threat.impact, MAX_TEXT),
-                "fixes": [_clip(fix, MAX_TEXT) for fix in threat.fixes[:3]],
-                "refs": [_clip(ref, 40) for ref in threat.refs[:6]],
-                "evidence": _clip(threat.evidence, MAX_TEXT),
+                "title": _one_line(threat.title, MAX_LABEL),
+                "summary": _one_line(threat.summary, MAX_TEXT),
+                "statement": _one_line(threat.statement, MAX_TEXT),
+                "impact": _one_line(threat.impact, MAX_TEXT),
+                "fixes": [_one_line(fix, MAX_TEXT) for fix in threat.fixes[:3]],
+                "refs": [_one_line(ref, 40) for ref in threat.refs[:6]],
+                "evidence": _one_line(threat.evidence, MAX_TEXT),
             }
         )
         for threat in kept
@@ -372,17 +372,17 @@ def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnal
             path.model_copy(
                 update={
                     "id": f"P{len(paths) + 1}",
-                    "title": _clip(path.title, MAX_LABEL),
+                    "title": _one_line(path.title, MAX_LABEL),
                     "steps": steps,
                     "threats": along,
-                    "story": _clip(path.story, MAX_TEXT),
+                    "story": _one_line(path.story, MAX_TEXT),
                 }
             )
         )
         if len(paths) >= MAX_PATHS:
             break
 
-    return ThreatAnalysis(verdict=_clip(analysis.verdict, MAX_TEXT), threats=threats, paths=paths)
+    return ThreatAnalysis(verdict=_one_line(analysis.verdict, MAX_TEXT), threats=threats, paths=paths)
 
 
 def remove_element(system: SystemMap, item_id: str) -> SystemMap:
@@ -397,14 +397,16 @@ def remove_element(system: SystemMap, item_id: str) -> SystemMap:
     return trimmed.model_copy(update={"boundaries": [b for b in trimmed.boundaries if b.id in used]})
 
 
-def _clip(text: str, limit: int) -> str:
-    """Trim whitespace and cut `text` to `limit` characters, marking the cut."""
-    stripped = text.strip()
-    return stripped if len(stripped) <= limit else stripped[: limit - 1].rstrip() + "…"
+def _one_line(text: str, limit: int) -> str:
+    """Fold every run of whitespace, line breaks included, into one space and cut to `limit`, marking the cut."""
+    # Agents read map and threat text line by line in `get_board` and `describe_element`, where a line
+    # break could pose as another id or threat. `str.split()` also breaks on `\r`, `\x85` and U+2028.
+    folded = " ".join(text.split())
+    return folded if len(folded) <= limit else folded[: limit - 1].rstrip() + "…"
 
 
-def _clip_optional(text: str | None, limit: int) -> str | None:
-    """`_clip` for nullable fields, turning blank text into `None`."""
+def _one_line_optional(text: str | None, limit: int) -> str | None:
+    """`_one_line` for nullable fields, turning blank text into `None`."""
     if text is None or not text.strip():
         return None
-    return _clip(text, limit)
+    return _one_line(text, limit)
