@@ -111,3 +111,4 @@ def test_describe_element_reports_an_id_missing_from_the_map_as_an_error(signed_
     failed, text = call_tool(signed_in, token, "describe_element", {"board_id": board_id, "element_id": "ghost"})
     assert failed
     assert "no node or flow with id ghost" in text
+    assert "Call get_board for its node and flow ids." in text
