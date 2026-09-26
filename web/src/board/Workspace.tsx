@@ -178,7 +178,7 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
             label="Resize side panel"
             controls="workspace-panel"
             edge="left"
-            width={panelWidth}
+            size={panelWidth}
             bounds={panelBounds}
             fallback={PANEL_DEFAULT}
             onResize={setPanelWidth}

@@ -6,9 +6,9 @@ import "./ResizeHandle.css";
 // =============================================================================
 // Module Overview
 // =============================================================================
-// A draggable edge that sets a pane's width, and the hook that remembers the
-// width in this browser. The handle is a focusable separator, so arrow keys
-// resize it too, and a double click puts the default width back.
+// A draggable edge that sets a pane's width or height, and the hook that
+// remembers a width in this browser. The handle is a focusable separator, so
+// arrow keys resize it too, and a double click puts the default size back.
 
 function readStored(key: string, fallback: number, bounds: WidthBounds): number {
   try {
@@ -32,46 +32,51 @@ export function useStoredWidth(key: string, fallback: number, bounds: WidthBound
   return [width, setWidth];
 }
 
-/** A vertical drag handle on one edge of a pane. */
+/** A drag handle on one edge of a pane. `onReset` replaces resizing to `fallback` on double click. */
 export function ResizeHandle({
   label,
   controls,
   edge,
-  width,
+  size,
   bounds,
   fallback,
   onResize,
+  onReset,
 }: {
   label: string;
   controls: string;
   edge: Edge;
-  width: number;
+  size: number;
   bounds: WidthBounds;
   fallback: number;
   onResize: (next: number) => void;
+  onReset?: () => void;
 }) {
-  const drag = useRef<{ x: number; start: number } | null>(null);
+  const drag = useRef<{ at: number; start: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const rows = edge === "top" || edge === "bottom";
 
   // The body class stops text selection and keeps the resize cursor while the pointer
   // is over the map or panel instead of the thin handle.
   useEffect(() => {
     if (!dragging) return undefined;
-    document.body.classList.add("is-resizing");
-    return () => document.body.classList.remove("is-resizing");
-  }, [dragging]);
+    const classes = rows ? ["is-resizing", "is-resizing-rows"] : ["is-resizing"];
+    document.body.classList.add(...classes);
+    return () => document.body.classList.remove(...classes);
+  }, [dragging, rows]);
 
   const down = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { x: event.clientX, start: width };
+    drag.current = { at: rows ? event.clientY : event.clientX, start: size };
     setDragging(true);
   };
 
   const move = (event: PointerEvent<HTMLDivElement>) => {
     if (!drag.current) return;
-    onResize(dragWidth(drag.current.start, event.clientX - drag.current.x, edge, bounds));
+    const at = rows ? event.clientY : event.clientX;
+    onResize(dragWidth(drag.current.start, at - drag.current.at, edge, bounds));
   };
 
   const up = () => {
@@ -80,7 +85,7 @@ export function ResizeHandle({
   };
 
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
-    const next = keyWidth(width, event.key, edge, bounds);
+    const next = keyWidth(size, event.key, edge, bounds);
     if (next === null) return;
     event.preventDefault();
     onResize(next);
@@ -92,8 +97,8 @@ export function ResizeHandle({
       tabIndex={0}
       aria-label={label}
       aria-controls={controls}
-      aria-orientation="vertical"
-      aria-valuenow={width}
+      aria-orientation={rows ? "horizontal" : "vertical"}
+      aria-valuenow={size}
       aria-valuemin={bounds.min}
       aria-valuemax={bounds.max}
       title="Drag to resize, double click to reset"
@@ -103,7 +108,7 @@ export function ResizeHandle({
       onPointerUp={up}
       onPointerCancel={up}
       onKeyDown={key}
-      onDoubleClick={() => onResize(clampWidth(fallback, bounds))}
+      onDoubleClick={() => (onReset ? onReset() : onResize(clampWidth(fallback, bounds)))}
     />
   );
 }

@@ -86,7 +86,7 @@ export function Shell() {
             label="Resize sidebar"
             controls="sidebar"
             edge="right"
-            width={width}
+            size={width}
             bounds={WIDTH_BOUNDS}
             fallback={DEFAULT_WIDTH}
             onResize={setWidth}
