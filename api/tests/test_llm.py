@@ -77,6 +77,30 @@ def test_rejected_response_format_falls_back_to_the_prompt() -> None:
     assert "JSON Schema" in calls.calls[1]["messages"][0]["content"]
 
 
+@pytest.mark.parametrize(
+    ("base_url", "field", "other"),
+    [
+        (None, "max_completion_tokens", "max_tokens"),
+        ("https://api.openai.com/v1", "max_completion_tokens", "max_tokens"),
+        ("https://api.featherless.ai/v1", "max_tokens", "max_completion_tokens"),
+    ],
+)
+def test_the_output_cap_uses_the_field_the_host_honors(base_url: str | None, field: str, other: str) -> None:
+    completions = _Completions([GOOD])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = OpenAICompatibleLlm(model="m", api_key="k", base_url=base_url, max_tokens=40, client=client)  # type: ignore[arg-type]
+    llm.generate(REQUEST)
+    assert completions.calls[0][field] == 40
+    assert other not in completions.calls[0]
+
+
+def test_no_cap_sends_neither_field() -> None:
+    llm, calls = scripted(GOOD)
+    llm.generate(REQUEST)
+    assert "max_tokens" not in calls.calls[0]
+    assert "max_completion_tokens" not in calls.calls[0]
+
+
 def test_auth_errors_name_the_variable_to_fix() -> None:
     request = httpx.Request("POST", "https://x/v1/chat/completions")
     error = openai.AuthenticationError("bad key", response=httpx.Response(401, request=request), body=None)  # type: ignore[arg-type]

@@ -48,6 +48,8 @@ class OpenAICompatibleLlm:
         )
         host = urlparse(base_url).hostname if base_url else "api.openai.com"
         self._label = f"{model} via {host}"
+        # OpenAI's reasoning models reject `max_tokens`; Featherless, vLLM and others ignore `max_completion_tokens`.
+        self._cap_field = "max_completion_tokens" if host == "api.openai.com" else "max_tokens"
 
     @property
     def label(self) -> str:
@@ -127,7 +129,7 @@ class OpenAICompatibleLlm:
         if response_format is not None:
             kwargs["response_format"] = response_format
         if self._max_tokens is not None:
-            kwargs["max_completion_tokens"] = self._max_tokens
+            kwargs[self._cap_field] = self._max_tokens
         try:
             return self._client.chat.completions.create(**kwargs)
         except openai.BadRequestError:
