@@ -183,7 +183,7 @@ The web app in [web/src/](../web/src/) is React 19 with Vite. There is no router
 | `settings/` | Connect a coding agent and model provider |
 | `styles/` | Design tokens and base styles |
 
-The canvas lays out the map with ELK, loaded on first use, and draws it as SVG with Rough.js. A small zustand store holds what the user is pointing at: the selected element and the ids lit by an answer, a quiz result, the voice coach or an attack path. The voice coach's tools light the map through that store from outside React.
+The canvas lays out the map with ELK, loaded on first use, both top to bottom and left to right, and draws whichever shows larger in its space as SVG with Rough.js. The same drawing serves both workflows: a map drafted from material and a map updated from a coding agent's diff. A small zustand store holds what the user is pointing at: the selected element and the ids lit by an answer, a quiz result, the voice coach or an attack path. The voice coach's tools light the map through that store from outside React.
 
 ## Contract flow
 

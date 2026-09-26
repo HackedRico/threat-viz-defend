@@ -117,19 +117,24 @@ When the map is drawn, the board goes to **Check the map** and the canvas shows 
 | Box with a person | External person or vendor |
 | Rounded box | Process your team runs |
 | Cylinder | Data store |
-| Dashed outline | Trust boundary |
+| Dashed outline | Trust boundary, the only dashed line on the map |
 | Arrow | Flow of data |
+| Two arrows side by side | Data moving both ways between the same two parts, each direction keeping to its own right |
 | Double line | The flow crosses a trust boundary |
 | Ring labeled "lethal trifecta" | An AI part that reads sensitive data, takes in untrusted content and can send data out |
+| Faint outline, while you check the map | The model inferred this part rather than quoting the material, so check it first |
 
-The map key sits in the bottom left corner of the board. Fold it to its title when it covers part of the map, and Show brings it back. The zoom, fit and zoom level controls sit in the bottom right corner.
+The map reads top to bottom or left to right, from where data enters, through your own system, to the outside services it reaches. The canvas picks whichever direction shows the map larger in the space it has, and picks again when opening or closing the side panel reshapes the canvas, until you pan, zoom or turn it yourself.
+
+The map key sits in the bottom left corner of the board. Fold it to its title when it covers part of the map, and Show brings it back; it stays folded on later boards until you open it again. The view controls sit in the bottom right corner: zoom in, zoom out, fit, turn the layout, show or hide threat pins, and the zoom level.
 
 - **Pan:** drag, scroll, or use the arrow keys.
 - **Zoom:** pinch, hold Ctrl and scroll, the zoom buttons, or `+` and `-`.
 - **Fit:** the fit button or `0`.
+- **Turn:** the turn button lays the map out the other way, top to bottom or left to right.
 - **Select:** click an element, or Tab to it and press Enter. Escape clears the selection.
 
-On an updated map, elements carry a `new` or `edited` tag.
+On an updated map, elements carry a `new` or `edited` tag. An update keeps the direction the map is laid out in, so a change from a coding agent never turns the board around.
 
 ### The inspector
 
@@ -165,10 +170,10 @@ Choose **Looks right, find threats**. The board goes to **Finding threats**, the
 
 ## Read the threats
 
-A ready board opens centered on the element with the worst threat.
+A ready board opens with the whole map in view when it fits at a readable size, and otherwise centered on the element with the worst threat.
 
 - **The short version.** The sticky note across the top of the canvas explains the board to someone new. Side by side it says what the system is, how many threats were found by severity and what to fix first, with how to read the map underneath. Fold it away with its button; it stays folded on later boards until you open it again.
-- **Pins.** Each threat is a numbered pin on its node or flow. The shape shows severity without relying on color: octagon for critical, triangle for high, circle for medium, square for low. Clicking a pin selects its element and opens the threat in the list.
+- **Pins.** Each threat is a numbered pin on its node's top right corner, or beside its flow's label. The shape shows severity without relying on color: octagon for critical, triangle for high, circle for medium, square for low, and a critical pin also wears a ring. Clicking a pin selects its element and opens the threat in the list. The pin button in the view controls hides every pin, so you can read the system on its own, and shows them again.
 - **Lethal trifecta.** A ring around an AI part. Select it to see "Reads sensitive data from", "Takes untrusted input from" and "Can send data out to".
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".
 - **Highlights.** When something lights up part of the map, a chip names the source, such as "Lit by the answer", with **Clear**.
