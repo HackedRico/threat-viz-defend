@@ -22,13 +22,10 @@ Your coding agent wrote it. ThreatViz Defend maps how it can be attacked, then q
 
 ## How it works
 
-```mermaid
-flowchart LR
-    IN["Your code and docs,<br/>or an agent's edits"] --> MAP["Model drafts<br/>the map"]
-    MAP --> OK{"You<br/>confirm it"}
-    OK --> T["Rules pick checks,<br/>model writes threats"]
-    T --> Q(["Defend quiz"])
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/how-it-works-dark.svg">
+  <img alt="Add material, draft the map, confirm it, find threats, defend it. A coding agent's edits feed the same map." src="docs/images/how-it-works-light.svg" width="100%">
+</picture>
 
 | Know what to fix first | Prove you understand it |
 |:---:|:---:|
@@ -36,24 +33,22 @@ flowchart LR
 
 ## hackUMBC 2026
 
-| Track | What we built for it | |
-|---|---|:---:|
-| 🛡️ Cybersecurity Application | Evidence-cited threat models and a quiz that proves you understood them. [Our own threat model](docs/security.md) | ✅ |
-| 🎙️ ElevenLabs | A voice coach that runs the quiz out loud, and dictation for questions | ✅ |
-| 🌊 DigitalOcean | App Platform, Managed Postgres, and serverless inference for the default model | ✅ |
-| 🌐 GoDaddy Registry | Our domain: `<domain goes here>` | ⏳ |
-| 🧠 Backboard | Analysis through Backboard, with memory across sessions | ✅ |
-| 🎤 Most Engaging Demo | A judge talks with the voice coach about how this app can be attacked | 🎬 |
-| 🏆 Best Overall | The whole path, end to end | 🎬 |
+| Track | What we built for it | Status |
+|---|---|---|
+| Cybersecurity Application | Evidence-cited threat models and a quiz that proves you understood them. [Our own threat model](docs/security.md) | Built |
+| ElevenLabs | A voice coach that runs the quiz out loud, and dictation for questions | Built |
+| DigitalOcean | App Platform, Managed Postgres, and serverless inference for the default model | Built |
+| GoDaddy Registry | Our domain: `<domain goes here>` | To do |
+| Backboard | Analysis through Backboard, with memory across sessions | Built |
+| Most Engaging Demo | A judge talks with the voice coach about how this app can be attacked | At the demo |
+| Best Overall | The whole path, end to end | At the demo |
 
-<sub>✅ done · ⏳ before submission · 🎬 at the live demo</sub>
-
-| Submission | |
-|---|:---:|
-| Public repo | ✅ |
-| Demo video, 30 seconds or more | ⏳ |
-| Live demo, 3 to 5 minutes | 🎬 |
-| Devpost entry by Sun 11:00 ET, final by 11:45 ET | ⏳ |
+| Submission | Status |
+|---|---|
+| Public repo | Done |
+| Demo video, 30 seconds or more | To do |
+| Live demo, 3 to 5 minutes | At the demo |
+| Devpost entry by Sun 11:00 ET, final by 11:45 ET | To do |
 
 **Team:** Ricky (core engine), MD (diagrams), Eman (voice), Jonathan (hosting). [Who owns what](docs/team.md)
 
@@ -61,34 +56,20 @@ All code was written during the event. Sign up needs an invite code handed out i
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    B["Browser"] -- "GoDaddy domain" --> API
-    A["Claude Code or Cursor"] -- "MCP or hook" --> API
-    B -. "voice" .-> EL
-    API["FastAPI on DigitalOcean"] --> DB[("DigitalOcean Postgres")]
-    API --> LLM["Model"]
-    API --> GH["GitHub"]
-    API --> EL["ElevenLabs"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img alt="The browser and coding agents reach the web app and API on DigitalOcean App Platform. The API stores boards in Postgres and calls ElevenLabs, the model and GitHub." src="docs/images/architecture-light.svg" width="100%">
+</picture>
 
 ## Security by design
 
-Every model reply is untrusted until code checks it.
-
-```mermaid
-flowchart LR
-    IN["Untrusted input"] --> F["Masked and<br/>fenced as data"]
-    F --> M["Model with<br/>no tools"]
-    M --> V{"Valid<br/>schema?"}
-    V -- "retry once" --> M
-    V -- "yes" --> S["Unknown ids<br/>dropped"]
-    S --> OUT["Shown as<br/>plain text"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/output-checks-dark.svg">
+  <img alt="Untrusted input is masked and fenced, the model has no tools, and its reply is validated, sanitized and shown as plain text." src="docs/images/output-checks-light.svg" width="100%">
+</picture>
 
 - Uploads are never stored, only their names and sizes.
 - API keys never reach the browser or the logs.
-- Quiz answer keys come from code, never a model.
 - No admin page: admin runs from the command line.
 
 [docs/security.md](docs/security.md) has every control and our known limits.
