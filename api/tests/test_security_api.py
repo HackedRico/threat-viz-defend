@@ -148,3 +148,16 @@ def test_only_plain_github_repo_urls_parse(url: str) -> None:
 def test_github_urls_with_a_branch_parse() -> None:
     ref = parse_repo_url("https://github.com/owner/my-repo/tree/main")
     assert ref.archive_url == "https://codeload.github.com/owner/my-repo/tar.gz/main"
+
+
+def test_ipv6_clients_share_a_limit_per_64() -> None:
+    from app.context import network_key
+
+    assert network_key("2001:db8:1:2:aaaa::1") == network_key("2001:db8:1:2:bbbb::9") == "2001:db8:1:2::/64"
+    assert network_key("203.0.113.9") == "203.0.113.9"
+    assert network_key("::ffff:203.0.113.9") == "203.0.113.9"
+
+
+def test_uploads_to_someone_elses_board_stop_before_any_work(signed_in: TestClient) -> None:
+    body = {"sources": [{"name": "k.txt", "kind": "text", "text": "-----BEGIN PRIVATE KEY-----\n" * 5000}]}
+    assert signed_in.post("/api/boards/not-a-board/sources", json=body).status_code == 404

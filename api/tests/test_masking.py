@@ -79,3 +79,62 @@ def test_file_policy_lists_what_the_browser_skips() -> None:
     assert ".env" in policy["secretNames"]  # type: ignore[operator]
     assert "node_modules" in policy["ignoredDirs"]  # type: ignore[operator]
     assert policy["maxFileBytes"] == 200_000
+
+
+def test_repeated_key_markers_mask_in_linear_time() -> None:
+    hostile = "-----BEGIN PRIVATE KEY-----\n" * 90_000
+    started = time.perf_counter()
+    masked = mask_secrets(hostile)
+    assert time.perf_counter() - started < 1.0
+    assert "BEGIN PRIVATE KEY" not in masked.text
+
+
+def test_pgp_and_unterminated_keys_are_removed() -> None:
+    pgp = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBF\n-----END PGP PRIVATE KEY BLOCK-----\nafter"
+    assert mask_secrets(pgp).text == "[private key removed]\nafter"
+    assert "BEGIN" not in mask_secrets("-----BEGIN RSA PRIVATE KEY-----\nMIIE...").text
+
+
+@pytest.mark.parametrize(
+    ("text", "leaked"),
+    [
+        ('DB_PASSWORD="Summer 2024!"', "Summer 2024"),
+        ("pwd='hunter'", "hunter"),
+        ("    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVk=", "LS0tLS1CRUdJTiBS"),
+        ('{"auths": {"ghcr.io": {"auth": "dXNlcjpwYXNzd29yZDEyMw=="}}}', "dXNlcjpwYXNz"),
+        ("DefaultEndpointsProtocol=https;AccountName=x;AccountKey=abcdEFGHijklMNOP0123==;", "abcdEFGH"),
+        ("Authorization: Basic dXNlcjpwYXNzd29yZA==", "dXNlcjpwYXNz"),
+        ("token glpat-abcdefghij0123456789", "glpat-abcdefghij"),
+        ("//registry.npmjs.org/:_authToken=npm_abcdefghijklmnopqrstuvwxyz0123456789", "npm_abcdefghij"),
+    ],
+)
+def test_more_secret_shapes_are_masked(text: str, leaked: str) -> None:
+    assert leaked not in mask_secrets(text).text
+
+
+@pytest.mark.parametrize(
+    "path", [".envrc", "kubeconfig", "home/.kube/config", ".docker/config.json", "keys/me.ppk", "x.gpg", "k.asc"]
+)
+def test_more_credential_files_are_skipped(path: str) -> None:
+    assert skip_reason(path) == "may hold credentials"
+
+
+def test_a_plain_config_file_is_still_read() -> None:
+    assert skip_reason("app/config.json") is None
+
+
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        "sk-" * 400_000,
+        "token=" * 200_000,
+        "eyJ" + "a" * 1_000_000,
+        ("eyJ" + "a" * 50) * 20_000,
+        "Bearer " + "a" * 1_000_000,
+    ],
+    ids=["key-prefixes", "assignments", "jwt-start", "jwt-many", "bearer"],
+)
+def test_long_runs_mask_in_linear_time(hostile: str) -> None:
+    started = time.perf_counter()
+    mask_secrets(hostile)
+    assert time.perf_counter() - started < 2.0

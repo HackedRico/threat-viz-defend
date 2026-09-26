@@ -91,6 +91,7 @@ class FilePolicyOut(BaseModel):
     max_file_bytes: int = Field(alias="maxFileBytes")
     max_upload_bytes: int = Field(alias="maxUploadBytes")
     max_files: int = Field(alias="maxFiles")
+    secret_paths: list[str] = Field(alias="secretPaths")
 
 
 class ConfigOut(BaseModel):

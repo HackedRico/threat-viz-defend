@@ -25,7 +25,7 @@ class Jobs(Protocol):
 class ThreadJobs:
     """Runs jobs on a bounded thread pool."""
 
-    def __init__(self, workers: int = 4) -> None:
+    def __init__(self, workers: int = 8) -> None:
         self._pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="job")
 
     def submit(self, work: Callable[[], None], label: str) -> None:

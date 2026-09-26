@@ -12,6 +12,7 @@ from app.errors import bad_request
 from app.llm.backboard import BackboardLlm
 from app.llm.base import JsonMode, Llm, LlmError
 from app.llm.openai_compat import OpenAICompatibleLlm
+from app.providers.gate import GatedLlm, provider_slot
 from app.providers.netguard import Resolver, check_base_url, resolve
 from app.providers.secrets_box import SecretBox
 from app.schemas import ProviderIn, ProviderOut, ProviderTestOut
@@ -98,7 +99,7 @@ class Providers:
         except ValueError as exc:
             raise bad_request(str(exc)) from exc
         llm = self._build(kind, url, model, key, memory, assistant, user_id)
-        return Chosen(LlmAnalyst(llm), own_key=True)
+        return Chosen(LlmAnalyst(GatedLlm(llm, user_id)), own_key=True)
 
     def view(self, session: Session, user_id: str) -> ProviderOut:
         """What analyzes this user's boards, without the key."""
@@ -179,6 +180,14 @@ class Providers:
                     raise bad_request(str(exc)) from exc
         label = _label(body.kind, body.model, body.memory)
         try:
+            with provider_slot(user_id):
+                return self._probe(body, url, key, label)
+        except LlmError as exc:
+            return ProviderTestOut(ok=False, label=label, message=exc.message, models=[])
+
+    def _probe(self, body: ProviderIn, url: str, key: str, label: str) -> ProviderTestOut:
+        """Try the provider once: Backboard by listing assistants, others by listing models."""
+        try:
             if body.kind == "backboard":
                 llm = BackboardLlm(api_key=key, model=body.model, base_url=url, memory=body.memory, timeout_s=15)
                 return ProviderTestOut(ok=True, label=label, message=llm.check(), models=[])
@@ -215,8 +224,14 @@ class Providers:
         # Most user endpoints are not OpenAI itself, so ask for JSON in the prompt unless it is.
         mode: JsonMode = "json_schema" if "api.openai.com" in url else "prompt"
         # The SDK insists on some key; servers that need none ignore it.
+        # No SDK retries: a slow or failing host the user chose should cost one attempt, not three.
         return OpenAICompatibleLlm(
-            model=model, api_key=key or "none", base_url=url, json_mode=mode, timeout_s=self._settings.llm_timeout_s
+            model=model,
+            api_key=key or "none",
+            base_url=url,
+            json_mode=mode,
+            timeout_s=self._settings.llm_timeout_s,
+            max_retries=0,
         )
 
 

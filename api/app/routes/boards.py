@@ -61,6 +61,9 @@ def delete_board(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Non
 @router.post("/{board_id}/sources", status_code=status.HTTP_202_ACCEPTED)
 def add_sources(board_id: str, body: SourcesIn, user: CurrentUser, svc: Svc, session: Db) -> BoardOut:
     """Add pasted text or files and start drawing the map; poll the board for the result."""
+    # Check ownership and pace before masking, which is the expensive part of an upload.
+    svc.boards.get(session, user.id, board_id)
+    svc.limiter.hit(f"sources:{user.id}", 20, 600, "Too many uploads in a few minutes. Wait, then try again.")
     items = [SourceItem(name=s.name, kind=s.kind, text=s.text) for s in body.sources]
     svc.boards.add_material(user.id, board_id, build_material(items, utcnow()))
     return board_out(session, svc.boards, svc.boards.get(session, user.id, board_id))
@@ -70,6 +73,8 @@ def add_sources(board_id: str, body: SourcesIn, user: CurrentUser, svc: Svc, ses
 def add_github(board_id: str, body: GithubIn, user: CurrentUser, svc: Svc, session: Db) -> BoardOut:
     """Read a public GitHub repository and start drawing the map from it."""
     repo = parse_repo_url(body.url)
+    svc.boards.get(session, user.id, board_id)
+    svc.limiter.hit(f"sources:{user.id}", 20, 600, "Too many uploads in a few minutes. Wait, then try again.")
     svc.boards.add_from_fetch(
         user.id, board_id, lambda: fetch_repo(repo, utcnow()), f"Reading {repo.label} from GitHub."
     )
@@ -79,6 +84,7 @@ def add_github(board_id: str, body: GithubIn, user: CurrentUser, svc: Svc, sessi
 @router.put("/{board_id}/map")
 def save_map(board_id: str, body: MapIn, user: CurrentUser, svc: Svc, session: Db) -> BoardOut:
     """Save a map edited by hand; the board returns to review."""
+    svc.limiter.hit(f"map-save:{user.id}", 60, 600, "Too many map saves in a few minutes. Wait, then try again.")
     return board_out(session, svc.boards, svc.boards.save_map(session, user.id, board_id, body.map))
 
 

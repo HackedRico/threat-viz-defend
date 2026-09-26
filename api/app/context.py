@@ -1,3 +1,4 @@
+import ipaddress
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Annotated
@@ -64,12 +65,26 @@ Db = Annotated[Session, Depends(db_session)]
 
 
 def client_ip(request: Request, settings: Settings) -> str:
-    """The caller's IP: the proxy's header when the proxy is trusted, else the socket peer."""
+    """The caller's network for rate limits: the proxy's header when trusted, else the socket peer."""
+    address = request.client.host if request.client else "unknown"
     if settings.trust_proxy:
         forwarded = request.headers.get(settings.client_ip_header, "").split(",")[0].strip()
         if forwarded:
-            return forwarded
-    return request.client.host if request.client else "unknown"
+            address = forwarded
+    return network_key(address)
+
+
+def network_key(address: str) -> str:
+    """An IPv4 address as is, an IPv6 address as its /64, since one client holds a whole /64."""
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
 
 
 def current_user(request: Request, svc: Svc, session: Db) -> UserRow:

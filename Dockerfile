@@ -46,7 +46,9 @@ RUN npm run build
 FROM ${PYTHON_IMAGE} AS runtime
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /app --no-create-home app
-ENV PATH=/opt/venv/bin:$PATH \
+# Production unless told otherwise, so a stray run of this image never gets development defaults.
+ENV APP_ENV=production \
+    PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8080

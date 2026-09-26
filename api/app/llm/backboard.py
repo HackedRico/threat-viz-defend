@@ -121,7 +121,9 @@ class BackboardLlm:
                 "not_configured", "Backboard does not know that endpoint or model. Check the base URL and model."
             )
         if response.status_code >= 400:
-            raise LlmError("unavailable", f"Backboard answered {response.status_code}: {response.text[:200]}")
+            # Collapsing whitespace keeps a hostile error body from forging log lines.
+            detail = " ".join(response.text[:200].split())
+            raise LlmError("unavailable", f"Backboard answered {response.status_code}: {detail}")
         try:
             return response.json()
         except ValueError as exc:

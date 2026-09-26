@@ -185,9 +185,13 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
             <span className="step-num">2</span> Add the server to your agent
           </h3>
           {!fresh && <p className="field-hint">Create a token above and it fills in below.</p>}
-          <Snippet title="Claude Code" value={claudeCommand(origin, token)} label="the Claude Code command" />
+          <Snippet
+            title="First, in the shell that starts your agent"
+            value={envLine(token)}
+            label="the environment line"
+          />
+          <Snippet title="Claude Code" value={claudeCommand(origin)} label="the Claude Code command" />
           <Snippet title="Cursor: .cursor/mcp.json" value={cursorConfig(origin)} label="the Cursor config" />
-          <Snippet title="Then, in the shell that starts Cursor" value={envLine(token)} label="the environment line" />
           <p className="field-hint">
             The MCP endpoint is <code>{mcpUrl(origin)}</code>. A Claude Code hook that sends each change to your board
             is in the <code>integrations/</code> folder of this repository.

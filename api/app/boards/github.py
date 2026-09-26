@@ -24,6 +24,9 @@ _URL = re.compile(
 )
 MAX_ARCHIVE_BYTES = 30_000_000
 MAX_READ_BYTES = 4_000_000
+# Walking an archive decompresses every member, even skipped ones, so its size and entry count are capped.
+MAX_MEMBERS = 20_000
+MAX_EXPANDED_BYTES = 300_000_000
 
 
 @dataclass(frozen=True)
@@ -90,10 +93,16 @@ def _text_files(archive: bytes) -> list[SourceItem]:
     """Readable text files from a tarball, capped in count and total bytes."""
     items: list[SourceItem] = []
     read = 0
+    seen = 0
+    expanded = 0
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
         for member in tar:
-            if len(items) >= MAX_FILES or read >= MAX_READ_BYTES:
+            seen += 1
+            expanded += max(member.size, 0)
+            if len(items) >= MAX_FILES or read >= MAX_READ_BYTES or seen > MAX_MEMBERS or expanded > MAX_EXPANDED_BYTES:
                 break
+            # tarfile keeps every header it walks; clearing them keeps memory flat on huge archives.
+            tar.members = []  # type: ignore[attr-defined]  # a real attribute the stubs omit
             if not member.isfile() or member.size > MAX_FILE_BYTES:
                 continue
             # Archives start with one `<repo>-<sha>/` folder; drop it so paths read like the repository.

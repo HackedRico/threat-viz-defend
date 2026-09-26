@@ -635,7 +635,8 @@
               "payload_too_large",
               "model_error",
               "voice_error",
-              "not_configured"
+              "not_configured",
+              "internal_error"
             ],
             "title": "Code",
             "type": "string"
@@ -802,6 +803,13 @@
             "title": "Secretnames",
             "type": "array"
           },
+          "secretPaths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Secretpaths",
+            "type": "array"
+          },
           "secretWordsPattern": {
             "title": "Secretwordspattern",
             "type": "string"
@@ -818,7 +826,8 @@
           "binaryExtensions",
           "maxFileBytes",
           "maxUploadBytes",
-          "maxFiles"
+          "maxFiles",
+          "secretPaths"
         ],
         "title": "FilePolicyOut",
         "type": "object"

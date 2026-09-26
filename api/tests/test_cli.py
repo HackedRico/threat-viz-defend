@@ -39,3 +39,19 @@ def test_create_user_makes_an_account_without_an_invite(
     mismatched = iter(["organizer-pass-42", "something-else-9"])
     monkeypatch.setattr("getpass.getpass", lambda prompt="": next(mismatched))
     assert main(["create-user", "other"]) == 1
+
+
+def test_a_password_reset_signs_everyone_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi.testclient import TestClient
+
+    url = f"sqlite:///{tmp_path / 'app.db'}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    settings = Settings(database_url=url, static_dir=None, invite_codes=(INVITE,))
+    with TestClient(create_app(settings, jobs=InlineJobs())) as client:
+        client.post("/api/auth/signup", json={"username": "yuki", "password": PASSWORD, "invite_code": INVITE})
+        token = client.post("/api/tokens", json={"name": "hook"}).json()["token"]
+        answers = iter(["brand-new-pass-1", "brand-new-pass-1"])
+        monkeypatch.setattr("getpass.getpass", lambda prompt="": next(answers))
+        assert main(["create-user", "yuki"]) == 0
+        assert client.get("/api/auth/me").status_code == 401
+        assert client.get("/api/agent/boards", headers={"Authorization": f"Bearer {token}"}).status_code == 401

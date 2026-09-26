@@ -30,6 +30,7 @@ class OpenAICompatibleLlm:
         json_mode: JsonMode = "json_schema",
         timeout_s: float = 120.0,
         max_tokens: int | None = None,
+        max_retries: int = 2,
         client: openai.OpenAI | None = None,
     ) -> None:
         if not model:
@@ -41,7 +42,7 @@ class OpenAICompatibleLlm:
             api_key=api_key,
             base_url=base_url,
             timeout=timeout_s,
-            max_retries=2,
+            max_retries=max_retries,
             # A redirect could lead a checked public base URL to a private address, so none are followed.
             http_client=openai.DefaultHttpxClient(follow_redirects=False),
         )

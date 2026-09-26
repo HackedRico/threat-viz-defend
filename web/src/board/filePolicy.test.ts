@@ -14,6 +14,7 @@ const policy: FilePolicy = {
   secretNames: [".env", ".npmrc", "credentials", "id_rsa"],
   secretWordsPattern: "secret|credential|service-?account",
   configExtensions: ["json", "yaml", "yml", "toml", "txt", "ini", "xml", "cfg", "conf"],
+  secretPaths: [".docker/config.json", ".kube/config"],
   secretExtensions: ["pem", "key", "tfvars"],
   safeEnvSuffixes: ["example", "sample", "template"],
   ignoredDirs: ["node_modules", ".git", "dist", "Pods"],

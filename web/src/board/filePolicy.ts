@@ -36,7 +36,8 @@ export function skipReason(path: string, policy: FilePolicy): string | null {
   if (name === undefined) return "empty path";
   // Folder names compare case sensitively, as the server does, so `Pods` and `DerivedData` match exactly.
   if (parts.slice(0, -1).some((part) => policy.ignoredDirs.includes(part))) return "vendored or generated folder";
-  if (isSecretName(name, policy)) return "may hold credentials";
+  const inFolder = parts.length > 1 ? `${parts.at(-2)?.toLowerCase()}/${name}` : name;
+  if (isSecretName(name, policy) || policy.secretPaths.includes(inFolder)) return "may hold credentials";
   if (policy.lockfiles.includes(name)) return "dependency lockfile";
   if (policy.binaryExtensions.includes(extension(name)) || name.endsWith(".min.js")) return "binary or generated file";
   return null;

@@ -818,7 +818,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "bad_request" | "invalid_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "budget_exhausted" | "payload_too_large" | "model_error" | "voice_error" | "not_configured";
+            code: "bad_request" | "invalid_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "budget_exhausted" | "payload_too_large" | "model_error" | "voice_error" | "not_configured" | "internal_error";
             /** Message */
             message: string;
         };
@@ -887,6 +887,8 @@ export interface components {
             secretExtensions: string[];
             /** Secretnames */
             secretNames: string[];
+            /** Secretpaths */
+            secretPaths: string[];
             /** Secretwordspattern */
             secretWordsPattern: string;
         };

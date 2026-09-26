@@ -191,6 +191,10 @@ class Boards:
             except LlmError as exc:
                 self._fail(board_id, "review", exc.message)
                 return
+            except Exception:
+                log.exception("[boards] Finding threats for %s failed unexpectedly.", board_id)
+                self._fail(board_id, "review", "Finding threats failed. Try again.")
+                return
             with self._db.session() as session:
                 target = session.get(BoardRow, board_id)
                 if target is None:
@@ -283,6 +287,11 @@ class Boards:
                 return
             except ValueError as exc:
                 self._fail(board_id, restore, str(exc))
+                return
+            except Exception:
+                # Network errors, broken archives and the like must not leave the board busy forever.
+                log.exception("[boards] Drawing the map for %s failed unexpectedly.", board_id)
+                self._fail(board_id, restore, "Reading the material failed. Try again.")
                 return
             with self._db.session() as session:
                 target = session.get(BoardRow, board_id)

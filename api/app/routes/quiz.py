@@ -26,6 +26,7 @@ def get_quiz(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> QuizOut
 @router.post("/{board_id}/quiz/answers")
 def answer_question(board_id: str, body: AnswerIn, user: CurrentUser, svc: Svc) -> AnsweredOut:
     """Grade one answer: choice questions by code, open ones by the model."""
+    svc.limiter.hit(f"quiz-answer:{user.id}", 60, 60, "Too many answers in a minute. Slow down a little.")
     return svc.quiz.answer(user.id, board_id, body)
 
 

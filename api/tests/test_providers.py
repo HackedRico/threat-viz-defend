@@ -195,3 +195,21 @@ def test_a_saved_key_is_not_reused_for_another_host(make_client: ClientFactory) 
     assert client.put("/api/provider", json=moved).status_code == 400
     assert client.post("/api/provider/test", json=moved).status_code == 400
     assert client.put("/api/provider", json=provider_body(api_key=None, model="gpt-2")).status_code == 200
+
+
+def test_each_user_gets_one_provider_call_at_a_time() -> None:
+    from app.providers.gate import MAX_IN_FLIGHT, provider_slot
+
+    with provider_slot("u1"), pytest.raises(LlmError, match="still answering"), provider_slot("u1"):
+        pass
+    held = [provider_slot(f"user-{i}") for i in range(MAX_IN_FLIGHT)]
+    for slot in held:
+        slot.__enter__()
+    try:
+        with pytest.raises(LlmError, match="Many people"), provider_slot("one-more"):
+            pass
+    finally:
+        for slot in held:
+            slot.__exit__(None, None, None)
+    with provider_slot("one-more"):
+        pass

@@ -3,18 +3,21 @@ import hmac
 import logging
 import re
 import secrets
+import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db import utcnow
-from app.errors import bad_request, conflict, forbidden, not_found, too_many, unauthorized
+from app.errors import AppError, bad_request, conflict, forbidden, not_found, too_many, unauthorized
 from app.limits import RateLimiter
 from app.tables import ApiTokenRow, LoginSessionRow, UserRow
 
@@ -37,6 +40,9 @@ _hasher = PasswordHasher()
 # Verifying against a throwaway hash when the username is unknown keeps both paths equally slow,
 # so response time does not reveal which usernames exist.
 _DUMMY_HASH = _hasher.hash(secrets.token_urlsafe(16))
+# Each argon2id hash takes 64 MiB; two at a time keeps a burst of sign ins from exhausting memory.
+_HASH_SLOTS = threading.BoundedSemaphore(2)
+_HASH_WAIT_S = 5.0
 _COMMON_PASSWORDS = frozenset({"password12", "password123", "1234567890", "qwertyuiop", "letmein123", "iloveyou12"})
 
 
@@ -74,6 +80,8 @@ class Accounts:
             raise bad_request("Usernames are 3 to 24 characters: letters, digits, dots, dashes and underscores.")
         if not self._invite_ok(invite_code):
             self._limiter.hit(f"invite-fail:{ip}", 20, 3600, "Too many wrong invite codes. Try again in an hour.")
+            # Across all networks too, so rotating addresses cannot guess codes without end.
+            self._limiter.hit("invite-fail:all", 300, 3600, "Too many wrong invite codes. Try again in an hour.")
             raise forbidden("That invite code is not valid. Ask the organizers for the current code.")
         if password.lower() in _COMMON_PASSWORDS or name in password.lower():
             raise bad_request("Pick a less guessable password, one that does not contain your username.")
@@ -82,7 +90,7 @@ class Accounts:
         count = session.scalar(select(func.count()).select_from(UserRow)) or 0
         if count >= self._settings.max_users:
             raise forbidden("Sign ups are closed: this event has reached its account limit.")
-        user = UserRow(id=str(uuid.uuid4()), username=name, password_hash=_hasher.hash(password))
+        user = UserRow(id=str(uuid.uuid4()), username=name, password_hash=_hash(password))
         session.add(user)
         session.flush()
         log.info("[auth] New account %s.", name)
@@ -97,11 +105,13 @@ class Accounts:
             raise bad_request("Passwords need 10 or more characters.")
         user = session.scalar(select(UserRow).where(UserRow.username == name))
         if user is None:
-            user = UserRow(id=str(uuid.uuid4()), username=name, password_hash=_hasher.hash(password))
+            user = UserRow(id=str(uuid.uuid4()), username=name, password_hash=_hash(password))
             session.add(user)
         elif not _verify(user.password_hash, password):
-            user.password_hash = _hasher.hash(password)
-        user.disabled = False
+            user.password_hash = _hash(password)
+            # A reset is often a response to a compromise, so every existing session and token ends.
+            session.execute(delete(LoginSessionRow).where(LoginSessionRow.user_id == user.id))
+            session.execute(delete(ApiTokenRow).where(ApiTokenRow.user_id == user.id))
         session.flush()
         return user
 
@@ -128,7 +138,7 @@ class Accounts:
             raise forbidden("This account is disabled. Ask the organizers.")
         self._limiter.reset(failures)
         if _hasher.check_needs_rehash(user.password_hash):
-            user.password_hash = _hasher.hash(password)
+            user.password_hash = _hash(password)
         user.last_login_at = utcnow()
         return SignedIn(user, self._open_session(session, user))
 
@@ -221,10 +231,28 @@ class Tokens:
         return user
 
 
+@contextmanager
+def _hash_slot() -> Iterator[None]:
+    """Hold one of the few argon2 slots, or answer 503 when the server is busy hashing."""
+    if not _HASH_SLOTS.acquire(timeout=_HASH_WAIT_S):
+        raise AppError(503, "rate_limited", "Sign in is busy right now. Try again in a few seconds.")
+    try:
+        yield
+    finally:
+        _HASH_SLOTS.release()
+
+
+def _hash(password: str) -> str:
+    """Hash a password with argon2id inside a slot."""
+    with _hash_slot():
+        return _hasher.hash(password)
+
+
 def _verify(password_hash: str, password: str) -> bool:
     """True when `password` matches `password_hash`."""
     try:
-        return _hasher.verify(password_hash, password)
+        with _hash_slot():
+            return _hasher.verify(password_hash, password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
 
