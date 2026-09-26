@@ -1,0 +1,407 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The defend panel: the mastery score, the mode switch, the question stops,
+   question cards with lettered options, and the teacher's stamp on results. */
+
+.defend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---------- mastery ---------- */
+
+.mastery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--board);
+}
+
+.mastery-score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.mastery-percent {
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.mastery-caption {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.mastery-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.mastery-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.weak-spots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.weak-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.weak-chip {
+  cursor: pointer;
+  border-style: dashed;
+}
+
+.weak-chip:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ---------- mode switch ---------- */
+
+.defend-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+}
+
+.defend-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.defend-mode[aria-checked="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.defend-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.defend-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--line);
+}
+
+/* ---------- stops ---------- */
+
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.quiz-stops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-stop {
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.quiz-stop.is-current {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+  color: var(--ink);
+}
+
+.quiz-stop.is-correct {
+  background: var(--marker-green);
+  border-color: var(--marker-green);
+  color: var(--ink-inverse);
+}
+
+.quiz-stop.is-partial {
+  background: linear-gradient(135deg, var(--sev-medium) 50%, var(--surface) 50%);
+  border-color: var(--sev-medium);
+  color: var(--ink);
+}
+
+.quiz-stop.is-wrong {
+  border-color: var(--danger);
+  border-style: dashed;
+  color: var(--danger);
+}
+
+/* ---------- question card ---------- */
+
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.question-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.question-topic {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.question-prompt {
+  font-family: var(--font-hand);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.question-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  list-style: none;
+}
+
+.options-how {
+  margin-bottom: 4px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+label.option:hover {
+  border-color: var(--line-strong);
+}
+
+label.option:focus-within {
+  outline: 2.5px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.option-letter {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--ink-soft);
+  border-radius: 50%;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.option.is-picked {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.option.is-picked .option-letter {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.option-label {
+  flex: 1;
+}
+
+.options-graded .option {
+  cursor: default;
+}
+
+.option.is-right {
+  border-color: var(--marker-green);
+  background: var(--marker-green-wash);
+}
+
+.option.is-right .option-letter {
+  background: var(--marker-green);
+  border-color: var(--marker-green);
+  color: var(--ink-inverse);
+}
+
+.option.is-wrong {
+  border-color: var(--danger);
+  border-style: dashed;
+  background: var(--marker-red-wash);
+}
+
+.option.is-wrong .option-letter {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.option-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.is-right .option-mark {
+  color: var(--marker-green);
+}
+
+.is-wrong .option-mark {
+  color: var(--danger);
+}
+
+/* ---------- result ---------- */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stamp {
+  align-self: flex-start;
+  padding: 0 var(--space-3);
+  border: 3px solid currentColor;
+  border-radius: 8px;
+  font-family: var(--font-hand);
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  transform: rotate(-4deg);
+  animation: stamp-in 260ms var(--ease-out);
+}
+
+.stamp-correct {
+  color: var(--marker-green);
+}
+.stamp-partial {
+  color: var(--sev-medium);
+}
+.stamp-wrong {
+  color: var(--danger);
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-12deg) scale(1.6);
+  }
+}
+
+.result-feedback {
+  font-weight: 560;
+}
+
+.result-explanation {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.your-text {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+
+.result-evidence ul {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.result-evidence li {
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--line-strong);
+}
+
+.evidence-label {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--ink-faint);
+}
+
+.result-evidence q {
+  font-style: italic;
+}

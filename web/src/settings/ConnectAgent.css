@@ -1,0 +1,104 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The coding agent section: the token form, the one-time token, the token
+   table and copyable setup snippets. */
+
+.connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.connect-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.token-once {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--sticky);
+  color: var(--sticky-ink);
+  border-bottom: 3px solid var(--sticky-edge);
+  box-shadow: var(--shadow-sticky);
+}
+
+.token-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.token-value code {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+  word-break: break-all;
+  user-select: all;
+}
+
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.token-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1.5px solid var(--line);
+}
+
+.token-table td {
+  padding: var(--space-2);
+  border-bottom: 1px dashed var(--line);
+}
+
+.snippet {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.snippet-title {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+
+.snippet-body {
+  margin: 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  background: var(--board);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  user-select: text;
+}
+
+.copy-button {
+  gap: 5px;
+}
+
+.connect-board {
+  max-width: 420px;
+}

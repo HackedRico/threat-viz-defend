@@ -1,0 +1,20 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The full-page loading and failure states shown before the app can start. */
+
+.app-status {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  min-height: 100%;
+  padding: var(--space-6);
+  text-align: center;
+  background: var(--board);
+}
+
+.app-status-title {
+  font-size: var(--hand-xl);
+  line-height: 1;
+}

@@ -1,0 +1,182 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The voice coach: a big round start and stop control whose ring follows the
+   microphone level, the question on screen, and the live transcript. */
+
+.coach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.coach-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--board);
+  text-align: center;
+}
+
+.coach-button {
+  --level: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 132px;
+  height: 132px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background var(--dur-med) var(--ease-out),
+    color var(--dur-med) var(--ease-out);
+}
+
+.coach-button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.coach-button-text {
+  font-family: var(--font-hand);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.coach-ring {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  opacity: 0;
+  transform: scale(calc(1 + var(--level) * 0.18));
+  transition: transform 80ms linear;
+  pointer-events: none;
+}
+
+.is-live .coach-button {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.is-live .coach-ring {
+  opacity: 1;
+}
+
+.is-live.is-speaking .coach-ring {
+  border-color: var(--ai);
+  border-style: dashed;
+  animation: coach-speak 1.4s linear infinite;
+}
+
+@keyframes coach-speak {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.coach-state {
+  max-width: 34ch;
+  font-weight: 560;
+}
+
+.coach-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1.5px solid var(--line);
+  border-left: 5px solid var(--accent);
+  border-radius: var(--radius-md);
+}
+
+.coach-prompt {
+  font-family: var(--font-hand);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.coach-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+
+.coach-options li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.coach-options .option-letter {
+  width: 22px;
+  height: 22px;
+  font-size: 0.95rem;
+}
+
+.coach-result {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.coach-transcript ol {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 280px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.turn {
+  display: flex;
+  flex-direction: column;
+  max-width: 88%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.turn-agent {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border-bottom-left-radius: 2px;
+}
+
+.turn-user {
+  align-self: flex-end;
+  background: var(--accent-wash);
+  border-bottom-right-radius: 2px;
+}
+
+.turn-who {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-ring {
+    transform: none;
+  }
+  .is-live.is-speaking .coach-ring {
+    animation: none;
+  }
+}

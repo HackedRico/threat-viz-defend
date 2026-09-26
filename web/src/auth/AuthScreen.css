@@ -1,0 +1,210 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The sign in screen: a whiteboard with the pitch and a self-drawing diagram
+   on the left, the account form on the right. It stacks on narrow screens. */
+
+.auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 440px);
+  min-height: 100%;
+  background: var(--tray);
+}
+
+.auth-board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-5);
+  margin-right: 0;
+  padding: clamp(var(--space-5), 5vw, var(--space-7));
+  padding-bottom: 72px;
+  border: 10px solid var(--surface-3);
+  border-radius: var(--radius-lg);
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.06), var(--shadow-2);
+  overflow: hidden;
+}
+
+.auth-brand {
+  font-size: var(--hand-lg);
+  color: var(--accent);
+  line-height: 1;
+  transform: rotate(-2deg);
+  transform-origin: left;
+}
+
+.auth-headline {
+  font-size: clamp(2.6rem, 5.2vw, 4.4rem);
+  line-height: 0.95;
+  max-width: 12ch;
+}
+
+.auth-underline {
+  position: relative;
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.auth-underline::after {
+  content: "";
+  position: absolute;
+  left: 2%;
+  right: 4%;
+  bottom: -0.02em;
+  height: 0.12em;
+  border-radius: 999px;
+  background: var(--danger);
+  transform: rotate(-1.5deg);
+  opacity: 0.8;
+}
+
+.auth-lede {
+  max-width: 46ch;
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+}
+
+.auth-sketch {
+  width: min(460px, 100%);
+  margin-top: auto;
+  align-self: flex-end;
+}
+
+.auth-tray {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 28px;
+  background: var(--surface-3);
+}
+
+.marker {
+  width: 64px;
+  height: 11px;
+  border-radius: 3px 6px 6px 3px;
+  background: var(--ink);
+  box-shadow: inset -12px 0 0 rgba(255, 255, 255, 0.25);
+}
+.marker-red {
+  background: var(--marker-red);
+}
+.marker-blue {
+  background: var(--marker-blue);
+}
+.eraser {
+  width: 54px;
+  height: 16px;
+  margin-left: auto;
+  border-radius: 3px;
+  background: var(--ink-soft);
+  box-shadow: inset 0 -5px 0 var(--line-strong);
+}
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: clamp(var(--space-5), 5vw, var(--space-7));
+}
+
+.auth-tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1.5px solid var(--line);
+}
+
+.auth-tab {
+  padding: var(--space-2) var(--space-1);
+  margin-bottom: -1.5px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-family: var(--font-hand);
+  font-size: var(--hand-md);
+  font-weight: 700;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.auth-tab + .auth-tab {
+  margin-left: var(--space-4);
+}
+
+.auth-tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.auth-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.auth-note {
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-password {
+  position: relative;
+}
+
+.auth-password .input {
+  padding-right: 64px;
+}
+
+.auth-reveal {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+}
+
+.auth-error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--danger);
+  background: var(--marker-red-wash);
+  font-size: var(--text-sm);
+}
+
+.auth-submit {
+  min-height: 44px;
+  font-size: var(--text-md);
+}
+
+.honeypot {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 860px) {
+  .auth {
+    grid-template-columns: 1fr;
+  }
+  .auth-board {
+    margin: var(--space-3);
+    padding-bottom: 60px;
+  }
+  .auth-sketch {
+    display: none;
+  }
+}

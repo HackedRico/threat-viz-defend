@@ -1,0 +1,90 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The settings page frame shared by every section: the board background, the
+   section tabs, headings and the numbered step cards. */
+
+.connect {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-6) var(--space-5);
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+.connect-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.connect-title {
+  font-size: var(--hand-xl);
+  line-height: 1;
+}
+
+.connect-lede {
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+  max-width: 60ch;
+}
+
+.connect-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.connect-step-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-lg);
+}
+
+.step-num {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  font-family: var(--font-hand);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  align-self: flex-start;
+}
+
+.settings-tab {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.settings-tab[aria-current="page"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}

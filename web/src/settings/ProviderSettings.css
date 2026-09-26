@@ -1,0 +1,104 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The model provider section: the provider in use, the kind picker, preset
+   chips, the model suggestions from a connection test, and the quiet line that
+   names the model where an analysis runs. */
+
+.provider-now {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.provider-label {
+  font-size: var(--hand-lg);
+  line-height: 1;
+}
+
+.provider-form .field {
+  max-width: 560px;
+}
+
+.provider-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.provider-kinds legend {
+  margin-bottom: var(--space-1);
+}
+
+.provider-kind {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.provider-kind input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.provider-kind:focus-within {
+  outline: 2.5px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.provider-kind.is-on {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.provider-kind-name {
+  font-weight: 650;
+}
+
+.provider-presets,
+.provider-models {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.provider-models {
+  margin-top: var(--space-2);
+}
+
+.provider-preset {
+  cursor: pointer;
+}
+
+.provider-preset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.provider-saved {
+  font-size: var(--text-sm);
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.provider-line {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .provider-kinds {
+    grid-template-columns: 1fr;
+  }
+}

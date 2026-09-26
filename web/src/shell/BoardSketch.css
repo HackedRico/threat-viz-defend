@@ -1,0 +1,136 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   Stroke-by-stroke drawing for `BoardSketch`. Each path has a path length of 1,
+   so one dash offset animation draws any stroke at the same pace. Reduced
+   motion shows the finished drawing at once. */
+
+.board-sketch {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.sketch-stroke {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sketch-draw 0.5s var(--ease-out) forwards;
+}
+
+.tone-ink {
+  stroke: var(--ink);
+}
+/* A dash pattern cannot also carry the draw-on animation, so the boundary fades in instead. */
+.sketch-stroke.tone-boundary {
+  stroke: var(--ink-faint);
+  stroke-width: 1.6;
+  stroke-dasharray: 7 6;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  animation: sketch-fade 0.6s ease forwards;
+}
+.tone-flow {
+  stroke: var(--accent);
+}
+.tone-danger {
+  stroke: var(--danger);
+  stroke-width: 2.4;
+}
+
+.sketch-label,
+.sketch-pin {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 19px;
+  fill: var(--ink);
+  opacity: 0;
+  animation: sketch-fade 0.4s ease forwards;
+  animation-delay: 1.7s;
+}
+
+.sketch-zone {
+  fill: var(--ink-faint);
+  font-size: 16px;
+}
+
+.sketch-pin {
+  fill: var(--danger);
+  font-size: 17px;
+  text-anchor: middle;
+  animation-delay: 2.1s;
+}
+
+.is-looping .sketch-stroke {
+  animation: sketch-loop 4.2s var(--ease-out) infinite;
+}
+
+.is-looping .sketch-stroke.tone-boundary {
+  animation: sketch-fade-loop 4.2s ease infinite;
+}
+
+.is-looping .sketch-label,
+.is-looping .sketch-pin {
+  animation: sketch-fade-loop 4.2s ease infinite;
+}
+
+@keyframes sketch-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sketch-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sketch-loop {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  45%,
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes sketch-fade-loop {
+  0%,
+  40% {
+    opacity: 0;
+  }
+  55%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sketch-stroke,
+  .is-looping .sketch-stroke {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .sketch-stroke.tone-boundary,
+  .is-looping .sketch-stroke.tone-boundary,
+  .sketch-label,
+  .sketch-pin,
+  .is-looping .sketch-label,
+  .is-looping .sketch-pin {
+    animation: none;
+    opacity: 1;
+  }
+}
