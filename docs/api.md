@@ -232,16 +232,16 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 
 ## MCP tools
 
-`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. App errors, such as a busy board or a spent budget, come back as tool errors with the app's message. [integrations/README.md](../integrations/README.md) has the client setup.
+`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. [integrations/README.md](../integrations/README.md) has the client setup.
 
 | Tool | Arguments | Does | Spends |
 |---|---|---|---|
 | `list_boards` | none | Lists boards: id, title, status, threat counts | nothing |
 | `get_board` | `board_id` | Describes the system, its trust zones, AI exposure, up to 6 threats with fixes, the status and every node id | nothing |
-| `describe_element` | `board_id`, `element_id` | Describes one node or flow and the threats pinned to it | nothing |
+| `describe_element` | `board_id`, `element_id` | Describes one node or flow and the threats pinned to it; an id the map does not hold is a tool error | nothing |
 | `ask_board` | `board_id`, `question` | Answers a question about a finished board, with related ids | 1 model call |
 | `report_change` | `board_id`, `summary`, `diff`, `files` | Updates the map from a change the agent made; the developer reviews it in the app | 1 model call, 1 of 30 agent changes per hour |
-| `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered | nothing |
+| `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered; a map with no questions is a tool error | nothing |
 | `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or the developer's own words, and returns the result, feedback and explanation | 1 model call for open questions |
 
 ## Examples

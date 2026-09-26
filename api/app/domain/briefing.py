@@ -53,8 +53,8 @@ def brief(system: SystemMap, analysis: ThreatAnalysis | None, *, max_threats: in
     return "\n".join(lines)
 
 
-def describe_element(system: SystemMap, analysis: ThreatAnalysis | None, item_id: str) -> str:
-    """Describe one node or flow and the threats pinned to it, or say the id is not on the map."""
+def describe_element(system: SystemMap, analysis: ThreatAnalysis | None, item_id: str) -> str | None:
+    """Describe one node or flow and the threats pinned to it, or `None` when the id is not on the map."""
     nodes = node_index(system)
     threats = [t for t in (analysis.threats if analysis else []) if t.element == item_id]
     if item_id in nodes:
@@ -70,7 +70,7 @@ def describe_element(system: SystemMap, analysis: ThreatAnalysis | None, item_id
     else:
         flow = next((f for f in system.flows if f.id == item_id), None)
         if flow is None:
-            return f"There is no node or flow with id {item_id} on this map."
+            return None
         carries = f" It carries {flow.data}." if flow.data else ""
         crossing = " It crosses a trust boundary." if crosses_boundary(system, flow) else ""
         text = f"{flow_label(system, flow)}.{carries}{crossing}"
