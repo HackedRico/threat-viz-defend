@@ -43,6 +43,7 @@
 }
 
 .workspace-panel {
+  position: relative;
   min-height: 0;
   overflow: hidden;
   border-left: 1.5px solid var(--line);
@@ -173,6 +174,10 @@
     border-left: 0;
     border-top: 1.5px solid var(--line);
     max-height: 55vh;
+  }
+  /* Stacked under the map, the panel is full width, so there is no edge to drag. */
+  .workspace-panel > .resize-handle {
+    display: none;
   }
   .lit-chip {
     max-width: calc(100% - 32px);

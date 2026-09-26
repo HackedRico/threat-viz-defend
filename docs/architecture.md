@@ -139,7 +139,7 @@ AnalystSource          Providers.for_user       the user's saved provider, else 
 
 ## Voice coach
 
-[voice.py](../api/app/voice.py) mints a WebRTC conversation token for the private ElevenLabs agent with the server's key. `POST /api/boards/{id}/voice` spends one voice session and returns the token plus a short spoken brief of the board as dynamic variables. The browser ([web/src/voice/](../web/src/voice/README.md)) starts the session and registers four client tools: `get_next_question`, `submit_answer`, `show_on_board` and `get_board_brief`. `submit_answer` posts to the same quiz route as the text quiz, so grading happens on the server either way.
+[voice.py](../api/app/voice.py) mints a WebRTC conversation token for the private ElevenLabs agent with the server's key. `POST /api/boards/{id}/voice` spends one voice session and returns the token plus a short spoken brief of the board as dynamic variables. The browser ([web/src/voice/](../web/src/voice/AGENTS.md)) starts the session and registers four client tools: `get_next_question`, `submit_answer`, `show_on_board` and `get_board_brief`. `submit_answer` posts to the same quiz route as the text quiz, so grading happens on the server either way.
 
 ## Coding agents
 

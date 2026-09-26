@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import type { BoardOut, SystemMap } from "../api/types.ts";
 import { CloseIcon, SidebarIcon } from "../shell/icons.tsx";
+import { ResizeHandle, useStoredWidth } from "../shell/ResizeHandle.tsx";
+import { clampWidth } from "../shell/resize.ts";
 import { isBusy } from "../shell/statusText.ts";
 import { ProviderLine } from "../settings/ProviderSettings.tsx";
 import { ActivityLog } from "./ActivityLog.tsx";
@@ -35,6 +37,10 @@ const SOURCE_TEXT: Record<HighlightSource, string> = {
   threat: "Lit by the threat",
 };
 
+const PANEL_WIDTH_KEY = "panel-width";
+const PANEL_DEFAULT = 380;
+const PANEL_BOUNDS = { min: 320, max: 900 };
+
 /** The map and its side panel for a board in review, analysis or ready. */
 export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next: BoardOut) => void }) {
   const review = board.status === "review";
@@ -44,6 +50,11 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
   const [editBase, setEditBase] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [askSignal, setAskSignal] = useState(0);
+  const [storedWidth, setPanelWidth] = useStoredWidth(PANEL_WIDTH_KEY, PANEL_DEFAULT, PANEL_BOUNDS);
+  // The panel may take most of the window but always leaves some map to look at. The cap
+  // applies only on screen, so a narrow window never overwrites the width the user chose.
+  const panelBounds = { min: PANEL_BOUNDS.min, max: Math.min(PANEL_BOUNDS.max, Math.round(window.innerWidth * 0.6)) };
+  const panelWidth = clampWidth(storedWidth, panelBounds);
 
   // Adopt the server's map when it changes, unless the user has unsaved edits to keep.
   const seenRevision = useRef(board.revision);
@@ -87,7 +98,10 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
   const shownLabels = highlight.slice(0, 4).map((id) => labelOf(id, map, analysis));
 
   return (
-    <div className={`workspace ${panelOpen ? "" : "panel-closed"}`}>
+    <div
+      className={`workspace ${panelOpen ? "" : "panel-closed"}`}
+      style={{ "--panel-width": `${panelWidth}px` } as CSSProperties}
+    >
       <div className="workspace-stage">
         <div className="workspace-canvas">
           {layout && key ? (
@@ -160,6 +174,15 @@ export function Workspace({ board, onApply }: { board: BoardOut; onApply: (next:
 
       {panelOpen && (
         <aside id="workspace-panel" className="workspace-panel" aria-label={review ? "Review the map" : "Threat model"}>
+          <ResizeHandle
+            label="Resize side panel"
+            controls="workspace-panel"
+            edge="left"
+            width={panelWidth}
+            bounds={panelBounds}
+            fallback={PANEL_DEFAULT}
+            onResize={setPanelWidth}
+          />
           {busy ? (
             <div className="panel">
               <p className="muted">

@@ -2,6 +2,10 @@
 
 ThreatViz Defend is two programs in two languages. `api/` is a Python FastAPI server and `web/` is a React and TypeScript app. Each language owns the half it fits best; pick by where the code runs, never by habit. The [README](README.md) says what the product does and [docs/architecture.md](docs/architecture.md) explains how.
 
+## Team and areas
+
+The core engine in `api/` is the hub; diagrams, voice, hosting, coding agents and model providers are spokes that each touch it at one seam. Before you change a file, find its area and owner in [docs/team.md](docs/team.md): work inside your own area, and change a seam or another owner's folder only with that owner's review. Each area has its own guide, loaded when you work there: [api/AGENTS.md](api/AGENTS.md) (core engine), [web/src/board/AGENTS.md](web/src/board/AGENTS.md) (diagrams), [web/src/voice/AGENTS.md](web/src/voice/AGENTS.md) (voice), [.do/AGENTS.md](.do/AGENTS.md) (hosting).
+
 ## Commands
 
 ```bash
@@ -55,18 +59,16 @@ A change is done when both halves pass their checks. CI runs the same commands a
 - Cookie routes require JSON bodies and same-site or allowlisted origins (`RequestGuard` in `api/app/web.py`). Model and voice routes spend from `Budget` in `api/app/limits.py`.
 - Never commit `.env`, a database or a real key. The repo is public.
 
-## Code style
+## Code style and commits
 
-- Every file opens with a Module Overview banner after its imports, and every public function has a one-line doc comment. Comments say why, never what.
-- Python: type every signature, `mypy --strict` clean, errors raised through the helpers in `api/app/errors.py` with a message that tells the user what to do next.
-- TypeScript: strict, no `any` outside SDK boundaries, CSS beside each component, colors and fonts only from `web/src/styles/tokens.css`. Pure logic lives in `.ts` modules with `node:test` tests beside them.
+[docs/conventions.md](docs/conventions.md) is the full style guide for Python, TypeScript, tests, docs, commits and PRs. The rules every change keeps:
+
+- Every file opens with a Module Overview banner, every export has a one-line doc comment, and comments say why, never what.
+- Python is typed and `mypy --strict` clean; TypeScript is strict with no `any` outside SDK boundaries.
 - Tests never call a real model, voice service or network: use `DemoAnalyst`, scripted fakes, `InlineJobs` and the `make_client` fixture in `api/tests/conftest.py`.
-
-## Writing and commits
-
-- Docs and UI copy: plain words, sentence case headings, straight quotes, and never an em dash or en dash. Use a comma or a period.
-- A behavior change updates the doc that describes it: [docs/user-guide.md](docs/user-guide.md) for screens, [docs/api.md](docs/api.md) for endpoints, [docs/security.md](docs/security.md) for controls, `.env.example` and [docs/deploy.md](docs/deploy.md) for configuration.
-- Commits follow Conventional Commits, lowercase, no trailing period, no AI attribution. Scopes: `api`, `web`, `integrations`, `docs`.
+- Docs, UI copy, commits and PRs use plain words, sentence case and straight quotes, and never an em dash or en dash.
+- A behavior change updates the doc that describes it in the same PR.
+- Conventional Commits, lowercase, no trailing period, no AI attribution, never a push to `main`.
 
 ## Ask first
 

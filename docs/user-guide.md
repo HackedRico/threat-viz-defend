@@ -23,6 +23,7 @@ The left rail holds everything outside the open board.
 
 - **App name.** Goes home, which opens the board you changed most recently. With no boards, home shows "A clean whiteboard." with **Start a board** and **Open the example board**.
 - **Collapse sidebar.** The icon beside the name narrows the rail to one letter per board. The app remembers your choice in this browser.
+- **Resize sidebar.** Drag the sidebar's right edge to make it wider or narrower, between 200 and 480 pixels. With the edge focused, the arrow keys move it 16 pixels and Home and End jump to the limits. Double click the edge to go back to the default width. The app remembers the width in this browser.
 - **New board.** Type a name and choose **Create**, or press Escape to cancel. An empty name becomes "Untitled system".
 - **Your boards.** Every board with its status and, once threats are found, its worst severity and threat count. The example board carries an `example` tag. The list refreshes every 15 seconds, so boards a coding agent changes show up on their own.
 - **Example board.** Opens the example. If you deleted it, the button reads **Restore the example board** and adds a fresh copy.
@@ -172,6 +173,7 @@ A ready board opens centered on the element with the worst threat.
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".
 - **Highlights.** When something lights up part of the map, a chip names the source, such as "Lit by the answer", with **Clear**.
 - **Hide panel.** The button on the canvas hides or shows the side panel.
+- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag.
 
 ### Ask
 

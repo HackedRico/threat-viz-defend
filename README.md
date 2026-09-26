@@ -108,6 +108,8 @@ After changing `api/app/schemas.py` or a route, run `npm run gen:api` in `web/` 
 | [docs/deploy.md](docs/deploy.md) | Deploying to DigitalOcean App Platform |
 | [integrations/README.md](integrations/README.md) | Connecting Claude Code and Cursor: MCP server and hook |
 | [AGENTS.md](AGENTS.md) | Commands, contracts and rules for anyone changing the code |
+| [docs/team.md](docs/team.md) | Who owns each area, how the areas attach to the core engine, and how to work in parallel |
+| [docs/conventions.md](docs/conventions.md) | Code style, tests, docs, commits and pull requests |
 
 ## Project layout
 
