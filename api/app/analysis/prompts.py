@@ -68,7 +68,11 @@ Processes are code the team runs. Stores are where data rests: databases, bucket
 privilege zone when the material says so, and the user's browser or device when the team's client code runs there. \
 Put every process and store in a boundary. Leave people and vendor systems outside every boundary.
 - A flow points the way the data moves. Name sensitive data plainly.
-- Aim for 6 to 14 nodes. Merge small pieces that share one job. Never invent a component the material gives no hint of.
+- Aim for 6 to 14 nodes and no more than 20 flows, so a reviewer can check the diagram at a glance. Merge small pieces \
+that share one job, and flows that carry the same data between the same two nodes. Never invent a component the \
+material gives no hint of.
+- Name each node the way the team says it, in 1 to 4 words and under 24 characters. Label each flow with a verb \
+phrase of 1 to 3 words, such as `send email` or `save tokens`, and put the detail in `data`.
 - Set `ai` on anything that is or calls a language model or agent, and `sensitive` on stores that hold credentials, \
 personal, financial or regulated data.
 - Cite evidence for every node and flow: a short quote, a file path, or `inferred:` with the reason.

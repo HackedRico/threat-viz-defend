@@ -914,7 +914,7 @@ export interface components {
             id: string;
             /**
              * Label
-             * @description What happens, 1 to 4 words
+             * @description What happens, as a verb phrase of 1 to 3 words such as `send email`
              */
             label: string;
             /**
@@ -1020,7 +1020,7 @@ export interface components {
             kind: "external" | "process" | "store";
             /**
              * Label
-             * @description The name a developer on the team would use, 1 to 4 words
+             * @description The name a developer on the team would use, 1 to 4 words and under 24 characters
              */
             label: string;
             /**
