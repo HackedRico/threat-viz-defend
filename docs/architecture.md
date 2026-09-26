@@ -177,7 +177,7 @@ The web app in [web/src/](../web/src/) is React 19 with Vite. There is no router
 | `api/` | The typed client (`openapi-fetch`), the generated `schema.d.ts`, aliases in `types.ts`, and error handling |
 | `auth/` | Sign in and create account |
 | `shell/` | App layout, sidebar, account menu with usage meters, routing, polling |
-| `board/` | The board screen: intake, the drawing state, the canvas, the ELK layout, the inspector, the review panel, the ready panel with threats, paths, ask and activity |
+| `board/` | The board screen: intake, the drawing state, the canvas, the ELK layout, the inspector, the ask bar under the canvas, the review panel, the ready panel with threats, paths, defend and activity |
 | `quiz/` | The Defend tab and the text quiz |
 | `voice/` | The voice coach, loaded only when used |
 | `settings/` | Connect a coding agent and model provider |

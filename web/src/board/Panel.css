@@ -2,7 +2,7 @@
    Module Overview
    =============================================================================
    Shared styles for the side panels: sections and labels, the review sticky
-   note, tabs, the threat and path cards, the ask box and the activity log. */
+   note, tabs, the threat and path cards and the activity log. */
 
 .panel {
   flex: 1;
@@ -382,73 +382,4 @@ summary.panel-label {
 .path-threats {
   font-size: var(--text-xs);
   color: var(--ink-soft);
-}
-
-/* ---------- ask ---------- */
-
-.ask {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.ask-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.ask-focus {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.ask-starters,
-.ask-lit-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.ask-starter,
-.ask-lit-chips .chip {
-  cursor: pointer;
-}
-
-.ask-starter:hover,
-.ask-lit-chips .chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.ask-answer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--board);
-}
-
-.ask-question {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
-.ask-reply {
-  font-family: var(--font-hand);
-  font-size: 1.3rem;
-  line-height: 1.25;
-  white-space: pre-wrap;
-}
-
-.ask-lit {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
