@@ -109,7 +109,7 @@ class Providers:
                 kind=row.kind,
                 base_url=row.base_url,
                 model=row.model,
-                key_preview=f"...{row.key_last4}",
+                key_preview=f"...{row.key_last4}" if row.key_last4 else None,
                 memory=row.memory,
                 label=_label(row.kind, row.model, row.memory),
                 updated_at=row.updated_at,
@@ -132,13 +132,17 @@ class Providers:
         )
         _check_model(body)
         row = session.get(ProviderRow, user_id)
-        if body.api_key is None and row is None:
-            raise bad_request("Enter an API key.")
+        new_key = body.api_key
+        if new_key is None and row is None:
+            if body.kind == "backboard":
+                raise bad_request("Enter your Backboard API key.")
+            # Local servers such as Ollama take no key; an empty one is stored so the row stays complete.
+            new_key = ""
         if row is None:
             row = ProviderRow(user_id=user_id)
             session.add(row)
-        if body.api_key is not None:
-            key = body.api_key.strip()
+        if new_key is not None:
+            key = new_key.strip()
             row.key_sealed = self._box.seal(key, user_id)
             row.key_last4 = key[-4:]
         # A different Backboard account or kind would not know the old assistant.
@@ -165,9 +169,9 @@ class Providers:
         if key is None:
             with self._db.session() as session:
                 row = session.get(ProviderRow, user_id)
-                if row is None:
-                    raise bad_request("Enter an API key to test.")
-                key = self._box.open(row.key_sealed, user_id)
+                if row is None and body.kind == "backboard":
+                    raise bad_request("Enter your Backboard API key to test.")
+                key = self._box.open(row.key_sealed, user_id) if row is not None else ""
         label = _label(body.kind, body.model, body.memory)
         try:
             if body.kind == "backboard":
@@ -205,8 +209,9 @@ class Providers:
             )
         # Most user endpoints are not OpenAI itself, so ask for JSON in the prompt unless it is.
         mode: JsonMode = "json_schema" if "api.openai.com" in url else "prompt"
+        # The SDK insists on some key; servers that need none ignore it.
         return OpenAICompatibleLlm(
-            model=model, api_key=key, base_url=url, json_mode=mode, timeout_s=self._settings.llm_timeout_s
+            model=model, api_key=key or "none", base_url=url, json_mode=mode, timeout_s=self._settings.llm_timeout_s
         )
 
 
@@ -225,7 +230,7 @@ def _label(kind: str, model: str, memory: bool) -> str:
 
 def _list_models(url: str, key: str) -> list[str]:
     """Model ids an OpenAI-compatible endpoint lists, as proof the key works."""
-    client = openai.OpenAI(api_key=key, base_url=url, timeout=10.0, max_retries=0)
+    client = openai.OpenAI(api_key=key or "none", base_url=url, timeout=10.0, max_retries=0)
     try:
         return sorted(model.id for model in client.models.list())
     except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:

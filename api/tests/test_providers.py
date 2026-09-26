@@ -82,11 +82,21 @@ def test_provider_settings_round_trip_without_exposing_the_key(make_client: Clie
     assert client.get("/api/provider").json()["source"] == "demo"
 
 
-def test_a_first_save_needs_a_key_and_a_safe_url(make_client: ClientFactory) -> None:
+def test_backboard_needs_a_key_and_every_url_must_be_safe(make_client: ClientFactory) -> None:
     client = make_client(allow_private_provider_urls=False, resolver=lambda host, port: ["127.0.0.1"])
     sign_up(client)
-    assert client.put("/api/provider", json=provider_body(api_key=None)).status_code == 400
     assert client.put("/api/provider", json=provider_body()).status_code == 400
+    backboard_body = provider_body(kind="backboard", model="openai/gpt-4o", api_key=None)
+    assert client.put("/api/provider", json=backboard_body).status_code == 400
+
+
+def test_local_servers_can_be_saved_without_a_key(make_client: ClientFactory) -> None:
+    client = make_client(allow_private_provider_urls=True)
+    sign_up(client)
+    body = provider_body(base_url="http://localhost:11434/v1", model="llama3", api_key=None)
+    saved = client.put("/api/provider", json=body).json()
+    assert saved["source"] == "custom"
+    assert saved["key_preview"] is None
 
 
 def test_backboard_models_need_a_provider_prefix(make_client: ClientFactory) -> None:
