@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,13 @@ def test_a_broken_example_stops_loading(tmp_path: Path) -> None:
     (folder / "material.md").write_text("notes")
     with pytest.raises(ValueError, match="broken"):
         load_examples.__wrapped__(tmp_path)
+
+
+def test_every_example_reads_in_the_style_the_prompt_asks_for() -> None:
+    # The threat prompt copies the example's verdict, so it has to follow the prompt's own rules.
+    for example in load_examples():
+        assert re.match(r"Fix .+ first: ", example.analysis.verdict)
+        assert not re.search(r"\bT\d+\b", example.analysis.verdict)
 
 
 def test_brief_reads_the_board_aloud() -> None:

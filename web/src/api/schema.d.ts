@@ -642,7 +642,7 @@ export interface components {
             steps: string[];
             /**
              * Story
-             * @description 1 or 2 sentences
+             * @description 1 or 2 plain sentences from the attacker's first move to the harm, naming components by their labels
              */
             story: string;
             /**
@@ -650,7 +650,10 @@ export interface components {
              * @description Threat ids along the way
              */
             threats: string[];
-            /** Title */
+            /**
+             * Title
+             * @description Under 60 characters, naming components by their labels
+             */
             title: string;
         };
         /**
@@ -1253,7 +1256,7 @@ export interface components {
             nodes: components["schemas"]["Node"][];
             /**
              * Summary
-             * @description One sentence on what the system does and for whom
+             * @description One plain sentence on what the system does and for whom, without jargon
              */
             summary: string;
         };
@@ -1329,7 +1332,7 @@ export interface components {
             threats: components["schemas"]["Threat"][];
             /**
              * Verdict
-             * @description 1 or 2 sentences on what to fix first
+             * @description 1 or 2 plain sentences starting `Fix <component> first:`, naming components by their labels, without threat ids
              */
             verdict: string;
         };
