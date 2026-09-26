@@ -17,7 +17,8 @@ export function formatTime(iso: string): string {
 
 /** The activity log and source list for a board. */
 export function ActivityLog({ board, open = false }: { board: BoardOut; open?: boolean }) {
-  const events = [...board.events].reverse();
+  // The API sends events newest first, which is the order a log is read in.
+  const events = board.events;
   return (
     <details className="panel-section" open={open}>
       <summary className="panel-label">

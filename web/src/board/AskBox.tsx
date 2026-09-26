@@ -1,7 +1,8 @@
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { Answer, BoardOut, SystemMap } from "../api/types.ts";
+import { useProvider } from "../settings/provider.ts";
 import { useSession } from "../shell/session.tsx";
 import { labelOf } from "./elements.ts";
 import { useBoardUi } from "./store.ts";
@@ -22,6 +23,12 @@ const STARTERS = [
 /** The ask box and its latest answer. */
 export function AskBox({ board, map }: { board: BoardOut; map: SystemMap }) {
   const { config, refreshMe } = useSession();
+  // The user's own provider answers when they saved one, so name it rather than the server's model.
+  const { provider, load } = useProvider();
+  useEffect(() => {
+    if (provider === null) void load();
+  }, [provider, load]);
+  const model = provider?.label ?? config.analyst;
   const selected = useBoardUi((s) => s.selected);
   const select = useBoardUi((s) => s.select);
   const setHighlight = useBoardUi((s) => s.setHighlight);
@@ -55,7 +62,7 @@ export function AskBox({ board, map }: { board: BoardOut; map: SystemMap }) {
     <div className="ask">
       <form onSubmit={ask} className="ask-form">
         <label htmlFor={id} className="panel-label">
-          Ask {config.analyst} about this board
+          Ask {model} about this board
         </label>
         {selected && (
           <p className="ask-focus">

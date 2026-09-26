@@ -44,7 +44,8 @@ export function Drawing({ board }: { board: BoardOut }) {
     return () => window.clearInterval(timer);
   }, [lines.length]);
 
-  const events = [...board.events].slice(-4).reverse();
+  // Newest first from the API; the four latest say what the job is doing now.
+  const events = board.events.slice(0, 4);
   return (
     <div className="drawing">
       <div className="drawing-sketch">
