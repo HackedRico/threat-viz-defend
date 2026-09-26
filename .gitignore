@@ -27,3 +27,6 @@ web/dist/
 
 # Agent worktrees
 .claude/worktrees/
+
+# Copied from node_modules by `npm run copy:worklets`
+web/public/vendor/elevenlabs/

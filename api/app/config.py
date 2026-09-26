@@ -18,10 +18,13 @@ from app.llm.base import JsonMode
 log = logging.getLogger(__name__)
 
 Environment = Literal["development", "production", "test"]
+SameSite = Literal["lax", "strict", "none"]
 
 _API_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_STATIC = _API_ROOT.parent / "web" / "dist"
 _DEV_INVITE = "local-dev"
+# Only for development and tests: production refuses to start without its own `APP_SECRET`.
+_DEV_SECRET = "development-only-secret-never-use-in-production"  # noqa: S105
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,11 @@ class Settings:
     trust_proxy: bool = False
     client_ip_header: str = "do-connecting-ip"
     cookie_secure: bool = False
+    cookie_samesite: SameSite = "lax"
+    cors_origins: tuple[str, ...] = ()
+    app_secret: str = _DEV_SECRET
+    allow_private_provider_urls: bool = True
+    backboard_base_url: str = "https://app.backboard.io/api"
     session_days: int = 7
     invite_codes: tuple[str, ...] = (_DEV_INVITE,)
     max_users: int = 300
@@ -73,6 +81,12 @@ class Settings:
         """Cookie name; the `__Host-` prefix pins it to this exact host over HTTPS."""
         return "__Host-tvd_session" if self.cookie_secure else "tvd_session"
 
+    @property
+    def trusted_origins(self) -> tuple[str, ...]:
+        """Browser origins allowed to call the API with the user's cookie."""
+        own = (self.public_origin,) if self.public_origin else ()
+        return own + self.cors_origins
+
 
 def load_settings(env: Mapping[str, str]) -> Settings:
     """Read and validate settings from `env`, raising `ValueError` that names the variable to fix."""
@@ -81,10 +95,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
 
     public_origin = _text(env, "PUBLIC_ORIGIN")
     if public_origin is not None:
-        parsed = urlparse(public_origin)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.path not in ("", "/"):
-            raise ValueError("`PUBLIC_ORIGIN` must look like `https://app.example.com`, with no path.")
-        public_origin = f"{parsed.scheme}://{parsed.netloc}"
+        public_origin = _origin(public_origin, "PUBLIC_ORIGIN")
     if production and (public_origin is None or not public_origin.startswith("https://")):
         raise ValueError("Set `PUBLIC_ORIGIN` to the https URL users browse to, such as `https://app.example.com`.")
 
@@ -111,6 +122,22 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     default_mode: JsonMode = "json_schema" if base_url is None or "api.openai.com" in base_url else "prompt"
     json_mode = cast(JsonMode, _choice(env, "LLM_JSON_MODE", ("json_schema", "json_object", "prompt"), default_mode))
 
+    cors = tuple(_origin(o, "CORS_ORIGINS") for o in _list(env, "CORS_ORIGINS"))
+    if production and any(not o.startswith("https://") for o in cors):
+        raise ValueError("Every origin in `CORS_ORIGINS` must be https in production.")
+    samesite = cast(SameSite, _choice(env, "COOKIE_SAMESITE", ("lax", "strict", "none"), "lax"))
+    cookie_secure = _flag(env, "COOKIE_SECURE", default=production)
+    if samesite == "none" and not cookie_secure:
+        raise ValueError("`COOKIE_SAMESITE=none` needs `COOKIE_SECURE=true`; browsers drop the cookie otherwise.")
+
+    app_secret = _text(env, "APP_SECRET")
+    if app_secret is None:
+        if production:
+            raise ValueError("Set `APP_SECRET` to 32 or more random characters; it encrypts saved API keys.")
+        app_secret = _DEV_SECRET
+    if len(app_secret) < 32:
+        raise ValueError("`APP_SECRET` must be at least 32 characters.")
+
     static = _text(env, "STATIC_DIR")
     static_dir = Path(static).resolve() if static else Settings().static_dir
     if static and not (static_dir and static_dir.is_dir()):
@@ -124,7 +151,12 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         allowed_hosts=tuple(dict.fromkeys(h for h in hosts if h)),
         trust_proxy=_flag(env, "TRUST_PROXY", default=False),
         client_ip_header=(_text(env, "CLIENT_IP_HEADER") or Settings.client_ip_header).lower(),
-        cookie_secure=_flag(env, "COOKIE_SECURE", default=production),
+        cookie_secure=cookie_secure,
+        cookie_samesite=samesite,
+        cors_origins=cors,
+        app_secret=app_secret,
+        allow_private_provider_urls=_flag(env, "ALLOW_PRIVATE_PROVIDER_URLS", default=not production),
+        backboard_base_url=(_text(env, "BACKBOARD_BASE_URL") or Settings.backboard_base_url).rstrip("/"),
         session_days=_int(env, "SESSION_DAYS", 7, low=1, high=30),
         invite_codes=invites,
         max_users=_int(env, "MAX_USERS", 300, low=1, high=100_000),
@@ -192,6 +224,14 @@ def _choice(env: Mapping[str, str], key: str, options: tuple[str, ...], default:
     if value not in options:
         raise ValueError(f"`{key}` must be one of {', '.join(options)}, not {value!r}.")
     return value
+
+
+def _origin(value: str, key: str) -> str:
+    """Normalize `https://host[:port]`, rejecting paths, queries and other schemes."""
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.path not in ("", "/") or parsed.query:
+        raise ValueError(f"`{key}` entries must look like `https://app.example.com`, with no path.")
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def _database_url(url: str) -> str:

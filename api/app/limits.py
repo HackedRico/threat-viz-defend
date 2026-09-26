@@ -74,8 +74,11 @@ class Budget:
         self._settings = settings
         self._limiter = limiter
 
-    def spend(self, session: Session, user_id: str, kind: UsageKind, task: str) -> None:
-        """Record one use of `kind` by `user_id`, or raise 429 when a limit is reached."""
+    def spend(self, session: Session, user_id: str, kind: UsageKind, task: str, *, own_key: bool = False) -> None:
+        """Record one use of `kind` by `user_id`, or raise 429 when a limit is reached.
+
+        Calls on the user's own provider key cost the server nothing, so only the per-minute limit applies.
+        """
         per_user, overall = self._limits(kind)
         if kind == "model":
             self._limiter.hit(
@@ -84,6 +87,10 @@ class Budget:
                 60,
                 "You are asking the model very quickly. Wait a moment and try again.",
             )
+        if own_key and kind == "model":
+            session.add(UsageRow(user_id=user_id, kind="own_model", task=task))
+            session.flush()
+            return
         since = _start_of_day()
         mine = self._count(session, kind, since, user_id)
         if mine >= per_user:

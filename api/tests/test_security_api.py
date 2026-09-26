@@ -87,18 +87,41 @@ def test_voice_mints_a_token_with_board_context(make_client: ClientFactory) -> N
     assert client.get("/api/auth/me").json()["usage"]["voice_sessions_today"] == 1
 
 
-def test_production_settings_demand_https_and_real_invites() -> None:
+def test_production_settings_demand_https_real_invites_and_a_secret() -> None:
+    base = {"APP_ENV": "production", "PUBLIC_ORIGIN": "https://api.example.com", "APP_SECRET": "s" * 40}
     with pytest.raises(ValueError, match="PUBLIC_ORIGIN"):
         load_settings({"APP_ENV": "production"})
     with pytest.raises(ValueError, match="INVITE_CODES"):
-        load_settings({"APP_ENV": "production", "PUBLIC_ORIGIN": "https://app.example.com", "INVITE_CODES": "abc"})
-    settings = load_settings(
-        {"APP_ENV": "production", "PUBLIC_ORIGIN": "https://app.example.com", "INVITE_CODES": "umbc-hack-42"}
-    )
+        load_settings({**base, "INVITE_CODES": "abc"})
+    with pytest.raises(ValueError, match="APP_SECRET"):
+        load_settings({**base, "APP_SECRET": "", "INVITE_CODES": "umbc-hack-42"})
+    with pytest.raises(ValueError, match="CORS_ORIGINS"):
+        load_settings({**base, "INVITE_CODES": "umbc-hack-42", "CORS_ORIGINS": "http://app.example.com"})
+    settings = load_settings({**base, "INVITE_CODES": "umbc-hack-42", "CORS_ORIGINS": "https://app.example.com/"})
     assert settings.cookie_secure
     assert settings.session_cookie == "__Host-tvd_session"
-    assert "app.example.com" in settings.allowed_hosts
+    assert "api.example.com" in settings.allowed_hosts
     assert "localhost" not in settings.allowed_hosts
+    assert settings.cors_origins == ("https://app.example.com",)
+    assert not settings.allow_private_provider_urls
+
+
+def test_samesite_none_needs_secure_cookies() -> None:
+    with pytest.raises(ValueError, match="COOKIE_SECURE"):
+        load_settings({"COOKIE_SAMESITE": "none"})
+
+
+def test_a_listed_frontend_origin_may_call_with_cookies(make_client: ClientFactory) -> None:
+    client = make_client(cors_origins=("https://app.example.com",))
+    sign_up(client)
+    headers = {"Origin": "https://app.example.com", "Sec-Fetch-Site": "same-site"}
+    created = client.post("/api/boards", json={"title": "x"}, headers=headers)
+    assert created.status_code == 201
+    assert created.headers["access-control-allow-origin"] == "https://app.example.com"
+    assert created.headers["access-control-allow-credentials"] == "true"
+    stranger = client.post("/api/boards", json={"title": "x"}, headers={"Origin": "https://evil.example"})
+    assert stranger.status_code == 403
+    assert "access-control-allow-origin" not in stranger.headers
 
 
 def test_postgres_urls_use_psycopg() -> None:

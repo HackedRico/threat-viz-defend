@@ -102,12 +102,13 @@ class RequestGuard:
         method: str = scope["method"]
         if method not in _UNSAFE or not path.startswith("/api/") or path.startswith(_TOKEN_PATHS):
             return None
-        # Browsers label cross-site requests; a forged form post from another site stops here.
-        if headers.get("sec-fetch-site") == "cross-site":
-            return 403, "forbidden", "Cross-site requests are not allowed."
         origin = headers.get("origin")
         if origin is not None and not self._origin_allowed(origin):
             return 403, "forbidden", "Requests must come from this site."
+        # Browsers label cross-site requests; a forged form post from another site stops here unless
+        # it comes from a frontend origin listed in `CORS_ORIGINS`.
+        if headers.get("sec-fetch-site") == "cross-site" and origin not in self._settings.trusted_origins:
+            return 403, "forbidden", "Cross-site requests are not allowed."
         has_body = method != "DELETE" and headers.get("content-length", "0") != "0"
         if has_body and not headers.get("content-type", "").startswith("application/json"):
             return 415, "bad_request", "Send the request body as JSON."
@@ -115,7 +116,7 @@ class RequestGuard:
 
     def _origin_allowed(self, origin: str) -> bool:
         """True when `origin` is this site."""
-        if self._settings.public_origin is not None and origin == self._settings.public_origin:
+        if origin in self._settings.trusted_origins:
             return True
         host = urlparse(origin).hostname
         return not self._settings.production and host in self._settings.allowed_hosts

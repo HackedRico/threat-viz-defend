@@ -13,6 +13,7 @@ from app.db import Database
 from app.errors import unauthorized
 from app.jobs import Jobs
 from app.limits import Budget, RateLimiter
+from app.providers.service import Providers
 from app.quiz_service import Quiz
 from app.tables import UserRow
 from app.voice import VoiceClient
@@ -40,6 +41,7 @@ class Services:
     tokens: Tokens
     boards: Boards
     quiz: Quiz
+    providers: Providers
     voice: VoiceClient | None
 
 

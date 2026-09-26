@@ -5,6 +5,7 @@ description = "API for ThreatViz Defend: threat models drawn from code and docs,
 requires-python = ">=3.12"
 dependencies = [
     "argon2-cffi>=25.1",
+    "cryptography>=46",
     "fastapi>=0.141",
     "httpx>=0.28",
     "mcp>=2.2",

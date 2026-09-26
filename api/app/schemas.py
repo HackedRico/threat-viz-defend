@@ -83,6 +83,8 @@ class FilePolicyOut(BaseModel):
     secret_names: list[str] = Field(alias="secretNames")
     secret_extensions: list[str] = Field(alias="secretExtensions")
     safe_env_suffixes: list[str] = Field(alias="safeEnvSuffixes")
+    secret_words_pattern: str = Field(alias="secretWordsPattern")
+    config_extensions: list[str] = Field(alias="configExtensions")
     ignored_dirs: list[str] = Field(alias="ignoredDirs")
     lockfiles: list[str]
     binary_extensions: list[str] = Field(alias="binaryExtensions")
@@ -347,3 +349,42 @@ class AgentChangeOut(BaseModel):
     board_id: str
     status: BoardStatus
     review_url: str
+
+
+# =============================================================================
+# Model provider
+# =============================================================================
+
+ProviderKind = Literal["openai_compatible", "backboard"]
+
+
+class ProviderIn(RequestBody):
+    """A user's own model provider. `api_key` null keeps the saved key."""
+
+    kind: ProviderKind
+    base_url: str = Field(min_length=8, max_length=300)
+    model: str = Field(min_length=1, max_length=120)
+    api_key: str | None = Field(default=None, min_length=1, max_length=500)
+    memory: bool = False
+
+
+class ProviderOut(BaseModel):
+    """Which model analyzes the user's boards. Keys are never returned, only their last four characters."""
+
+    source: Literal["custom", "server", "demo"]
+    kind: ProviderKind | None
+    base_url: str | None
+    model: str | None
+    key_preview: str | None
+    memory: bool
+    label: str
+    updated_at: datetime | None
+
+
+class ProviderTestOut(BaseModel):
+    """Whether a provider answered, and the models it offers when it lists them."""
+
+    ok: bool
+    label: str
+    message: str
+    models: list[str]

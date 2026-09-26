@@ -17,6 +17,7 @@ from app.examples import load_examples
 from app.jobs import Jobs
 from app.limits import Budget
 from app.llm.base import LlmError
+from app.providers.service import AnalystSource
 from app.tables import BoardEventRow, BoardRow
 
 # =============================================================================
@@ -39,16 +40,11 @@ MAX_EVENTS = 40
 class Boards:
     """Board storage and the jobs that analyze them."""
 
-    def __init__(self, db: Database, analyst: Analyst, budget: Budget, jobs: Jobs) -> None:
+    def __init__(self, db: Database, analysts: AnalystSource, budget: Budget, jobs: Jobs) -> None:
         self._db = db
-        self._analyst = analyst
+        self._analysts = analysts
         self._budget = budget
         self._jobs = jobs
-
-    @property
-    def analyst_label(self) -> str:
-        """What produces analyses on this server."""
-        return self._analyst.label
 
     # -----------------------------------------------------------------
     # Reading and simple edits
@@ -135,12 +131,12 @@ class Boards:
             row.sources = [*row.sources, *material.sources][-MAX_SOURCES:]
             _event(session, row.id, kind, material.summary())
 
-        current, restore = self._begin(user_id, board_id, "draft_map", "mapping", record)
-        self._queue_draft(board_id, current, restore, lambda: material.text)
+        current, restore, analyst = self._begin(user_id, board_id, "draft_map", "mapping", record)
+        self._queue_draft(board_id, current, restore, analyst, lambda: material.text)
 
     def add_from_fetch(self, user_id: str, board_id: str, fetch: Callable[[], Material], note: str) -> None:
         """Start drawing the map from material a job must fetch first, such as a GitHub repository."""
-        current, restore = self._begin(
+        current, restore, analyst = self._begin(
             user_id, board_id, "draft_map", "mapping", lambda row, session: _event(session, row.id, "github", note)
         )
 
@@ -153,7 +149,7 @@ class Boards:
                     _event(session, board_id, "github", material.summary())
             return material.text
 
-        self._queue_draft(board_id, current, restore, load)
+        self._queue_draft(board_id, current, restore, analyst, load)
 
     def save_map(self, session: Session, user_id: str, board_id: str, system: SystemMap) -> BoardRow:
         """Save a map edited by hand; threats found on the old map need a fresh confirm."""
@@ -163,6 +159,8 @@ class Boards:
         clean = sanitize_map(system)
         if not clean.nodes:
             raise bad_request("A map needs at least one component.")
+        # Keep the map before the edit so review marks what the person changed.
+        row.previous_map = row.map
         row.map = clean.model_dump(mode="json")
         row.status = "review"
         row.error = None
@@ -176,7 +174,7 @@ class Boards:
             current = self.get(session, user_id, board_id)
             if current.status != "review" or current.map is None:
                 raise conflict("Only a drafted map waiting for review can be confirmed.")
-        system, _ = self._begin(
+        system, _, analyst = self._begin(
             user_id,
             board_id,
             "find_threats",
@@ -188,7 +186,7 @@ class Boards:
 
         def work() -> None:
             try:
-                analysis = self._analyst.find_threats(system)
+                analysis = analyst.find_threats(system)
             except LlmError as exc:
                 self._fail(board_id, "review", exc.message)
                 return
@@ -198,7 +196,7 @@ class Boards:
                     return
                 target.analysis = analysis.model_dump(mode="json")
                 target.analysis_version += 1
-                target.analyzed_by = self._analyst.label
+                target.analyzed_by = analyst.label
                 target.status = "ready"
                 target.error = None
                 _event(session, board_id, "analyzed", f"Found {len(analysis.threats)} threats. {analysis.verdict}")
@@ -217,9 +215,10 @@ class Boards:
             system, analysis = read_map(row), read_analysis(row)
             if system is None or analysis is None:
                 raise conflict("Confirm the map and wait for the threats before asking about them.")
-            self._budget.spend(session, user_id, "model", "answer")
+            chosen = self._analysts.for_user(user_id)
+            self._budget.spend(session, user_id, "model", "answer", own_key=chosen.own_key)
         try:
-            return self._analyst.answer(system, analysis, question.strip(), focus)
+            return chosen.analyst.answer(system, analysis, question.strip(), focus)
         except LlmError as exc:
             raise model_error(exc) from exc
 
@@ -252,29 +251,32 @@ class Boards:
         task: str,
         status: str,
         record: Callable[[BoardRow, Session], None],
-    ) -> tuple[SystemMap | None, str]:
-        """Check the board is idle, spend one model call, mark it busy and commit before any job starts."""
+    ) -> tuple[SystemMap | None, str, Analyst]:
+        """Check the board is idle, pick the analyst, spend one model call, and commit before any job starts."""
+        chosen = self._analysts.for_user(user_id)
         # The commit has to land first: a job that writes the board inside this transaction would
         # deadlock on SQLite and race everywhere else.
         with self._db.session() as session:
             row = self.get(session, user_id, board_id)
             if row.status in BUSY:
                 raise conflict("The board is already working. Wait for it to finish, then try again.")
-            self._budget.spend(session, user_id, "model", task)
+            self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             restore = _stable_status(row)
             current = read_map(row)
             row.status = status
             row.error = None
             record(row, session)
             _touch(row)
-        return current, restore
+        return current, restore, chosen.analyst
 
-    def _queue_draft(self, board_id: str, current: SystemMap | None, restore: str, material: Callable[[], str]) -> None:
+    def _queue_draft(
+        self, board_id: str, current: SystemMap | None, restore: str, analyst: Analyst, material: Callable[[], str]
+    ) -> None:
         """Queue the job that draws the map from `material`, refining `current`."""
 
         def work() -> None:
             try:
-                drawn = self._analyst.draft_map(material(), current)
+                drawn = analyst.draft_map(material(), current)
             except LlmError as exc:
                 self._fail(board_id, restore, exc.message)
                 return

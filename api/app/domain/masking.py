@@ -34,7 +34,8 @@ _SECRET_NAMES = frozenset(
 _SECRET_EXTENSIONS = frozenset({"pem", "key", "p12", "pfx", "jks", "keystore", "tfstate", "tfvars", "ovpn", "kdbx"})
 # `.env.example` and friends document variable names without values, which says a lot about architecture.
 _SAFE_ENV_SUFFIXES = frozenset({"example", "sample", "template", "dist", "defaults"})
-_SECRET_WORDS = re.compile(r"secret|credential|service-?account")
+_SECRET_WORDS_PATTERN = r"secret|credential|service-?account"  # noqa: S105
+_SECRET_WORDS = re.compile(_SECRET_WORDS_PATTERN)
 _CONFIG_EXTENSIONS = frozenset({"json", "yaml", "yml", "toml", "txt", "ini", "xml", "cfg", "conf"})
 
 _IGNORED_DIRS = frozenset(
@@ -173,6 +174,9 @@ def file_policy() -> dict[str, object]:
         "secretNames": sorted(_SECRET_NAMES),
         "secretExtensions": sorted(_SECRET_EXTENSIONS),
         "safeEnvSuffixes": sorted(_SAFE_ENV_SUFFIXES),
+        # A name matching this pattern with a config extension counts as a credential file.
+        "secretWordsPattern": _SECRET_WORDS_PATTERN,
+        "configExtensions": sorted(_CONFIG_EXTENSIONS),
         "ignoredDirs": sorted(_IGNORED_DIRS),
         "lockfiles": sorted(_LOCKFILES),
         "binaryExtensions": sorted(_BINARY_EXTENSIONS),

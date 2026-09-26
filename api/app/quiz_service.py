@@ -1,7 +1,6 @@
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.analysis.analyst import Analyst
 from app.boards.service import Boards, model_error, read_analysis, read_map
 from app.db import Database
 from app.domain.models import GradeVerdict
@@ -9,6 +8,7 @@ from app.domain.quiz import QuizQuestion, Result, build_quiz, grade_choice, mast
 from app.errors import bad_request, conflict, not_found
 from app.limits import Budget
 from app.llm.base import LlmError
+from app.providers.service import AnalystSource
 from app.schemas import AnsweredOut, AnswerIn, AttemptOut, QuestionOut, QuizOut
 from app.tables import BoardRow, QuizAttemptRow
 
@@ -26,10 +26,10 @@ _OPEN_RESULT: dict[GradeVerdict, Result] = {"solid": "correct", "partial": "part
 class Quiz:
     """Questions, grading and progress for one user's board."""
 
-    def __init__(self, db: Database, boards: Boards, analyst: Analyst, budget: Budget) -> None:
+    def __init__(self, db: Database, boards: Boards, analysts: AnalystSource, budget: Budget) -> None:
         self._db = db
         self._boards = boards
-        self._analyst = analyst
+        self._analysts = analysts
         self._budget = budget
 
     def state(self, session: Session, user_id: str, board_id: str) -> QuizOut:
@@ -59,12 +59,13 @@ class Quiz:
             if question.kind == "open":
                 if not (body.text and body.text.strip()):
                     raise bad_request("Type or say an answer in your own words first.")
-                self._budget.spend(session, user_id, "model", "grade")
+                chosen = self._analysts.for_user(user_id)
+                self._budget.spend(session, user_id, "model", "grade", own_key=chosen.own_key)
 
         if question.kind == "open":
             assert system is not None  # a question exists only when the board has a map
             try:
-                grade = self._analyst.grade(system, analysis, question, (body.text or "").strip())
+                grade = chosen.analyst.grade(system, analysis, question, (body.text or "").strip())
             except LlmError as exc:
                 raise model_error(exc) from exc
             result, feedback, highlight = (

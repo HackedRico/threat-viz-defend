@@ -9,6 +9,7 @@ from app.analysis.analyst import Analyst, DemoAnalyst
 from app.config import Settings
 from app.jobs import InlineJobs
 from app.main import create_app
+from app.providers.netguard import Resolver
 from app.voice import VoiceClient
 from tests.factories import inbox
 
@@ -38,9 +39,17 @@ def make_client() -> Iterator[ClientFactory]:
     """Build app clients; every client opened here is closed after the test."""
     opened: list[TestClient] = []
 
-    def build(*, analyst: Analyst | None = None, voice: VoiceClient | None = None, **overrides: Any) -> TestClient:
+    def build(
+        *,
+        analyst: Analyst | None = None,
+        voice: VoiceClient | None = None,
+        resolver: Resolver | None = None,
+        **overrides: Any,
+    ) -> TestClient:
         settings = replace(BASE_SETTINGS, **overrides)
-        app = create_app(settings, analyst=analyst or DemoAnalyst(), jobs=InlineJobs(), voice=voice)
+        app = create_app(
+            settings, analyst=analyst or DemoAnalyst(), jobs=InlineJobs(), voice=voice, resolver=resolver or _no_dns
+        )
         client = TestClient(app)
         client.__enter__()
         opened.append(client)
@@ -49,6 +58,11 @@ def make_client() -> Iterator[ClientFactory]:
     yield build
     for client in opened:
         client.__exit__(None, None, None)
+
+
+def _no_dns(host: str, port: int) -> list[str]:
+    """Tests never touch real DNS; a test that needs a public host passes its own resolver."""
+    raise OSError(f"no DNS in tests for {host}")
 
 
 @pytest.fixture

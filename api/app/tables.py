@@ -119,3 +119,20 @@ class UsageRow(Base):
     kind: Mapped[str] = mapped_column(String(16))
     task: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, index=True)
+
+
+class ProviderRow(Base):
+    """A user's own model provider. The API key is stored sealed by `SecretBox`, never in plain text."""
+
+    __tablename__ = "providers"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete=_CASCADE), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    base_url: Mapped[str] = mapped_column(String(300))
+    model: Mapped[str] = mapped_column(String(120))
+    key_sealed: Mapped[str] = mapped_column(Text)
+    key_last4: Mapped[str] = mapped_column(String(4))
+    memory: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Backboard creates one assistant per user on first use; reusing it is what makes memory persist.
+    assistant_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)

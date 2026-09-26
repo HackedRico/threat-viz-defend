@@ -47,7 +47,13 @@ def logout(request: Request, response: Response, svc: Svc, session: Db) -> None:
     token = request.cookies.get(svc.settings.session_cookie)
     if token:
         svc.accounts.logout(session, token)
-    response.delete_cookie(svc.settings.session_cookie, path="/", secure=svc.settings.cookie_secure, httponly=True)
+    response.delete_cookie(
+        svc.settings.session_cookie,
+        path="/",
+        secure=svc.settings.cookie_secure,
+        httponly=True,
+        samesite=svc.settings.cookie_samesite,
+    )
 
 
 @router.get("/auth/me")
@@ -84,7 +90,7 @@ def _set_cookie(response: Response, svc: Svc, signed_in: SignedIn) -> None:
         path="/",
         secure=svc.settings.cookie_secure,
         httponly=True,
-        samesite="lax",
+        samesite=svc.settings.cookie_samesite,
     )
 
 

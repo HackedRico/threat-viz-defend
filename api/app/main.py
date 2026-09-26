@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.analysis.analyst import Analyst, DemoAnalyst, LlmAnalyst
@@ -21,8 +22,10 @@ from app.jobs import Jobs, ThreadJobs
 from app.limits import Budget, RateLimiter
 from app.llm.openai_compat import OpenAICompatibleLlm
 from app.mcp_tools import build_mcp
+from app.providers.netguard import Resolver, resolve
+from app.providers.service import Providers
 from app.quiz_service import Quiz
-from app.routes import agents, auth, boards, meta, quiz
+from app.routes import agents, auth, boards, meta, provider, quiz
 from app.voice import ElevenLabsVoice, VoiceClient
 from app.web import RequestGuard, spa_file
 
@@ -47,6 +50,7 @@ def create_app(
     analyst: Analyst | None = None,
     jobs: Jobs | None = None,
     voice: VoiceClient | None = None,
+    resolver: Resolver = resolve,
 ) -> FastAPI:
     """Build the API, the MCP server and the web app for `settings`; fakes may replace any service."""
     load_examples()  # fail at startup, not on first use, if an example is broken
@@ -55,7 +59,8 @@ def create_app(
     budget = Budget(settings, limiter)
     chosen_analyst = analyst or _analyst_for(settings)
     job_runner = jobs or ThreadJobs()
-    board_service = Boards(db, chosen_analyst, budget, job_runner)
+    providers = Providers(db, settings, chosen_analyst, demo=isinstance(chosen_analyst, DemoAnalyst), resolver=resolver)
+    board_service = Boards(db, providers, budget, job_runner)
     services = Services(
         settings=settings,
         db=db,
@@ -66,7 +71,8 @@ def create_app(
         accounts=Accounts(settings, limiter),
         tokens=Tokens(limiter),
         boards=board_service,
-        quiz=Quiz(db, board_service, chosen_analyst, budget),
+        quiz=Quiz(db, board_service, providers, budget),
+        providers=providers,
         voice=voice if voice is not None else _voice_for(settings),
     )
     mcp, mcp_app = build_mcp(services)
@@ -100,7 +106,7 @@ def create_app(
     )
     app.state.services = services
     _add_error_handlers(app)
-    for module in (meta, auth, boards, quiz, agents):
+    for module in (meta, auth, boards, quiz, provider, agents):
         app.include_router(module.router)
 
     static_dir = settings.static_dir
@@ -121,6 +127,16 @@ def create_app(
     # The MCP app matches every path, so it goes last; its own route is exactly `/mcp`.
     app.mount("/", mcp_app)
     app.add_middleware(RequestGuard, settings=settings)
+    if settings.cors_origins:
+        # Only listed frontend origins may send the session cookie cross-origin; `*` is never used.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.cors_origins),
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Content-Type"],
+            max_age=600,
+        )
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(settings.allowed_hosts) or ["*"])
     return app
 
