@@ -6,7 +6,7 @@ import openai
 import pytest
 
 from app.analysis.analyst import LlmAnalyst
-from app.analysis.prompts import fence, neutralize
+from app.analysis.prompts import fence, find_threats_content, neutralize
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.llm.base import LlmError, LlmRequest, parse_json, strict_schema
 from app.llm.openai_compat import OpenAICompatibleLlm
@@ -103,6 +103,13 @@ def test_fence_neutralizes_our_own_tags() -> None:
     assert fenced.count("</material>") == 1
     assert "&lt;/material>" in fenced
     assert neutralize("<div>ok</div>") == "<div>ok</div>"
+
+
+def test_find_threats_copies_the_example_style() -> None:
+    style = find_threats_content(inbox().map).split("<style_example>")[1]
+    assert inbox().analysis.verdict in style
+    assert inbox().analysis.threats[0].statement in style
+    assert inbox().analysis.paths[0].story in style
 
 
 def test_analyst_sanitizes_what_the_model_returns() -> None:

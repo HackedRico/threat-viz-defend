@@ -134,6 +134,15 @@ export type VoiceSessionOut = Schemas["VoiceSessionOut"];
 /** A spoken-style walkthrough of a board. */
 export type BriefOut = Schemas["BriefOut"];
 
+/** A recorded question, base64 encoded, for the server to transcribe. */
+export type DictationIn = Schemas["DictationIn"];
+
+/** The recording formats the server accepts for dictation. */
+export type AudioType = DictationIn["audio_type"];
+
+/** The text of a dictated question. */
+export type DictationOut = Schemas["DictationOut"];
+
 // ---------- personal tokens ----------
 
 /** A personal token, without its secret. */
@@ -155,3 +164,14 @@ export type ProviderIn = Schemas["ProviderIn"];
 
 /** The outcome of trying a provider, with the models it offers. */
 export type ProviderTestOut = Schemas["ProviderTestOut"];
+
+// ---------- memory ----------
+
+/** Whether Backboard memory is saved and applies to the user's analyses now. */
+export type MemoryOut = Schemas["MemoryOut"];
+
+/** A Backboard key to save or test for memory; `api_key` null keeps the saved key. */
+export type MemoryIn = Schemas["MemoryIn"];
+
+/** Whether Backboard accepted a memory key. */
+export type MemoryTestOut = Schemas["MemoryTestOut"];

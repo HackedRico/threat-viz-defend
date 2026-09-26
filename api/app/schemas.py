@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.quiz import Mastery, QuestionKind, QuestionTopic, QuizEvidence, QuizOption, Result
+from app.voice import AudioType
 
 # =============================================================================
 # Module Overview
@@ -61,6 +62,8 @@ class UsageOut(BaseModel):
     model_calls_limit: int
     voice_sessions_today: int
     voice_sessions_limit: int
+    dictations_today: int
+    dictations_limit: int
 
 
 class MeOut(BaseModel):
@@ -101,6 +104,7 @@ class ConfigOut(BaseModel):
     analyst: str
     demo_mode: bool
     voice_enabled: bool
+    dictation_enabled: bool
     signup_open: bool
     file_policy: FilePolicyOut
 
@@ -307,6 +311,20 @@ class BriefOut(BaseModel):
     text: str
 
 
+class DictationIn(RequestBody):
+    """A short recording of a spoken question, base64 encoded because every write is JSON."""
+
+    # About 1,500,000 bytes of audio, which keeps the body under the request cap.
+    audio: str = Field(min_length=1, max_length=2_000_000)
+    audio_type: AudioType
+
+
+class DictationOut(BaseModel):
+    """What was said, for the user to check before sending."""
+
+    text: str
+
+
 # =============================================================================
 # Personal tokens and coding agents
 # =============================================================================
@@ -389,3 +407,31 @@ class ProviderTestOut(BaseModel):
     label: str
     message: str
     models: list[str]
+
+
+# =============================================================================
+# Memory
+# =============================================================================
+
+
+class MemoryIn(RequestBody):
+    """A user's Backboard key for memory. `api_key` null keeps the saved key."""
+
+    api_key: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class MemoryOut(BaseModel):
+    """Whether memory is saved and whether it applies to the user's analyses now. Never the key."""
+
+    saved: bool
+    active: bool
+    key_preview: str | None
+    message: str
+    updated_at: datetime | None
+
+
+class MemoryTestOut(BaseModel):
+    """Whether Backboard accepted the key."""
+
+    ok: bool
+    message: str

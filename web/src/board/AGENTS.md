@@ -38,6 +38,7 @@ The target is a map a reviewer checks in under five minutes, the review step of 
 - **Laptop with the panel open.** The canvas there is about 1000 by 630, and the example fits at about 50% either way. Below 45% (`READABLE_ZOOM`) the opening view centers on the worst threat instead. Grouping or collapsing a boundary would help.
 - **Left to right labels.** Level runs cross the narrow gaps between layers, where upright runs also pass, so a label there can sit on another flow's line. Top to bottom has room; the test for this runs top to bottom only.
 - **Narrow boundaries top to bottom.** A one node boundary cannot dodge the flow entering its middle, so its name sits over that line; a halo in the board color breaks the line around the text.
+- **Overlays and the opening view.** The fit and the opening view center on the whole canvas, but the brief covers its top and the map key its bottom left, so the worst threat can open under one of them. Fitting to the canvas minus those overlays would fix it.
 - **Label clipping.** Flow labels are cut at 28 characters (`FLOW_LABEL_MAX`). Node names wrap onto two lines and are then cut at a word; tech lines are cut to the node's width.
 
 ## Rules for this area
@@ -56,3 +57,5 @@ npm run typecheck && npm test && npm run build
 ```
 
 Then look at it: `./scripts/dev.sh` from the repo root, sign in with the development account from `.env`, and open "Example: Inbox Helper". It has 12 nodes, 18 flows in four two way pairs, two boundaries, 7 threats and a lethal trifecta, so it exercises every mark. Check it in light and dark, with the side panel open and closed, at a laptop width and wide, turned both ways, and in review mode after a hand edit so the diff marks and inferred outlines show.
+
+The example is hand written and a model's board is not, so never tune a change to the example alone. Every overlay and every line of copy has to hold on a board with no AI part, no store, a taller map and a verdict three times as long. The starter questions and the brief read the board's own parts for that reason.

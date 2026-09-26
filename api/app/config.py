@@ -57,11 +57,13 @@ class Settings:
     model_calls_per_minute: int = 6
     global_daily_model_calls: int = 3000
     daily_voice_sessions: int = 10
+    daily_dictations: int = 30
     # A ready-made account for local development; refused in production.
     dev_username: str | None = None
     dev_password: str | None = None
     elevenlabs_api_key: str | None = None
     elevenlabs_agent_id: str | None = None
+    elevenlabs_stt_model: str = "scribe_v2"
     static_dir: Path | None = field(default=_DEFAULT_STATIC if _DEFAULT_STATIC.is_dir() else None)
 
     @property
@@ -78,6 +80,11 @@ class Settings:
     def voice_configured(self) -> bool:
         """True when the ElevenLabs agent can be reached."""
         return bool(self.elevenlabs_api_key and self.elevenlabs_agent_id)
+
+    @property
+    def dictation_configured(self) -> bool:
+        """True when questions can be spoken: an ElevenLabs key and a daily allowance above zero."""
+        return bool(self.elevenlabs_api_key) and self.daily_dictations > 0
 
     @property
     def session_cookie(self) -> str:
@@ -186,10 +193,12 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         model_calls_per_minute=_int(env, "MODEL_CALLS_PER_MINUTE", 6, low=1, high=1000),
         global_daily_model_calls=_int(env, "GLOBAL_DAILY_MODEL_CALLS", 3000, low=0, high=10_000_000),
         daily_voice_sessions=_int(env, "DAILY_VOICE_SESSIONS", 10, low=0, high=10_000),
+        daily_dictations=_int(env, "DAILY_DICTATIONS", 30, low=0, high=10_000),
         elevenlabs_api_key=_text(env, "ELEVENLABS_API_KEY"),
         dev_username=dev_username.lower() if dev_username else None,
         dev_password=dev_password,
         elevenlabs_agent_id=_text(env, "ELEVENLABS_AGENT_ID"),
+        elevenlabs_stt_model=_text(env, "ELEVENLABS_STT_MODEL") or Settings.elevenlabs_stt_model,
         static_dir=static_dir,
     )
 

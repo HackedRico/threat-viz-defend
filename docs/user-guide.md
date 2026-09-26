@@ -178,11 +178,11 @@ A ready board opens with the whole map in view when it fits at a readable size, 
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".
 - **Highlights.** When something lights up part of the map, a chip names the source, such as "Lit by the answer", with **Clear**.
 - **Hide panel.** The button at the top right of the canvas hides or shows the side panel.
-- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag.
+- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag, and the page scrolls down to it.
 
 ### Ask
 
-The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. Starter questions fill the box for you until you send your first question. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in the inspector puts the cursor in the ask bar. Drag the top edge of the ask bar to make it taller or shorter; the answer, or the box when there is no answer, takes the room. The height is remembered in this browser, and a double click on the edge fits the bar to its content again.
+The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. To say the question instead, choose the mic beside **Ask**, speak, and choose it again to stop; the words appear in the box for you to check and fix before you ask. A recording stops by itself after a minute, and Escape throws it away. Each recording uses one dictation, and the mic shows only when the server has dictation. Starter questions, which name parts of this board such as its AI part or the store that holds its most sensitive data, fill the box for you until you send your first question. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in the inspector puts the cursor in the ask bar. Drag the top edge of the ask bar to make it taller or shorter; the answer, or the box when there is no answer, takes the room. The height is remembered in this browser, and a double click on the edge fits the bar to its content again.
 
 The side panel has four tabs.
 
@@ -275,9 +275,9 @@ Open the account menu and choose **Model provider**. Maps, threats, answers and 
 To use your own:
 
 1. Pick a **Kind**:
-   - **OpenAI compatible**: OpenAI, DigitalOcean, OpenRouter, Ollama and other services that speak the Chat Completions API.
+   - **OpenAI compatible**: OpenAI, DigitalOcean, OpenRouter, Featherless, Ollama and other services that speak the Chat Completions API.
    - **Backboard**: many models through one key, with optional memory.
-2. Choose a preset to fill the **Base URL** and suggest a model: OpenAI, DigitalOcean, OpenRouter or Ollama, or Backboard. Or type your own base URL.
+2. Choose a preset to fill the **Base URL** and suggest a model: OpenAI, DigitalOcean, OpenRouter, Featherless or Ollama, or Backboard. Or type your own base URL.
 3. Enter the **Model**. Backboard models are written as `provider/model`, such as `openai/gpt-4o`.
 4. Paste the **API key**. Local services such as Ollama may need none. Once saved, the key is never shown again; leave the field empty to keep it.
 5. For Backboard, turn on **Remember my progress across boards** if you want memory.
@@ -290,6 +290,8 @@ Base URLs must use https and point at a public address. The Ollama preset uses `
 
 **What memory does.** With memory on, Backboard keeps what you asked the analyst and how your quiz answers went, and uses it in later answers and grading, across boards. Drawing maps and finding threats only read memory, so your uploaded material is never written into it.
 
+**Memory with any model.** The **Memory** section below the provider form takes a Backboard key on its own, so a model from another service, such as Featherless, can remember your progress. Paste the key, choose **Test key**, then **Save**. It works only with your own OpenAI-compatible model; with a Backboard provider, use that provider's memory switch instead. Backboard receives the questions you ask and the quiz questions with each verdict, never your uploads, maps or answer text. Model calls spend your model service's credits and memory calls spend your Backboard credits. **Turn off memory** forgets the key; notes already kept stay in your Backboard account.
+
 Calls on your own key do not count against the daily allowance, only against the limit of 6 model calls per minute.
 
 ## Usage limits
@@ -301,6 +303,7 @@ The account menu shows what you have used today. Allowances reset at midnight UT
 | Model calls per day on the server's model | 60 |
 | Model calls per minute, any model | 6 |
 | Voice sessions per day | 10 |
+| Dictations per day | 30 |
 | Boards | 30 |
 | Personal tokens | 10 |
 | Coding agent changes per hour | 30 |
@@ -334,7 +337,10 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 | "The server restarted while this was running." | Run the step again: add the material again, or confirm again. |
 | The quiz says a question is out of date | The board changed. Reload the quiz. |
 | **Talk it through** is greyed out | The server has no voice coach. Use the text quiz. |
-| "Microphone access is blocked." | Allow the microphone in the browser's site settings, then start again. |
+| "Microphone access is blocked." | Allow the microphone in the browser's site settings, then start again. This covers the coach and the mic beside **Ask**. |
 | "No voice sessions left today." | Use the text quiz until midnight UTC. |
+| There is no mic beside **Ask** | The server has no dictation. Type the question. |
+| "No speech was heard." | Speak closer to the microphone, or type the question. |
+| "You have used today's 30 dictations." | Type your questions until midnight UTC. |
 | A coding agent gets 401 | The token was revoked or mistyped. Create a new one. |
 | A coding agent's change does not show | The board may have been busy; the change is retried or refused with a message. Check the board's activity log. |

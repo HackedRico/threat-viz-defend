@@ -39,11 +39,11 @@ The message is written for the user and says what to do next. `429` responses ca
 | `not_found` | 404 | No such thing, or it belongs to someone else |
 | `conflict` | 409 | Wrong state: the board is busy, has no map yet, or is not in review |
 | `rate_limited` | 429 | Too many requests in a window, or a locked account |
-| `budget_exhausted` | 429 | Today's model calls or voice sessions are used up, for the user or for the whole app |
+| `budget_exhausted` | 429 | Today's model calls, voice sessions or dictations are used up, for the user or for the whole app |
 | `payload_too_large` | 413 | The body is over the cap |
 | `model_error` | 429, 502, 503 | The model call failed: 429 when the provider rate limits, 503 when it is unreachable, times out, is not configured or rejects the key, 502 when its output was unusable or it refused |
 | `voice_error` | 429, 503 | ElevenLabs is busy, unreachable or misconfigured |
-| `not_configured` | 503 | The voice coach is not set up on this server |
+| `not_configured` | 503 | The voice coach or dictation is not set up on this server |
 
 ## Rate limits and budgets
 
@@ -62,6 +62,8 @@ Rate limits count hits in a sliding window, in memory ([limits.py](../api/app/li
 | Model calls on the server's key | user | 60 per day | `DAILY_MODEL_CALLS` |
 | Model calls on the server's key | everyone | 3000 per day | `GLOBAL_DAILY_MODEL_CALLS` |
 | Voice sessions | user | 10 per day | `DAILY_VOICE_SESSIONS` |
+| Dictations | user | 10 per minute | fixed |
+| Dictations | user | 30 per day | `DAILY_DICTATIONS` |
 | Accounts | deployment | 300 | `MAX_USERS` |
 | Boards | user | 30 | fixed |
 
@@ -75,7 +77,7 @@ No auth. Returns `{"ok": true}`. Any Host header is accepted here, for platform 
 ### `GET /api/config`
 No auth. Public facts the sign in page and uploader need.
 
-Response `ConfigOut`: `app_name`, `analyst` (the server model's label), `demo_mode`, `voice_enabled`, `signup_open`, and `file_policy`: the secret file names and extensions, safe `.env` suffixes, the secret word pattern, config extensions, ignored folders, lockfiles, binary extensions, and the caps `maxFileBytes` (200,000), `maxUploadBytes` (1,500,000) and `maxFiles` (400). The browser and the hook apply this policy before they upload anything.
+Response `ConfigOut`: `app_name`, `analyst` (the server model's label), `demo_mode`, `voice_enabled`, `dictation_enabled`, `signup_open`, and `file_policy`: the secret file names and extensions, safe `.env` suffixes, the secret word pattern, config extensions, ignored folders, lockfiles, binary extensions, and the caps `maxFileBytes` (200,000), `maxUploadBytes` (1,500,000) and `maxFiles` (400). The browser and the hook apply this policy before they upload anything.
 
 ## Auth
 
@@ -95,7 +97,7 @@ Errors: `401` wrong username or password, with the same timing whether or not th
 Cookie optional. Ends this browser's session and clears the cookie. `204`.
 
 ### `GET /api/auth/me`
-Cookie. `200` with `MeOut`: `user` (`id`, `username`, `created_at`) and `usage` (`model_calls_today`, `model_calls_limit`, `voice_sessions_today`, `voice_sessions_limit`). `model_calls_today` counts calls on the server's key only.
+Cookie. `200` with `MeOut`: `user` (`id`, `username`, `created_at`) and `usage` (`model_calls_today`, `model_calls_limit`, `voice_sessions_today`, `voice_sessions_limit`, `dictations_today`, `dictations_limit`). `model_calls_today` counts calls on the server's key only.
 
 ## Personal tokens
 
@@ -175,6 +177,11 @@ Cookie. No body. Spends one voice session and returns `VoiceSessionOut`: `conver
 
 Errors: `503` `not_configured` when voice is off, `409` without a map, `429` `budget_exhausted`, `429` or `503` `voice_error`.
 
+### `POST /api/dictation`
+Cookie. Body `DictationIn`: `audio`, a recording of up to about 1,500,000 bytes encoded as base64, and `audio_type`, one of `audio/webm`, `audio/ogg`, `audio/mp4`, `audio/mpeg` or `audio/wav`. Spends one dictation, sends the clip to ElevenLabs Speech to Text with the server's key, and returns `DictationOut`: `text`, the words heard, up to 2,000 characters, or empty when nobody spoke. Neither the clip nor the text is stored. The web app puts the text in the ask box for the user to read before asking.
+
+Errors: `503` `not_configured` when dictation is off, `400` when `audio` is not base64, is under 1,000 bytes, or ElevenLabs cannot read it, `422` for another format, `429` `rate_limited` or `budget_exhausted`, `429` or `503` `voice_error`.
+
 ## Model provider
 
 `ProviderOut` holds `source` (`custom`, `server` or `demo`), `kind`, `base_url`, `model`, `key_preview` (`...` and the last four characters, or null), `memory`, `label` and `updated_at`. The key itself is never returned.
@@ -194,6 +201,24 @@ Cookie. Forgets the provider and key; the server's default takes over. `204`.
 Cookie. Body `ProviderIn`. Checks the URL the same way, then lists the endpoint's models (OpenAI-compatible) or its assistants (Backboard). Nothing is saved.
 
 `200` with `ProviderTestOut`: `ok`, `label`, `message` and up to 200 `models`. A rejected key, an unreachable host, or a model the endpoint does not list is `ok: false` with a message, not an HTTP error. With `api_key` null the saved key is used, but only for the same kind and base URL. Errors: `400` for a refused URL, `429` over 10 tests per 5 minutes.
+
+## Memory
+
+Backboard memory apart from the model provider. It applies only while the user has their own OpenAI-compatible provider. `MemoryOut` holds `saved`, `active` (memory applies to the user's analyses now), `key_preview`, `message` (the status in words) and `updated_at`. The key is never returned.
+
+### `GET /api/memory`
+Cookie. `200` with `MemoryOut`.
+
+### `PUT /api/memory`
+Cookie. Body `MemoryIn`: `api_key` (null keeps the saved key). `200` with `MemoryOut`. Errors: `400` when no key is saved and none is given. A different key forgets the saved assistant id.
+
+### `DELETE /api/memory`
+Cookie. Forgets the key; notes already kept stay in the user's Backboard account. `204`.
+
+### `POST /api/memory/test`
+Cookie. Body `MemoryIn`. Lists the account's Backboard assistants with the typed key, or the saved one when `api_key` is null. Nothing is saved.
+
+`200` with `MemoryTestOut`: `ok` and `message`. A rejected key is `ok: false`, not an HTTP error. Errors: `400` with no key at all, `429` over 10 tests per 5 minutes.
 
 ## Coding agents
 

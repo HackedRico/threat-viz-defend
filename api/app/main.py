@@ -23,11 +23,12 @@ from app.jobs import Jobs, ThreadJobs
 from app.limits import Budget, RateLimiter
 from app.llm.openai_compat import OpenAICompatibleLlm
 from app.mcp_tools import build_mcp
+from app.providers.memory import MemorySettings
 from app.providers.netguard import Resolver, resolve
 from app.providers.service import Providers
 from app.quiz_service import Quiz
-from app.routes import agents, auth, boards, meta, provider, quiz
-from app.voice import ElevenLabsVoice, VoiceClient
+from app.routes import agents, auth, boards, dictation, memory, meta, provider, quiz
+from app.voice import ElevenLabsTranscriber, ElevenLabsVoice, Transcriber, VoiceClient
 from app.web import RequestGuard, spa_file
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +37,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 # Module Overview
 # =============================================================================
 # Builds the application. `create_app` wires settings, the database, the
-# analyst, jobs and the voice client into `Services`, mounts the JSON routes,
+# analyst, jobs and the voice clients into `Services`, mounts the JSON routes,
 # the MCP server at `/mcp` and the built web app, and renders every error in
 # one shape. Tests call it with fakes; `app` is what uvicorn serves.
 
@@ -53,6 +54,7 @@ def create_app(
     analyst: Analyst | None = None,
     jobs: Jobs | None = None,
     voice: VoiceClient | None = None,
+    transcriber: Transcriber | None = None,
     resolver: Resolver = resolve,
 ) -> FastAPI:
     """Build the API, the MCP server and the web app for `settings`; fakes may replace any service."""
@@ -62,7 +64,15 @@ def create_app(
     budget = Budget(settings, limiter)
     chosen_analyst = analyst or _analyst_for(settings)
     job_runner = jobs or ThreadJobs()
-    providers = Providers(db, settings, chosen_analyst, demo=isinstance(chosen_analyst, DemoAnalyst), resolver=resolver)
+    memories = MemorySettings(db, settings)
+    providers = Providers(
+        db,
+        settings,
+        chosen_analyst,
+        demo=isinstance(chosen_analyst, DemoAnalyst),
+        memory=memories,
+        resolver=resolver,
+    )
     board_service = Boards(db, providers, budget, job_runner)
     services = Services(
         settings=settings,
@@ -76,7 +86,9 @@ def create_app(
         boards=board_service,
         quiz=Quiz(db, board_service, providers, budget),
         providers=providers,
+        memory=memories,
         voice=voice if voice is not None else _voice_for(settings),
+        transcriber=transcriber if transcriber is not None else _transcriber_for(settings),
     )
     mcp, mcp_app = build_mcp(services)
 
@@ -88,10 +100,11 @@ def create_app(
         if recovered:
             log.warning("[startup] Reset %d boards left busy by a restart.", recovered)
         log.info(
-            "[startup] %s ready; analyst: %s; voice: %s.",
+            "[startup] %s ready; analyst: %s; voice: %s; dictation: %s.",
             settings.app_name,
             chosen_analyst.label,
             services.voice is not None,
+            services.transcriber is not None,
         )
         # A mounted app's own lifespan never runs, so the MCP session manager starts here.
         async with mcp.session_manager.run():
@@ -110,7 +123,7 @@ def create_app(
     )
     app.state.services = services
     _add_error_handlers(app)
-    for module in (meta, auth, boards, quiz, provider, agents):
+    for module in (meta, auth, boards, quiz, dictation, provider, memory, agents):
         app.include_router(module.router)
 
     static_dir = settings.static_dir
@@ -177,6 +190,13 @@ def _voice_for(settings: Settings) -> VoiceClient | None:
     if not settings.voice_configured:
         return None
     return ElevenLabsVoice(settings.elevenlabs_api_key or "", settings.elevenlabs_agent_id or "")
+
+
+def _transcriber_for(settings: Settings) -> Transcriber | None:
+    """The ElevenLabs Speech to Text client when dictation is configured."""
+    if not settings.dictation_configured:
+        return None
+    return ElevenLabsTranscriber(settings.elevenlabs_api_key or "", settings.elevenlabs_stt_model)
 
 
 def _add_error_handlers(app: FastAPI) -> None:

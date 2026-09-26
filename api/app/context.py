@@ -14,10 +14,11 @@ from app.db import Database
 from app.errors import unauthorized
 from app.jobs import Jobs
 from app.limits import Budget, RateLimiter
+from app.providers.memory import MemorySettings
 from app.providers.service import Providers
 from app.quiz_service import Quiz
 from app.tables import UserRow
-from app.voice import VoiceClient
+from app.voice import Transcriber, VoiceClient
 
 # =============================================================================
 # Module Overview
@@ -43,7 +44,9 @@ class Services:
     boards: Boards
     quiz: Quiz
     providers: Providers
+    memory: MemorySettings
     voice: VoiceClient | None
+    transcriber: Transcriber | None
 
 
 def services(request: Request) -> Services:

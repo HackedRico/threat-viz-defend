@@ -71,7 +71,7 @@ class SystemMap(ModelOutput):
     """A data flow diagram of one system."""
 
     name: str = Field(description="Name of the system")
-    summary: str = Field(description="One sentence on what the system does and for whom")
+    summary: str = Field(description="One plain sentence on what the system does and for whom, without jargon")
     boundaries: list[Boundary]
     nodes: list[Node]
     flows: list[Flow]
@@ -108,17 +108,23 @@ class AttackPath(ModelOutput):
     """A route an attacker takes from an entry point to an impact."""
 
     id: str = Field(description="P1, P2, ...")
-    title: str
+    title: str = Field(description="Under 60 characters, naming components by their labels")
     severity: Severity
     steps: list[str] = Field(description="Node ids in order, from the entry point to the impact")
     threats: list[str] = Field(description="Threat ids along the way")
-    story: str = Field(description="1 or 2 sentences")
+    story: str = Field(
+        description="1 or 2 plain sentences from the attacker's first move to the harm, "
+        "naming components by their labels"
+    )
 
 
 class ThreatAnalysis(ModelOutput):
     """The threats and attack paths found on a confirmed map."""
 
-    verdict: str = Field(description="1 or 2 sentences on what to fix first")
+    verdict: str = Field(
+        description="1 or 2 plain sentences starting `Fix <component> first:`, naming components by their labels, "
+        "without threat ids"
+    )
     threats: list[Threat]
     paths: list[AttackPath]
 

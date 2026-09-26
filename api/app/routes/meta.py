@@ -21,13 +21,14 @@ def health() -> HealthOut:
 
 @router.get("/config")
 def config(svc: Svc) -> ConfigOut:
-    """The app name, what analyzes boards, whether voice and sign up are on, and the upload policy."""
+    """The app name, what analyzes boards, whether voice, dictation and sign up are on, and the upload policy."""
     settings = svc.settings
     return ConfigOut(
         app_name=settings.app_name,
         analyst=svc.analyst.label,
         demo_mode=not settings.llm_configured,
         voice_enabled=svc.voice is not None,
+        dictation_enabled=svc.transcriber is not None,
         signup_open=bool(settings.invite_codes),
         file_policy=FilePolicyOut.model_validate(file_policy()),
     )
