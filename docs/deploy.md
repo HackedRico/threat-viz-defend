@@ -193,6 +193,7 @@ The API ships an admin CLI. Run it inside the running container:
    ```sh
    python -m app.cli users              # list accounts and whether each is active or disabled
    python -m app.cli stats              # counts of accounts, boards and model calls
+   python -m app.cli create-user <name> # make an organizer account without an invite code; prompts for the password
    python -m app.cli disable <username> # block an account and sign it out
    python -m app.cli enable <username>  # unblock it
    python -m app.cli delete <username>  # delete an account and everything it owns; asks first, --yes skips that

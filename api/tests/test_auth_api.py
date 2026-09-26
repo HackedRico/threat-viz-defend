@@ -96,3 +96,20 @@ def test_a_stranger_on_another_network_cannot_lock_an_account(client: TestClient
     signed_in = services.accounts.login  # the real user signs in from a different network
     with services.db.session() as session:
         assert signed_in(session, username="hana", password=PASSWORD, ip="198.51.100.7").user.username == "hana"
+
+
+def test_development_account_is_ready_at_startup(make_client: ClientFactory) -> None:
+    client = make_client(dev_username="devuser", dev_password="local-password-1")
+    signed = client.post("/api/auth/login", json={"username": "devuser", "password": "local-password-1"})
+    assert signed.status_code == 200
+    assert [b["example"] for b in client.get("/api/boards").json()] == [True]
+
+
+def test_development_account_is_refused_in_production() -> None:
+    import pytest
+
+    from app.config import load_settings
+
+    base = {"APP_ENV": "production", "PUBLIC_ORIGIN": "https://api.example.com", "APP_SECRET": "s" * 40}
+    with pytest.raises(ValueError, match="DEV_USERNAME"):
+        load_settings({**base, "INVITE_CODES": "umbc-hack-42", "DEV_USERNAME": "dev", "DEV_PASSWORD": "x" * 12})

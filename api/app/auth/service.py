@@ -88,6 +88,23 @@ class Accounts:
         log.info("[auth] New account %s.", name)
         return SignedIn(user, self._open_session(session, user))
 
+    def ensure_account(self, session: Session, username: str, password: str) -> UserRow:
+        """Create `username` with `password`, or reset an existing one to it; for admins and development only."""
+        name = username.strip().lower()
+        if not USERNAME.match(name):
+            raise bad_request("Usernames are 3 to 24 characters: letters, digits, dots, dashes and underscores.")
+        if len(password) < 10:
+            raise bad_request("Passwords need 10 or more characters.")
+        user = session.scalar(select(UserRow).where(UserRow.username == name))
+        if user is None:
+            user = UserRow(id=str(uuid.uuid4()), username=name, password_hash=_hasher.hash(password))
+            session.add(user)
+        elif not _verify(user.password_hash, password):
+            user.password_hash = _hasher.hash(password)
+        user.disabled = False
+        session.flush()
+        return user
+
     def login(self, session: Session, *, username: str, password: str, ip: str) -> SignedIn:
         """Check a username and password, with per-network and per-username limits."""
         name = username.strip().lower()

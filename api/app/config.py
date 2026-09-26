@@ -57,6 +57,9 @@ class Settings:
     model_calls_per_minute: int = 6
     global_daily_model_calls: int = 3000
     daily_voice_sessions: int = 10
+    # A ready-made account for local development; refused in production.
+    dev_username: str | None = None
+    dev_password: str | None = None
     elevenlabs_api_key: str | None = None
     elevenlabs_agent_id: str | None = None
     static_dir: Path | None = field(default=_DEFAULT_STATIC if _DEFAULT_STATIC.is_dir() else None)
@@ -143,6 +146,14 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     if len(app_secret) < 32:
         raise ValueError("`APP_SECRET` must be at least 32 characters.")
 
+    dev_username, dev_password = _text(env, "DEV_USERNAME"), _text(env, "DEV_PASSWORD")
+    if production and (dev_username or dev_password):
+        raise ValueError("`DEV_USERNAME` and `DEV_PASSWORD` are for local development; remove them in production.")
+    if bool(dev_username) != bool(dev_password):
+        raise ValueError("Set both `DEV_USERNAME` and `DEV_PASSWORD`, or neither.")
+    if dev_password is not None and len(dev_password) < 10:
+        raise ValueError("`DEV_PASSWORD` needs 10 or more characters.")
+
     static = _text(env, "STATIC_DIR")
     static_dir = Path(static).resolve() if static else Settings().static_dir
     if static and not (static_dir and static_dir.is_dir()):
@@ -176,6 +187,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         global_daily_model_calls=_int(env, "GLOBAL_DAILY_MODEL_CALLS", 3000, low=0, high=10_000_000),
         daily_voice_sessions=_int(env, "DAILY_VOICE_SESSIONS", 10, low=0, high=10_000),
         elevenlabs_api_key=_text(env, "ELEVENLABS_API_KEY"),
+        dev_username=dev_username.lower() if dev_username else None,
+        dev_password=dev_password,
         elevenlabs_agent_id=_text(env, "ELEVENLABS_AGENT_ID"),
         static_dir=static_dir,
     )

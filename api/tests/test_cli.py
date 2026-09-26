@@ -26,3 +26,16 @@ def test_admin_can_disable_and_delete_accounts(
         assert "disabled" in capsys.readouterr().out
         assert main(["delete", "zoe", "--yes"]) == 0
         assert main(["enable", "zoe"]) == 1
+
+
+def test_create_user_makes_an_account_without_an_invite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'app.db'}")
+    answers = iter(["organizer-pass-42", "organizer-pass-42"])
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": next(answers))
+    assert main(["create-user", "Organizer"]) == 0
+    assert "organizer is ready" in capsys.readouterr().out
+    mismatched = iter(["organizer-pass-42", "something-else-9"])
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": next(mismatched))
+    assert main(["create-user", "other"]) == 1

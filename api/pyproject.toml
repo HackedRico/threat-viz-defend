@@ -12,6 +12,7 @@ dependencies = [
     "openai>=3.19",
     "psycopg[binary]>=3.3",
     "pydantic>=2.13",
+    "python-dotenv>=1.2",
     "sqlalchemy>=2.1",
     "uvicorn[standard]>=0.54",
 ]

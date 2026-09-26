@@ -36,6 +36,7 @@ You need Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 24.
 Start the API on port 8000:
 
 ```sh
+cp .env.example .env          # once; the API reads the repo-root .env on its own
 cd api
 uv sync
 uv run uvicorn app.main:app_from_env --factory --port 8000
@@ -49,7 +50,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, choose **Create account**, and use the invite code `local-dev`. Development creates a SQLite database in `api/data/app.db`.
+Open http://localhost:5173 and sign in with the development account from `.env` (`DEV_USERNAME` and `DEV_PASSWORD`). The server creates it at startup, with the example board, and resets it to that password if you change it. To try sign up instead, choose **Create account** with the invite code `local-dev`. Development creates a SQLite database in `api/data/app.db`.
+
+On a deployed server, `DEV_USERNAME` is refused; an operator creates accounts without an invite code with `uv run python -m app.cli create-user <name>`, which prompts for the password.
 
 ### Demo mode
 
@@ -59,11 +62,7 @@ With no model configured, the server runs in demo mode. Every new account gets a
 
 Pick one:
 
-- **Server default.** Copy [.env.example](.env.example) to `.env` at the repo root, set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`, and start the API with the file loaded:
-
-  ```sh
-  uv run uvicorn app.main:app_from_env --factory --port 8000 --env-file ../.env
-  ```
+- **Server default.** In the repo-root `.env`, set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`, then restart the API.
 
 - **Your own provider.** Open the account menu, choose **Model provider**, and save an OpenAI-compatible base URL, model and key, or a Backboard key. This works in demo mode too, and only for your account.
 

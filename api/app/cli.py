@@ -1,12 +1,16 @@
 import argparse
+import getpass
 import os
 import sys
 from collections.abc import Sequence
 
 from sqlalchemy import func, select
 
+from app.auth.service import Accounts
 from app.config import load_settings
 from app.db import Database
+from app.errors import AppError
+from app.limits import RateLimiter
 from app.tables import BoardRow, LoginSessionRow, UsageRow, UserRow
 
 # =============================================================================
@@ -30,10 +34,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     delete.add_argument("username")
     delete.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
     sub.add_parser("stats", help="counts of accounts, boards and model calls")
+    create = sub.add_parser("create-user", help="create an account without an invite code, or reset its password")
+    create.add_argument("username")
     args = parser.parse_args(argv)
 
-    db = Database(load_settings(os.environ).database_url)
+    settings = load_settings(os.environ)
+    db = Database(settings.database_url)
     db.create_tables()
+    if args.command == "create-user":
+        # Prompting keeps the password out of shell history and the process list.
+        password = getpass.getpass("Password (10+ characters): ")
+        if password != getpass.getpass("Repeat it: "):
+            print("The passwords did not match. Nothing changed.", file=sys.stderr)
+            return 1
+        try:
+            with db.session() as session:
+                created = Accounts(settings, RateLimiter()).ensure_account(session, args.username, password)
+                print(f"Account {created.username} is ready. It starts with no boards; add the example from the app.")
+        except AppError as exc:
+            print(exc.message, file=sys.stderr)
+            return 1
+        return 0
     with db.session() as session:
         if args.command == "users":
             for row in session.scalars(select(UserRow).order_by(UserRow.created_at)):

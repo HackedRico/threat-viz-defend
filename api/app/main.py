@@ -2,7 +2,9 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -27,6 +29,8 @@ from app.quiz_service import Quiz
 from app.routes import agents, auth, boards, meta, provider, quiz
 from app.voice import ElevenLabsVoice, VoiceClient
 from app.web import RequestGuard, spa_file
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # =============================================================================
 # Module Overview
@@ -79,6 +83,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         db.create_tables()
+        _seed_dev_account(services)
         recovered = board_service.recover_interrupted()
         if recovered:
             log.warning("[startup] Reset %d boards left busy by a restart.", recovered)
@@ -139,6 +144,18 @@ def create_app(
     return app
 
 
+def _seed_dev_account(services: Services) -> None:
+    """Create the development account from `DEV_USERNAME` and `DEV_PASSWORD`, with the example board."""
+    settings = services.settings
+    if settings.production or not settings.dev_username or not settings.dev_password:
+        return
+    with services.db.session() as session:
+        user = services.accounts.ensure_account(session, settings.dev_username, settings.dev_password)
+        if not services.boards.all_for(session, user.id):
+            services.boards.add_example(session, user.id)
+    log.info("[startup] Development account %r is ready; sign in with DEV_PASSWORD from .env.", settings.dev_username)
+
+
 def _analyst_for(settings: Settings) -> Analyst:
     """The model-backed analyst when a model is configured, otherwise the demo analyst."""
     if not settings.llm_configured:
@@ -192,4 +209,7 @@ def _add_error_handlers(app: FastAPI) -> None:
 def app_from_env() -> FastAPI:
     """The app configured from the process environment, for uvicorn's `--factory`."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    # Local runs read the repo-root `.env`; real environment variables still win, so hosts that
+    # inject settings, such as App Platform, are unaffected.
+    load_dotenv(_REPO_ROOT / ".env", override=False)
     return create_app(load_settings(os.environ))
