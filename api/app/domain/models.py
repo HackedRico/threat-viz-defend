@@ -40,7 +40,7 @@ class Node(ModelOutput):
     """An element of the map: an external entity, a process or a data store."""
 
     id: str = Field(description="Short lowercase slug, unique across every node and flow")
-    label: str = Field(description="The name a developer on the team would use, 1 to 4 words")
+    label: str = Field(description="The name a developer on the team would use, 1 to 4 words and under 24 characters")
     kind: ElementKind = Field(
         description="external: people or systems the team does not run. process: code the team runs. "
         "store: where data rests"
@@ -62,7 +62,7 @@ class Flow(ModelOutput):
     id: str = Field(description="f1, f2, ... unique across every node and flow")
     source: str = Field(description="Id of the node the data leaves")
     target: str = Field(description="Id of the node the data reaches")
-    label: str = Field(description="What happens, 1 to 4 words")
+    label: str = Field(description="What happens, as a verb phrase of 1 to 3 words such as `send email`")
     data: str | None = Field(description="What the flow carries, naming sensitive data plainly, or null")
     evidence: str | None = Field(description="A short quote, a file path or `inferred: <reason>`, or null")
 

@@ -915,7 +915,7 @@
             "type": "string"
           },
           "label": {
-            "description": "What happens, 1 to 4 words",
+            "description": "What happens, as a verb phrase of 1 to 3 words such as `send email`",
             "title": "Label",
             "type": "string"
           },
@@ -1200,7 +1200,7 @@
             "type": "string"
           },
           "label": {
-            "description": "The name a developer on the team would use, 1 to 4 words",
+            "description": "The name a developer on the team would use, 1 to 4 words and under 24 characters",
             "title": "Label",
             "type": "string"
           },

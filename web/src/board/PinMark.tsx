@@ -4,10 +4,12 @@ import { SEVERITY_SHAPE, shapePoints } from "./severity.ts";
 // =============================================================================
 // Module Overview
 // =============================================================================
-// A threat pin: a severity shape with the threat's number inside. It draws into
-// an existing SVG; `PinBadge` wraps it for use in ordinary text.
+// A threat pin: a severity shape with the threat's number inside, and a halo
+// around a critical one so the worst threats stand out without relying on
+// color. It draws into an existing SVG; `PinBadge` wraps it for ordinary text.
 
 const RADIUS = 10;
+const HALO = 15;
 
 /** The pin shape and number, centered on 0,0 inside a parent `<svg>`. */
 export function PinMark({ severity, label }: { severity: Severity; label: string }) {
@@ -16,6 +18,7 @@ export function PinMark({ severity, label }: { severity: Severity; label: string
   const textY = SEVERITY_SHAPE[severity] === "triangle" ? 4.5 : 1;
   return (
     <g className={`pin-mark sev-${severity}`}>
+      {severity === "critical" && <circle r={HALO} className="pin-halo" />}
       {points === null ? <circle r={RADIUS} className="pin-shape" /> : <polygon points={points} className="pin-shape" />}
       <text y={textY} className="pin-number">
         {label}

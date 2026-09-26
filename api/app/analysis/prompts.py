@@ -73,7 +73,11 @@ Put every process and store in a boundary. Leave people and vendor systems outsi
 - A flow points the way the data moves. Name sensitive data plainly.
 - `summary` is the first thing a reader outside the team sees, so say in one plain sentence what the system does \
 and for whom, without security or framework jargon.
-- Aim for 6 to 14 nodes. Merge small pieces that share one job. Never invent a component the material gives no hint of.
+- Aim for 6 to 14 nodes and no more than 20 flows, so a reviewer can check the diagram at a glance. Merge small pieces \
+that share one job, and flows that carry the same data between the same two nodes. Never invent a component the \
+material gives no hint of.
+- Name each node the way the team says it, in 1 to 4 words and under 24 characters. Label each flow with a verb \
+phrase of 1 to 3 words, such as `send email` or `save tokens`, and put the detail in `data`.
 - Set `ai` on anything that is or calls a language model or agent, and `sensitive` on stores that hold credentials, \
 personal, financial or regulated data.
 - Cite evidence for every node and flow: a short quote, a file path, or `inferred:` with the reason.
