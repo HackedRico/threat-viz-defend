@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 from pydantic import BaseModel
 
 from app.analysis.analyst import LlmAnalyst
@@ -104,13 +105,17 @@ class FakeMemory:
 class RecordingLlm:
     label = "fake"
 
-    def __init__(self, reply: BaseModel) -> None:
+    def __init__(self, reply: BaseModel, *, remembers: bool = False) -> None:
         self.reply = reply
         self.requests: list[LlmRequest[Any]] = []
+        self._remembers = remembers
 
     def generate[T: BaseModel](self, request: LlmRequest[T]) -> T:
         self.requests.append(request)
         return request.schema.model_validate(self.reply.model_dump())
+
+    def remembers(self, task: str) -> bool:
+        return self._remembers
 
 
 def test_answers_see_fenced_notes_and_keep_the_question() -> None:
@@ -135,6 +140,20 @@ def test_grading_keeps_the_verdict_but_never_the_developers_words() -> None:
     assert "<memory>" not in llm.requests[0].user
     assert notes.kept == [f"Quiz question: {question.prompt} Their answer was graded partial."]
     assert "secret thoughts" not in notes.kept[0]
+
+
+@pytest.mark.parametrize("remembers", [False, True])
+def test_answers_and_grades_quote_the_material_unless_the_provider_remembers_them(remembers: bool) -> None:
+    example = inbox()
+    quote = next(n.evidence for n in example.map.nodes if n.id == "sync")
+    question = next(q for q in build_quiz(example.map, example.analysis) if q.kind == "open")
+    answering = RecordingLlm(Answer(answer="Look at T1.", highlight=["T1"]), remembers=remembers)
+    grading = RecordingLlm(OpenGrade(verdict="solid", feedback="Good.", highlight=[]), remembers=remembers)
+    LlmAnalyst(answering).answer(example.map, example.analysis, "How often does the sync worker run?", None)
+    LlmAnalyst(grading).grade(example.map, example.analysis, question, "Turn off auto-send.")
+    sent = [answering.requests[0].user, grading.requests[0].user]
+    assert [quote in user for user in sent] == [not remembers, not remembers]
+    assert all("Mail sync worker" in user for user in sent)
 
 
 def test_mapping_and_threats_never_touch_memory() -> None:

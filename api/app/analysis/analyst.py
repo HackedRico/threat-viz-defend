@@ -81,11 +81,13 @@ class LlmAnalyst:
     def answer(self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None) -> Answer:
         """Answer a question, keeping only highlights that exist on the board."""
         notes = self._memory.recall(question) if self._memory else []
+        # Evidence quotes the uploads, so it stays out of any call the provider may keep as memory.
+        evidence = not self._llm.remembers("answer")
         reply = self._llm.generate(
             LlmRequest(
                 "answer",
                 prompts.ANSWER_SYSTEM,
-                prompts.answer_content(system, analysis, question, focus, notes),
+                prompts.answer_content(system, analysis, question, focus, notes, evidence=evidence),
                 Answer,
             )
         )
@@ -96,9 +98,13 @@ class LlmAnalyst:
     def grade(self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str) -> OpenGrade:
         """Grade an open answer, keeping only highlights that exist on the board."""
         notes = self._memory.recall(question.prompt) if self._memory else []
+        evidence = not self._llm.remembers("grade")
         grade = self._llm.generate(
             LlmRequest(
-                "grade", prompts.GRADE_SYSTEM, prompts.grade_content(system, analysis, question, text, notes), OpenGrade
+                "grade",
+                prompts.GRADE_SYSTEM,
+                prompts.grade_content(system, analysis, question, text, notes, evidence=evidence),
+                OpenGrade,
             )
         )
         if self._memory:

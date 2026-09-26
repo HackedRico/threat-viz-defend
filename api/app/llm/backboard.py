@@ -13,9 +13,10 @@ from app.llm.base import LlmError, LlmRequest, parse_json, repair_message, schem
 # `BackboardLlm` routes model calls through Backboard, a hosted layer that adds
 # long-term memory in front of thousands of models. Each user gets one Backboard
 # assistant, so what they struggled with in past quizzes carries into later
-# grading and answers. Material and threat steps only read memory: uploaded
-# code is never written into it. `BackboardApi` is the HTTP client it shares
-# with the memory layer in `app.memory`.
+# grading and answers. Material and threat steps only read memory. The steps
+# that write it get the map without its evidence quotes, since `remembers`
+# names them to the analyst, so uploaded code is never written into memory.
+# `BackboardApi` is the HTTP client it shares with the memory layer in `app.memory`.
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +82,10 @@ class BackboardLlm:
             return parse_json(str(second.get("content") or ""), request.schema)
         except (ValidationError, ValueError) as exc:
             raise LlmError("bad_output", f"{self._label} returned data in the wrong shape twice. Try again.") from exc
+
+    def remembers(self, task: str) -> bool:
+        """True for the tasks that write memory, so the analyst keeps quotes from the material out of them."""
+        return self._memory_mode(task) == "Auto"
 
     def check(self) -> str:
         """Confirm the key works by listing assistants; return a short status line."""
