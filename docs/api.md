@@ -220,7 +220,7 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 |---|---|---|---|
 | `list_boards` | none | Lists boards: id, title, status, threat counts | nothing |
 | `get_board` | `board_id` | Describes the system, its trust zones, AI exposure, up to 6 threats with fixes, the status and every node id | nothing |
-| `describe_element` | `board_id`, `element_id` | Describes one node or flow and the threats pinned to it | nothing |
+| `describe_element` | `board_id`, `element_id` | Describes one node or flow and the threats pinned to it; an id the map does not hold is a tool error | nothing |
 | `ask_board` | `board_id`, `question` | Answers a question about a finished board, with related ids | 1 model call |
 | `report_change` | `board_id`, `summary`, `diff`, `files` | Updates the map from a change the agent made; the developer reviews it in the app | 1 model call, 1 of 30 agent changes per hour |
 | `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered; a map with no questions is a tool error | nothing |

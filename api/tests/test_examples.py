@@ -48,6 +48,7 @@ def test_brief_reads_the_board_aloud() -> None:
 
 def test_describe_element_names_its_threats() -> None:
     text = describe_element(inbox().map, inbox().analysis, "agent")
+    assert text is not None
     assert text.startswith("Triage agent (process")
     assert "T1 (critical)" in text
-    assert "no node or flow" in describe_element(inbox().map, None, "ghost")
+    assert describe_element(inbox().map, None, "ghost") is None

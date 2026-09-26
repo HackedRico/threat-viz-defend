@@ -123,7 +123,12 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
 
         def work(user_id: str) -> str:
             with services.db.session() as session:
-                return describe_one(*_board_parts(services, session, user_id, board_id), element_id)
+                text = describe_one(*_board_parts(services, session, user_id, board_id), element_id)
+            if text is None:
+                raise ToolError(
+                    f"There is no node or flow with id {element_id} on this map. Call get_board for its node ids."
+                )
+            return text
 
         return await _as_user(work)
 
