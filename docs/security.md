@@ -133,7 +133,8 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 |---|---|---|
 | The server's model provider (`LLM_BASE_URL`) | Masked material, maps, threats, questions to the analyst and open quiz answers | For users without their own provider |
 | The user's own provider | The same | For that user |
-| Backboard | The same, and with memory on, the user's questions and quiz answers with their replies are kept as memory of the user's assistant | For users who pick Backboard |
+| Backboard | The same, and with memory on, the user's questions and quiz answers with their replies are kept as memory of the user's assistant | For users who pick Backboard as their provider |
+| Backboard memory | The user's questions to the analyst and the open quiz questions as search queries, and notes of those questions with each quiz verdict. Never uploads, maps or the user's answer text | For users who save a memory key with their own model |
 | ElevenLabs | The user's voice, the transcript, the username, the system name, a short brief of the board, and the quiz questions and feedback the tools return | During a voice session |
 | GitHub | A request for the named public repository, from the server's IP | During an import |
 

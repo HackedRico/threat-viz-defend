@@ -26,7 +26,7 @@ It is a hosted, invite-only web app. Coding agents such as Claude Code and Curso
 - **Model output renders as plain text.** A poisoned upload cannot inject HTML or links into the page or the exported report.
 - **The analysis model has no tools.** It can read untrusted material, but it cannot act, so our own pipeline has no lethal trifecta.
 - **Invite codes and daily budgets.** The server's model bill has a ceiling per user and overall.
-- **Bring your own model.** Each user can point analysis at their own OpenAI-compatible endpoint or at Backboard.
+- **Bring your own model.** Each user can point analysis at their own OpenAI-compatible endpoint or at Backboard, and add Backboard memory to any of them.
 - **Admin by command line only.** There is no admin page for an attacker to reach from the web.
 
 ## Quick start
@@ -70,7 +70,7 @@ Pick one:
 
 - **Server default.** In the repo-root `.env`, set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`, then restart the API.
 
-- **Your own provider.** Open the account menu, choose **Model provider**, and save an OpenAI-compatible base URL, model and key, or a Backboard key. This works in demo mode too, and only for your account.
+- **Your own provider.** Open the account menu, choose **Model provider**, and save an OpenAI-compatible base URL, model and key, or a Backboard key. Under **Memory**, a Backboard key lets any of them remember your progress. This works in demo mode too, and only for your account.
 
 ### Run with Docker
 
