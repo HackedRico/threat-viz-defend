@@ -64,26 +64,31 @@
 
 /* ---------- brief sticky note ---------- */
 
+/* A wide, short strip across the top of the canvas rather than a tall card, so
+   it covers the least of a map that is itself wide. It stops short of the
+   panel toggle on the right. */
 .brief {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 4;
-  width: min(340px, calc(100% - 32px));
+  container-type: inline-size;
+  width: min(1040px, max(calc(100% - 170px), min(320px, calc(100% - 32px))));
   max-height: calc(100% - 96px);
   overflow-y: auto;
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
   background: var(--sticky);
   color: var(--sticky-ink);
   border-bottom: 3px solid var(--sticky-edge);
   box-shadow: var(--shadow-sticky);
-  transform: rotate(-0.8deg);
+  transform: rotate(-0.3deg);
   transform-origin: top left;
   animation: sticky-in var(--dur-slow) var(--ease-out);
 }
 
 .brief.is-folded {
   width: auto;
+  container-type: normal;
   padding-bottom: var(--space-2);
 }
 
@@ -107,11 +112,82 @@
   text-transform: uppercase;
 }
 
+/* The fix gets the widest column: it is the one thing a reader should act on.
+   A mid width canvas stacks the other two beside it; a narrow one stacks all three. */
 .brief-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.3fr);
+  grid-template-areas: "what risk fix";
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
   margin-top: var(--space-1);
+}
+
+.brief-what {
+  grid-area: what;
+}
+
+.brief-risk {
+  grid-area: risk;
+}
+
+.brief-fix {
+  grid-area: fix;
+}
+
+.brief-risk,
+.brief-fix {
+  padding-left: var(--space-4);
+  border-left: 1.5px dashed color-mix(in srgb, var(--sticky-ink) 25%, transparent);
+}
+
+@container (max-width: 760px) {
+  .brief-body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "what fix"
+      "risk fix";
+  }
+
+  .brief-risk {
+    padding-left: 0;
+    border-left: none;
+  }
+}
+
+@container (max-width: 460px) {
+  .brief-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "what" "risk" "fix";
+  }
+
+  .brief-fix {
+    padding-left: 0;
+    border-left: none;
+  }
+}
+
+/* No verdict yet: the other two share the width at every size but the narrowest. */
+.brief-body:not(:has(.brief-fix)) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "what risk";
+}
+
+.brief-body:not(:has(.brief-fix)) .brief-risk {
+  padding-left: var(--space-4);
+  border-left: 1.5px dashed color-mix(in srgb, var(--sticky-ink) 25%, transparent);
+}
+
+@container (max-width: 460px) {
+  .brief-body:not(:has(.brief-fix)) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "what" "risk";
+  }
+
+  .brief-body:not(:has(.brief-fix)) .brief-risk {
+    padding-left: 0;
+    border-left: none;
+  }
 }
 
 .brief-part > .brief-label {
@@ -125,12 +201,16 @@
 }
 
 .brief-part .brief-verdict {
-  font-size: 1.18rem;
-  line-height: 1.15;
+  font-size: 1.08rem;
+  line-height: 1.2;
 }
 
-.brief-part .brief-howto {
+.brief-howto {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1.5px dashed color-mix(in srgb, var(--sticky-ink) 25%, transparent);
   font-size: var(--text-xs);
+  line-height: 1.4;
 }
 
 @keyframes sticky-in {
