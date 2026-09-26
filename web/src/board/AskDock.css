@@ -2,9 +2,12 @@
    Module Overview
    =============================================================================
    The ask bar docked under the canvas: its header line, the input and send
-   button, the starter questions, and the latest answer stacked above them. */
+   button, the starter questions, and the latest answer stacked above them.
+   Dragging the top edge gives the bar a fixed height; the answer, or the input
+   when there is no answer, takes the extra room. */
 
 .ask-dock {
+  position: relative;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -12,6 +15,50 @@
   padding: var(--space-3) var(--space-4);
   border-top: 1.5px solid var(--line);
   background: var(--surface);
+}
+
+.ask-dock.is-sized {
+  overflow: hidden;
+}
+
+/* Straddle the border so the grab strip is easy to hit, with a grip that says it moves. */
+.ask-dock > .resize-handle {
+  top: -4px;
+}
+
+.ask-dock > .resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  transform: translateX(-50%);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ask-dock > .resize-handle:hover::before,
+.ask-dock > .resize-handle.is-dragging::before {
+  background: var(--accent);
+}
+
+.ask-dock.is-sized .ask-answer {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.ask-dock.is-sized:not(.has-answer) .ask-form,
+.ask-dock.is-sized:not(.has-answer) .ask-row {
+  flex: 1;
+  min-height: 0;
+}
+
+.ask-dock.is-sized:not(.has-answer) .ask-input {
+  align-self: stretch;
+  max-height: none;
 }
 
 .ask-form {
