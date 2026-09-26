@@ -12,7 +12,6 @@ import { findingsLine } from "./brief.ts";
 import { expandHighlight, labelOf } from "./elements.ts";
 import { Inspector } from "./Inspector.tsx";
 import { MapCanvas } from "./MapCanvas.tsx";
-import { MapLegend } from "./MapLegend.tsx";
 import { diffMaps } from "./mapDiff.ts";
 import { ReadyPanel } from "./ReadyPanel.tsx";
 import { ReviewPanel } from "./ReviewPanel.tsx";
@@ -136,11 +135,7 @@ export function Workspace({
             </div>
           )}
 
-          {/* The brief and the key share the left edge, so a long brief scrolls instead of covering the key. */}
-          <div className="canvas-notes">
-            {analysis && <Brief board={board} map={map} analysis={analysis} />}
-            {layout && key && <MapLegend />}
-          </div>
+          {analysis && <Brief board={board} map={map} analysis={analysis} />}
 
           {source && !activePath && highlight.length > 0 && (
             <div className="lit-chip" role="status">
@@ -272,31 +267,30 @@ function Brief({ board, map, analysis }: { board: BoardOut; map: SystemMap; anal
         </button>
       </div>
       {!folded && (
-        <div className="brief-body">
-          <div className="brief-part">
-            <h3 className="brief-label">What this is</h3>
-            <p>
-              <strong>{map.name}.</strong> {map.summary}
-            </p>
-          </div>
-          <div className="brief-part">
-            <h3 className="brief-label">What could go wrong</h3>
-            <p>{findingsLine(board.counts, analysis.paths.length)}</p>
-          </div>
-          {analysis.verdict && (
-            <div className="brief-part">
-              <h3 className="brief-label">Fix first</h3>
-              <p className="brief-verdict hand">{analysis.verdict}</p>
+        <>
+          <div className="brief-body">
+            <div className="brief-part brief-what">
+              <h3 className="brief-label">What this is</h3>
+              <p>
+                <strong>{map.name}.</strong> {map.summary}
+              </p>
             </div>
-          )}
-          <div className="brief-part">
-            <h3 className="brief-label">How to read the map</h3>
-            <p className="brief-howto">
-              Boxes are parts of the system and arrows are data moving between them. Each numbered pin is a threat:
-              select one to see what could happen and how to fix it.
-            </p>
+            <div className="brief-part brief-risk">
+              <h3 className="brief-label">What could go wrong</h3>
+              <p>{findingsLine(board.counts, analysis.paths.length)}</p>
+            </div>
+            {analysis.verdict && (
+              <div className="brief-part brief-fix">
+                <h3 className="brief-label">Fix first</h3>
+                <p className="brief-verdict hand">{analysis.verdict}</p>
+              </div>
+            )}
           </div>
-        </div>
+          <p className="brief-howto">
+            <strong>How to read the map:</strong> boxes are parts of the system and arrows are data moving between
+            them. Each numbered pin is a threat: select one to see what could happen and how to fix it.
+          </p>
+        </>
       )}
     </section>
   );

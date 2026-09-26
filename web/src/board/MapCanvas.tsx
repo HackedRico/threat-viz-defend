@@ -5,6 +5,7 @@ import { FitIcon, ZoomInIcon, ZoomOutIcon } from "../shell/icons.tsx";
 import { STRIDE } from "./severity.ts";
 import { clip, roundedPath, TECH_MAX, trimEnd, type Box, type MapLayout } from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
+import { MapLegend } from "./MapLegend.tsx";
 import { placePins, type Pin } from "./pins.ts";
 import { boundaryOutline, LID, nodeFill, nodeOutline, personGlyph } from "./shapes.ts";
 import { PinMark } from "./PinMark.tsx";
@@ -150,7 +151,7 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
   }, [zoomAt, panBy]);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as Element).closest(".canvas-controls")) return;
+    if (event.button !== 0 || (event.target as Element).closest(".canvas-controls, .map-legend")) return;
     drag.current = { id: event.pointerId, startX: event.clientX, startY: event.clientY, view, dragging: false };
   };
 
@@ -264,7 +265,7 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
       onPointerCancel={() => (drag.current = null)}
       onKeyDown={onKeyDown}
       onClick={(event) => {
-        if ((event.target as Element).closest("[data-el], .canvas-controls") === null) select(null);
+        if ((event.target as Element).closest("[data-el], .canvas-controls, .map-legend") === null) select(null);
       }}
     >
       <p id={hintId} className="visually-hidden">
@@ -363,6 +364,7 @@ export function MapCanvas({ map, layout, layoutKey, threats, exposure, crossings
           {Math.round(view.k * 100)}%
         </span>
       </div>
+      <MapLegend />
     </div>
   );
 }

@@ -23,7 +23,7 @@ The spoke that turns a board's map into the whiteboard people read. Owner: MD. I
 
 - **Wide maps at laptop width.** The example lays out about 1800 by 400 pixels. The opening view fits the whole map only when that stays at 55% zoom or more; otherwise it opens at 55% on the worst threat. A taller layout, grouping, or collapsing a boundary would help.
 - **Busy boundaries.** The backend boundary holds most nodes, so its flows bunch together. Ordering, port placement or a better prompt for splitting zones are all fair game.
-- **Overlays and the opening view.** The fit and the opening view center on the whole canvas, but the brief and the map key cover its left edge, so the worst threat can open under the brief. Fitting to the canvas minus the notes column would fix it.
+- **Overlays and the opening view.** The fit and the opening view center on the whole canvas, but the brief covers its top and the map key its bottom left, so the worst threat can open under one of them. Fitting to the canvas minus those overlays would fix it.
 - **Label clipping.** Long flow labels are cut at 28 characters (`FLOW_LABEL_MAX`), and tech lines at 30.
 
 ## Rules for this area
