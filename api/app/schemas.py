@@ -389,3 +389,31 @@ class ProviderTestOut(BaseModel):
     label: str
     message: str
     models: list[str]
+
+
+# =============================================================================
+# Memory
+# =============================================================================
+
+
+class MemoryIn(RequestBody):
+    """A user's Backboard key for memory. `api_key` null keeps the saved key."""
+
+    api_key: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class MemoryOut(BaseModel):
+    """Whether memory is saved and whether it applies to the user's analyses now. Never the key."""
+
+    saved: bool
+    active: bool
+    key_preview: str | None
+    message: str
+    updated_at: datetime | None
+
+
+class MemoryTestOut(BaseModel):
+    """Whether Backboard accepted the key."""
+
+    ok: bool
+    message: str
