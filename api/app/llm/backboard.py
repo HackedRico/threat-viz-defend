@@ -14,7 +14,8 @@ from app.llm.base import LlmError, LlmRequest, parse_json, repair_message, schem
 # long-term memory in front of thousands of models. Each user gets one Backboard
 # assistant, so what they struggled with in past quizzes carries into later
 # grading and answers. Material and threat steps only read memory: uploaded
-# code is never written into it.
+# code is never written into it. `BackboardApi` is the HTTP client it shares
+# with the memory layer in `app.memory`.
 
 log = logging.getLogger(__name__)
 
@@ -46,9 +47,10 @@ class BackboardLlm:
         self._memory = memory
         self._assistant_id = assistant_id
         self._on_assistant = on_assistant
-        self._headers = {"X-API-Key": api_key}
-        self._client = client or httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout_s, follow_redirects=False)
         self._label = f"{model} via Backboard" + (" with memory" if memory else "")
+        self._api = BackboardApi(
+            api_key=api_key, base_url=base_url, label=self._label, timeout_s=timeout_s, client=client
+        )
 
     @property
     def label(self) -> str:
@@ -82,7 +84,7 @@ class BackboardLlm:
 
     def check(self) -> str:
         """Confirm the key works by listing assistants; return a short status line."""
-        response = self._request("GET", "/assistants")
+        response = self._api.request("GET", "/assistants")
         count = len(response) if isinstance(response, list) else 0
         return f"Backboard accepted the key ({count} assistants on the account)."
 
@@ -94,7 +96,7 @@ class BackboardLlm:
 
     def _send(self, body: dict[str, Any]) -> dict[str, Any]:
         """Post one message and remember the assistant Backboard created or used."""
-        reply = self._request("POST", "/threads/messages", body)
+        reply = self._api.request("POST", "/threads/messages", body)
         if not isinstance(reply, dict):
             raise LlmError("bad_output", f"{self._label} returned an unexpected reply. Try again.")
         assistant = reply.get("assistant_id")
@@ -104,8 +106,25 @@ class BackboardLlm:
                 self._on_assistant(assistant)
         return reply
 
-    def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
-        """Call Backboard and translate HTTP failures into `LlmError`."""
+
+class BackboardApi:
+    """Backboard's HTTP API with its key, redirects off, and failures turned into `LlmError`."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        label: str = "Backboard",
+        timeout_s: float = 120.0,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self._label = label
+        self._headers = {"X-API-Key": api_key}
+        self._client = client or httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout_s, follow_redirects=False)
+
+    def request(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+        """Call Backboard and return its JSON, translating HTTP failures into `LlmError`."""
         try:
             response = self._client.request(method, path, json=body, headers=self._headers)
         except httpx.TimeoutException as exc:
@@ -113,7 +132,7 @@ class BackboardLlm:
         except httpx.HTTPError as exc:
             raise LlmError("unavailable", f"{self._label} is unreachable right now.") from exc
         if response.status_code in (401, 403):
-            raise LlmError("auth", "Backboard rejected the API key. Check it under Model provider.")
+            raise LlmError("auth", "Backboard rejected the API key. Check it in settings.")
         if response.status_code == 429:
             raise LlmError("rate_limited", "Backboard is rate limiting requests. Wait a minute and retry.")
         if response.status_code == 404:

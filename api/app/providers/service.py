@@ -13,6 +13,7 @@ from app.llm.backboard import BackboardLlm
 from app.llm.base import JsonMode, Llm, LlmError
 from app.llm.openai_compat import OpenAICompatibleLlm
 from app.providers.gate import GatedLlm, provider_slot
+from app.providers.memory import MemorySettings
 from app.providers.netguard import Resolver, check_base_url, resolve
 from app.providers.secrets_box import SecretBox
 from app.schemas import ProviderIn, ProviderOut, ProviderTestOut
@@ -24,7 +25,8 @@ from app.tables import ProviderRow
 # Which model analyzes a user's boards. A user may save their own provider:
 # an OpenAI-compatible endpoint or Backboard, with a base URL, a model and a
 # key. `Providers.for_user` returns that user's analyst, or the server's default
-# when they saved none. `AnalystSource` is the seam boards and the quiz use,
+# when they saved none, with their Backboard memory from `MemorySettings` when
+# they saved one. `AnalystSource` is the seam boards and the quiz use,
 # so tests and other deployments can pick analysts any other way.
 
 log = logging.getLogger(__name__)
@@ -67,9 +69,11 @@ class Providers:
         server: Analyst,
         *,
         demo: bool,
+        memory: MemorySettings | None = None,
         resolver: Resolver = resolve,
     ) -> None:
         self._db = db
+        self._memory = memory
         self._settings = settings
         self._server = server
         self._demo = demo
@@ -99,7 +103,9 @@ class Providers:
         except ValueError as exc:
             raise bad_request(str(exc)) from exc
         llm = self._build(kind, url, model, key, memory, assistant, user_id)
-        return Chosen(LlmAnalyst(GatedLlm(llm, user_id)), own_key=True)
+        # A Backboard provider brings its own memory, so the separate memory would only double it.
+        notes = self._memory.for_user(user_id) if self._memory is not None and kind != "backboard" else None
+        return Chosen(LlmAnalyst(GatedLlm(llm, user_id), notes), own_key=True)
 
     def view(self, session: Session, user_id: str) -> ProviderOut:
         """What analyzes this user's boards, without the key."""

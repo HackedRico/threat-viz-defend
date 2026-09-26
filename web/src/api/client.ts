@@ -3,7 +3,7 @@ import createClient, { type Middleware } from "openapi-fetch";
 import { API_BASE, apiUrl } from "./base.ts";
 import { ApiError, networkError, toApiError } from "./errors.ts";
 import type { paths } from "./schema";
-import type { AnswerIn, DictationIn, LoginIn, ProviderIn, SignupIn, SourceIn, SystemMap } from "./types.ts";
+import type { AnswerIn, DictationIn, LoginIn, MemoryIn, ProviderIn, SignupIn, SourceIn, SystemMap } from "./types.ts";
 
 // =============================================================================
 // Module Overview
@@ -102,6 +102,11 @@ export const api = {
   saveProvider: (body: ProviderIn) => unwrap(http.PUT("/api/provider", { body })),
   testProvider: (body: ProviderIn) => unwrap(http.POST("/api/provider/test", { body })),
   resetProvider: () => unwrap(http.DELETE("/api/provider")),
+
+  memory: () => unwrap(http.GET("/api/memory")),
+  saveMemory: (body: MemoryIn) => unwrap(http.PUT("/api/memory", { body })),
+  testMemory: (body: MemoryIn) => unwrap(http.POST("/api/memory/test", { body })),
+  resetMemory: () => unwrap(http.DELETE("/api/memory")),
 
   tokens: () => unwrap(http.GET("/api/tokens")),
   createToken: (name: string) => unwrap(http.POST("/api/tokens", { body: { name } })),

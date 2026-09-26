@@ -145,7 +145,7 @@ export function ProviderSettings() {
           <label className={`provider-kind ${form.kind === "openai_compatible" ? "is-on" : ""}`}>
             <input type="radio" name={`${ids}-kind`} checked={form.kind === "openai_compatible"} onChange={() => setKind("openai_compatible")} />
             <span className="provider-kind-name">OpenAI compatible</span>
-            <span className="field-hint">OpenAI, DigitalOcean, OpenRouter, Ollama and others</span>
+            <span className="field-hint">OpenAI, Featherless, OpenRouter, Ollama and others</span>
           </label>
           <label className={`provider-kind ${form.kind === "backboard" ? "is-on" : ""}`}>
             <input type="radio" name={`${ids}-kind`} checked={form.kind === "backboard"} onChange={() => setKind("backboard")} />
