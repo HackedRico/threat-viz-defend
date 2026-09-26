@@ -33,7 +33,7 @@ The names and parameters below must match in `tools.ts` and `scripts/elevenlabs_
 - Dictation goes through our API, never from the browser to ElevenLabs, so the key stays on the server and neither hosting layout needs a CSP change. Keep a clip under the 2,500,000 byte body cap once base64 grows it by a third: `DICTATION_MAX_SECONDS` and `DICTATION_BITS_PER_SECOND` in `dictation.ts` do that, and the server refuses more than about 1,500,000 bytes of audio.
 - Dictated text lands in the box for the user to read; it never sends a question on its own, since asking spends a model call.
 - The CSP allows scripts only from our origin, so the SDK's audio worklets are self-hosted: `npm run copy:worklets` copies them to `web/public/vendor/elevenlabs/` and `workletPaths` points at them. Recopy after upgrading `@elevenlabs/react`.
-- Voice is optional. With it off, `voiceEnabled` hides the panel and the text quiz still works, and `dictationEnabled` hides the mic; nothing outside this folder may depend on voice.
+- Voice is optional. With it off, `voiceEnabled` hides the panel and the text quiz still works. The mic beside Ask always shows, so people can find it; with `dictationEnabled` false it is dimmed, and a press says dictation is off without opening the microphone. Nothing outside this folder may depend on voice.
 
 ## Getting it running
 
@@ -42,7 +42,7 @@ The names and parameters below must match in `tools.ts` and `scripts/elevenlabs_
 3. Put that id in `.env` as `ELEVENLABS_AGENT_ID` and restart the API. `GET /api/config` now reports `voice_enabled: true`.
 4. `./scripts/dev.sh`, sign in with the development account, open the example board, go to Defend, and start the voice coach.
 
-Dictation needs only step 1: with `ELEVENLABS_API_KEY` set, `GET /api/config` reports `dictation_enabled: true` and the mic appears beside Ask on a finished board. The key needs the Speech to Text permission.
+Dictation needs only step 1: with `ELEVENLABS_API_KEY` set, `GET /api/config` reports `dictation_enabled: true` and the mic beside Ask records instead of saying dictation is off. The key needs the Speech to Text permission.
 
 `npm test` covers the letter parsing, speech text and dictation helpers without a key, and `api/tests/test_dictation.py` covers the route and the ElevenLabs request against a mock. Nothing else here runs in tests, so check the live session and a real recording by hand after each change.
 

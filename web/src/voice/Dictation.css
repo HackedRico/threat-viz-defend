@@ -3,7 +3,8 @@
    =============================================================================
    The dictate button beside a text box: a mic at rest, a red stop square with
    a running clock while recording, and a halo that grows with the mic level so
-   people can see they are being heard. */
+   people can see they are being heard. Dimmed when the server has no
+   dictation, but still pressable so it can say why. */
 
 .dictate {
   --level: 0;
@@ -11,6 +12,10 @@
   min-width: 42px;
   min-height: 42px;
   padding: 0 var(--space-3);
+}
+
+.dictate.is-off {
+  opacity: 0.55;
 }
 
 .dictate.is-recording,

@@ -21,9 +21,9 @@ import "./AskDock.css";
 // any, goes along as the focus; the answer comes back as plain text plus ids
 // that light up on the map. The bar fits its content until the user drags its
 // top edge. The starter questions name this board's own parts and go away
-// once the first question is sent. When the server has dictation, a mic beside
-// Ask writes a spoken question into the box, where the user reads it before
-// sending.
+// once the first question is sent. A mic beside Ask writes a spoken question
+// into the box, where the user reads it before sending; on a server without
+// dictation it stays, and pressing it says dictation is off.
 
 const QUESTION_MAX = 2000;
 const HEIGHT_KEY = "ask-height";
@@ -214,7 +214,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void ask(e);
             }}
           />
-          {dictationEnabled(config) && <DictateButton onText={takeDictation} onError={setError} disabled={busy} />}
+          <DictateButton available={dictationEnabled(config)} onText={takeDictation} onError={setError} disabled={busy} />
           <button type="submit" className="btn btn-primary ask-send" disabled={busy || question.trim() === ""}>
             {busy && <span className="spinner" aria-hidden="true" />} Ask
           </button>

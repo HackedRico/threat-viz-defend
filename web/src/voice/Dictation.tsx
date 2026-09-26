@@ -21,9 +21,13 @@ import "./Dictation.css";
 // ElevenLabs Speech to Text write it down. The clip goes to our own API, which
 // holds the ElevenLabs key, and the words come back for the caller to put in
 // front of the user, who reads them before sending. Escape throws a recording
-// away, and a recording stops by itself after a minute.
+// away, and a recording stops by itself after a minute. The button shows even
+// when the server has no ElevenLabs key, so people can find it; pressing it
+// then says dictation is off and never opens the microphone.
 
 type Phase = "idle" | "starting" | "recording" | "sending";
+
+const OFF_MESSAGE = "Dictation is not set up on this server yet, since it has no ElevenLabs API key. Type your question for now.";
 
 interface Take {
   recorder: MediaRecorder;
@@ -34,6 +38,8 @@ interface Take {
 }
 
 interface DictateProps {
+  /** False when the server cannot transcribe; the button then explains instead of recording. */
+  available: boolean;
   /** Receives the heard words, trimmed and never empty. */
   onText: (text: string) => void;
   /** Receives a message for the user, or `null` to clear an earlier one. */
@@ -42,7 +48,7 @@ interface DictateProps {
 }
 
 /** A mic button that turns a spoken question into text. */
-export function DictateButton({ onText, onError, disabled = false }: DictateProps) {
+export function DictateButton({ available, onText, onError, disabled = false }: DictateProps) {
   const { me, refreshMe } = useSession();
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -167,22 +173,26 @@ export function DictateButton({ onText, onError, disabled = false }: DictateProp
 
   const left = me.usage.dictations_limit - me.usage.dictations_today;
   const label = recording ? "Stop and write down your question" : phase === "sending" ? "Writing down your question" : "Speak your question";
-  const hint = recording
-    ? "Recording. Press again to stop, or Escape to throw it away."
-    : `Speak your question instead of typing it. ${left > 0 ? `${left} dictation${left === 1 ? "" : "s"} left today.` : "No dictations left today."}`;
+  const hint = !available
+    ? "Dictation is not set up on this server yet."
+    : recording
+      ? "Recording. Press again to stop, or Escape to throw it away."
+      : `Speak your question instead of typing it. ${left > 0 ? `${left} dictation${left === 1 ? "" : "s"} left today.` : "No dictations left today."}`;
 
   return (
     <>
       <button
         ref={button}
         type="button"
-        className={`btn dictate ${recording ? "is-recording" : ""}`}
+        className={`btn dictate ${recording ? "is-recording" : ""} ${available ? "" : "is-off"}`}
         aria-label={label}
         aria-pressed={recording}
+        // Still focusable and pressable when off, so the press can say why instead of doing nothing.
+        aria-disabled={!available}
         title={hint}
         // A recording in progress can always be stopped, even while the caller is busy.
         disabled={(disabled && !recording) || phase === "starting" || phase === "sending"}
-        onClick={() => (recording ? finish(true) : void start())}
+        onClick={() => (!available ? onError(OFF_MESSAGE) : recording ? finish(true) : void start())}
       >
         {phase === "starting" || phase === "sending" ? (
           <span className="spinner" aria-hidden="true" />
