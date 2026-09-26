@@ -1,15 +1,16 @@
 import type { SettingsSection } from "../shell/route.ts";
 import { navigate } from "../shell/useRoute.ts";
 import { ConnectAgent } from "./ConnectAgent.tsx";
+import { MemorySettings } from "./MemorySettings.tsx";
 import { ProviderSettings } from "./ProviderSettings.tsx";
 import "./SettingsView.css";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
-// The settings page: connecting coding agents and choosing the model provider,
-// as two sections under one set of tabs. The board id rides along so agent
-// setup can name the board the user came from.
+// The settings page: connecting coding agents, and choosing the model provider
+// with its optional memory, as two sections under one set of tabs. The board
+// id rides along so agent setup can name the board the user came from.
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "agents", label: "Coding agents" },
@@ -37,7 +38,14 @@ export function SettingsView({ section, boardId }: { section: SettingsSection; b
             </a>
           ))}
         </nav>
-        {section === "provider" ? <ProviderSettings /> : <ConnectAgent boardId={boardId} />}
+        {section === "provider" ? (
+          <>
+            <ProviderSettings />
+            <MemorySettings />
+          </>
+        ) : (
+          <ConnectAgent boardId={boardId} />
+        )}
       </div>
     </div>
   );

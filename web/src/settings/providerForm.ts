@@ -33,6 +33,7 @@ export const PRESETS: readonly Preset[] = [
     note: "Use a model access key from DigitalOcean's serverless inference.",
   },
   { id: "openrouter", label: "OpenRouter", kind: "openai_compatible", baseUrl: "https://openrouter.ai/api/v1", model: "", note: "" },
+  { id: "featherless", label: "Featherless", kind: "openai_compatible", baseUrl: "https://api.featherless.ai/v1", model: "", note: "" },
   {
     id: "ollama",
     label: "Ollama",
