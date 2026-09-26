@@ -104,6 +104,8 @@ def _me(svc: Svc, session: Db, user: UserRow) -> MeOut:
             model_calls_limit=settings.daily_model_calls,
             voice_sessions_today=svc.budget.used_today(session, user.id, "voice"),
             voice_sessions_limit=settings.daily_voice_sessions,
+            dictations_today=svc.budget.used_today(session, user.id, "dictation"),
+            dictations_limit=settings.daily_dictations,
         ),
     )
 

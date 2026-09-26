@@ -30,19 +30,20 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
   );
 }
 
-/** Today's usage as two meters. */
-export function UsageMeters({ usage }: { usage: UsageOut }) {
+/** Today's usage as meters; dictation shows only where the server offers it. */
+export function UsageMeters({ usage, dictation }: { usage: UsageOut; dictation: boolean }) {
   return (
     <div className="usage">
       <Meter label="Model calls today" used={usage.model_calls_today} limit={usage.model_calls_limit} />
       <Meter label="Voice sessions today" used={usage.voice_sessions_today} limit={usage.voice_sessions_limit} />
+      {dictation && <Meter label="Dictations today" used={usage.dictations_today} limit={usage.dictations_limit} />}
     </div>
   );
 }
 
 /** The account button and its menu; `collapsed` shows only the initial. */
 export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: string | null }) {
-  const { me, refreshMe, signOut } = useSession();
+  const { config, me, refreshMe, signOut } = useSession();
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -72,7 +73,7 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
           <p className="user-pop-name">
             Signed in as <strong>{name}</strong>
           </p>
-          <UsageMeters usage={me.usage} />
+          <UsageMeters usage={me.usage} dictation={config.dictation_enabled} />
           <button
             type="button"
             className="btn btn-ghost user-pop-item"

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { Answer, BoardOut, SystemMap } from "../api/types.ts";
@@ -7,7 +7,9 @@ import { CloseIcon, SparkIcon } from "../shell/icons.tsx";
 import { ResizeHandle } from "../shell/ResizeHandle.tsx";
 import { clampWidth, parseWidth } from "../shell/resize.ts";
 import { useSession } from "../shell/session.tsx";
+import { dictationEnabled, DictateButton, joinDictation } from "../voice/index.tsx";
 import { labelOf } from "./elements.ts";
+import { starterQuestions } from "./starters.ts";
 import { useBoardUi } from "./store.ts";
 import "./AskDock.css";
 
@@ -18,14 +20,12 @@ import "./AskDock.css";
 // so the question sits next to the map it lights. The selected element, if
 // any, goes along as the focus; the answer comes back as plain text plus ids
 // that light up on the map. The bar fits its content until the user drags its
-// top edge, and the starter questions go away once the first question is sent.
+// top edge. The starter questions name this board's own parts and go away
+// once the first question is sent. When the server has dictation, a mic beside
+// Ask writes a spoken question into the box, where the user reads it before
+// sending.
 
-const STARTERS = [
-  "What should I fix first, and why?",
-  "Where can untrusted input reach an AI part?",
-  "What happens if the database leaks?",
-];
-
+const QUESTION_MAX = 2000;
 const HEIGHT_KEY = "ask-height";
 const HEIGHT_MIN = 100;
 const HEIGHT_MAX = 900;
@@ -90,6 +90,10 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   const input = useRef<HTMLTextAreaElement>(null);
   const id = useId();
   const analysis = board.analysis;
+  const starters = useMemo(
+    () => (analysis ? starterQuestions(map, analysis, board.exposure) : []),
+    [map, analysis, board.exposure],
+  );
 
   useEffect(() => {
     if (focusSignal > 0) input.current?.focus();
@@ -118,6 +122,17 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   const pickStarter = (starter: string) => {
     setQuestion(starter);
     input.current?.focus();
+  };
+
+  // The heard words join what was typed, and the cursor lands after them so a fix is one keystroke away.
+  const takeDictation = (heard: string) => {
+    setQuestion((typed) => joinDictation(typed, heard, QUESTION_MAX));
+    requestAnimationFrame(() => {
+      const box = input.current;
+      if (!box) return;
+      box.focus();
+      box.setSelectionRange(box.value.length, box.value.length);
+    });
   };
 
   return (
@@ -191,7 +206,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
             id={id}
             className="textarea ask-input"
             rows={1}
-            maxLength={2000}
+            maxLength={QUESTION_MAX}
             placeholder="What could go wrong if..."
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
@@ -199,13 +214,14 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void ask(e);
             }}
           />
+          {dictationEnabled(config) && <DictateButton onText={takeDictation} onError={setError} disabled={busy} />}
           <button type="submit" className="btn btn-primary ask-send" disabled={busy || question.trim() === ""}>
             {busy && <span className="spinner" aria-hidden="true" />} Ask
           </button>
         </div>
         {!asked && question === "" && (
           <div className="ask-starters">
-            {STARTERS.map((starter) => (
+            {starters.map((starter) => (
               <button key={starter} type="button" className="chip ask-starter" onClick={() => pickStarter(starter)}>
                 {starter}
               </button>

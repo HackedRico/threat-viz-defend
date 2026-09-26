@@ -25,7 +25,7 @@ The app is invite-only, and the expensive parts are metered. All limits live in 
 - **Per-network limits, kept loose on purpose.** At a venue everyone can share one public IP, so per-IP limits are high: 60 sign ups per hour and 150 sign in attempts per 5 minutes. The invite code is the real gate. The client IP comes from the header named by `CLIENT_IP_HEADER` (App Platform's `do-connecting-ip`) only when `TRUST_PROXY` is on; otherwise it is the socket peer. IPv6 clients are counted by their /64, since one client usually holds a whole /64, and wrong invite codes also have a ceiling across all networks, 300 per hour.
 - **Account lockout.** After 5 failed sign ins for one username from one network in 15 minutes, that pair is locked for 15 minutes, even with the right password. A looser ceiling of 50 failures per username across all networks stops a distributed guess. Keying the tight limit on the network means a stranger cannot lock someone else out from elsewhere. A success clears the count.
 - **Account cap.** Sign ups stop at `MAX_USERS` accounts, 300 by default.
-- **Daily budgets.** Each user may make `DAILY_MODEL_CALLS` model calls (60) and start `DAILY_VOICE_SESSIONS` voice sessions (10) per UTC day on the server's keys. All users together may make `GLOBAL_DAILY_MODEL_CALLS` model calls (3000). The `usage` table records every spend, so budgets survive a restart.
+- **Daily budgets.** Each user may make `DAILY_MODEL_CALLS` model calls (60), start `DAILY_VOICE_SESSIONS` voice sessions (10) and dictate `DAILY_DICTATIONS` questions (30, 10 a minute at most) per UTC day on the server's keys. All users together may make `GLOBAL_DAILY_MODEL_CALLS` model calls (3000). The `usage` table records every spend, so budgets survive a restart.
 - **Per-minute limit.** Each user may make `MODEL_CALLS_PER_MINUTE` model calls (6) per minute, including calls on their own provider key.
 - **Other caps.** 30 boards per user, 10 personal tokens per user, 10 new tokens per hour, 10 provider tests per 5 minutes, 30 agent changes per hour, one background job per board at a time, and 4 background model jobs running at once across the server.
 - **Request size.** `RequestGuard` in [web.py](../api/app/web.py) refuses a body over 2,500,000 bytes, by `Content-Length` and again while the body streams in. Request schemas cap every string and list, and reject unknown keys.
@@ -136,12 +136,13 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 | Backboard | The same, and with memory on, the user's questions and quiz answers with their replies are kept as memory of the user's assistant | For users who pick Backboard as their provider |
 | Backboard memory | The user's questions to the analyst and the open quiz questions as search queries, and notes of those questions with each quiz verdict. Never uploads, maps or the user's answer text | For users who save a memory key with their own model |
 | ElevenLabs | The user's voice, the transcript, the username, the system name, a short brief of the board, and the quiz questions and feedback the tools return | During a voice session |
+| ElevenLabs | A recording of the question the user dictates, up to a minute, through the API with the server's key | When the user presses the mic beside **Ask** |
 | GitHub | A request for the named public repository, from the server's IP | During an import |
 
 ## Data retention
 
 - **Kept until deleted:** accounts, boards with their maps, analyses, source records and activity, quiz answers including open answers in the user's own words, personal tokens, saved providers and usage records. A user can delete boards, revoke tokens, remove their provider and start a quiz over. Deleting an account takes an operator, and deletes everything the account owns.
-- **Never kept:** the content of uploads, pasted text, GitHub files and agent diffs.
+- **Never kept:** the content of uploads, pasted text, GitHub files and agent diffs, and dictated recordings and their text.
 - **Sessions** stop working after `SESSION_DAYS`. Expired rows stay in the table.
 - **Server logs** hold usernames at sign up, the IP of a request that filled the honeypot, job failure messages, and, when a model reply fails validation, a short excerpt of that reply.
 - **The event deployment**, including its database, is torn down after the event.
@@ -174,7 +175,8 @@ The map below is how we see our own system. Each row is a STRIDE threat, what st
 | Agent changes | D | An agent floods a board | 30 changes per hour, busy boards refuse new work | None known |
 | Voice | T | Tampered dynamic variables or tool calls | Grading and budgets stay on the server; tools validate input | A user can change only their own coach's context |
 | Voice | D | Voice minutes drained | Per-user daily sessions, budget spent before the token is minted | No overall voice cap; the ElevenLabs plan is the ceiling |
-| Usage records | R | Denying a spend | Every model call and voice session is a `usage` row | No audit log of other actions |
+| Dictation | D | Speech to Text credits drained | Per-user daily and per-minute caps spent before ElevenLabs is called, clips of about a minute at most, the body cap | No overall dictation cap; the ElevenLabs plan is the ceiling |
+| Usage records | R | Denying a spend | Every model call, voice session and dictation is a `usage` row | No audit log of other actions |
 | Database | I | Dump or backup leaks | Only hashes of sessions and tokens, sealed keys, no upload content | Maps, threats and quiz answers are in clear text |
 | Admin | E | An admin page gets attacked | No admin page; CLI on the host only | Anyone with shell access on the host is an admin |
 

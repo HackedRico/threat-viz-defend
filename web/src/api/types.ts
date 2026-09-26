@@ -134,6 +134,15 @@ export type VoiceSessionOut = Schemas["VoiceSessionOut"];
 /** A spoken-style walkthrough of a board. */
 export type BriefOut = Schemas["BriefOut"];
 
+/** A recorded question, base64 encoded, for the server to transcribe. */
+export type DictationIn = Schemas["DictationIn"];
+
+/** The recording formats the server accepts for dictation. */
+export type AudioType = DictationIn["audio_type"];
+
+/** The text of a dictated question. */
+export type DictationOut = Schemas["DictationOut"];
+
 // ---------- personal tokens ----------
 
 /** A personal token, without its secret. */

@@ -20,10 +20,12 @@ from app.tables import UsageRow
 # =============================================================================
 # Abuse controls. `RateLimiter` counts hits per key in a sliding window, in
 # memory, which fits the single instance this app runs as. `Budget` meters the
-# expensive things, model calls and voice sessions, per user per UTC day and
-# across all users, and records each spend in the `usage` table.
+# expensive things, model calls, voice sessions and dictations, per user per
+# UTC day and across all users, and records each spend in the `usage` table.
 
-UsageKind = Literal["model", "voice"]
+UsageKind = Literal["model", "voice", "dictation"]
+
+_NOUNS: dict[UsageKind, str] = {"model": "model requests", "voice": "voice sessions", "dictation": "dictations"}
 
 _MAX_KEYS = 50_000
 
@@ -68,7 +70,7 @@ class RateLimiter:
 
 
 class Budget:
-    """Daily allowances for model calls and voice sessions, per user and overall."""
+    """Daily allowances for model calls, voice sessions and dictations, per user and overall."""
 
     def __init__(self, settings: Settings, limiter: RateLimiter) -> None:
         self._settings = settings
@@ -94,11 +96,10 @@ class Budget:
         since = _start_of_day()
         mine = self._count(session, kind, since, user_id)
         if mine >= per_user:
-            noun = "model requests" if kind == "model" else "voice sessions"
             raise AppError(
                 429,
                 "budget_exhausted",
-                f"You have used today's {per_user} {noun}. The allowance resets at midnight UTC.",
+                f"You have used today's {per_user} {_NOUNS[kind]}. The allowance resets at midnight UTC.",
                 headers={"Retry-After": str(_seconds_to_midnight())},
             )
         if self._count(session, kind, since, None) >= overall:
@@ -119,8 +120,10 @@ class Budget:
         """The per-user and overall daily limits for `kind`."""
         if kind == "model":
             return self._settings.daily_model_calls, self._settings.global_daily_model_calls
-        # Voice has no separate overall cap; the ElevenLabs plan's own minutes are the ceiling.
-        return self._settings.daily_voice_sessions, 10**9
+        # Voice and dictation have no separate overall cap; the ElevenLabs plan's own credits are the ceiling.
+        if kind == "voice":
+            return self._settings.daily_voice_sessions, 10**9
+        return self._settings.daily_dictations, 10**9
 
     @staticmethod
     def _count(session: Session, kind: UsageKind, since: datetime, user_id: str | None) -> int:

@@ -3,7 +3,7 @@ import createClient, { type Middleware } from "openapi-fetch";
 import { API_BASE, apiUrl } from "./base.ts";
 import { ApiError, networkError, toApiError } from "./errors.ts";
 import type { paths } from "./schema";
-import type { AnswerIn, LoginIn, MemoryIn, ProviderIn, SignupIn, SourceIn, SystemMap } from "./types.ts";
+import type { AnswerIn, DictationIn, LoginIn, MemoryIn, ProviderIn, SignupIn, SourceIn, SystemMap } from "./types.ts";
 
 // =============================================================================
 // Module Overview
@@ -96,6 +96,7 @@ export const api = {
 
   brief: (id: string) => unwrap(http.GET("/api/boards/{board_id}/brief", path(id))),
   voiceSession: (id: string) => unwrap(http.POST("/api/boards/{board_id}/voice", path(id))),
+  dictate: (body: DictationIn) => unwrap(http.POST("/api/dictation", { body })),
 
   provider: () => unwrap(http.GET("/api/provider")),
   saveProvider: (body: ProviderIn) => unwrap(http.PUT("/api/provider", { body })),
