@@ -328,7 +328,8 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 | A GitHub import fails with "over 30 MB" | Upload the repository's key folder instead. |
 | "The board is already working." | A map or threat job is running. Wait for the status to settle. |
 | "found no components in that material" | The material did not describe a system. Add a README, design notes or source code. |
-| "returned data in the wrong shape twice" or "ran out of output tokens" | The model struggled. Try again with less material, or pick a stronger model. |
+| "returned data in the wrong shape twice" | The model struggled. Try again with less material, or pick a stronger model. |
+| "ran out of output tokens" | The reply outgrew the server's output cap. Try again, or pick another model. The operator can raise `LLM_MAX_TOKENS`. |
 | "rejected the API key" | Fix the key under **Model provider**, or remove your provider. |
 | "The base URL points at a private or local address" | This server only calls public addresses. Use a public endpoint. |
 | "A saved API key could not be decrypted" | The server's secret changed. Save your provider again with the key. |

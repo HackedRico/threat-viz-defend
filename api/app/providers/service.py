@@ -237,6 +237,7 @@ class Providers:
             base_url=url,
             json_mode=mode,
             timeout_s=self._settings.llm_timeout_s,
+            max_tokens=self._settings.llm_max_tokens,
             max_retries=0,
         )
 

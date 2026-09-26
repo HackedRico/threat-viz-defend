@@ -7,6 +7,7 @@ import pytest
 
 from app.analysis.analyst import LlmAnalyst
 from app.analysis.prompts import fence, find_threats_content, neutralize
+from app.config import load_settings
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.llm.base import LlmError, LlmRequest, parse_json, strict_schema
 from app.llm.openai_compat import OpenAICompatibleLlm
@@ -27,6 +28,8 @@ class _Completions:
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
+        if isinstance(reply, SimpleNamespace):
+            return reply
         message = SimpleNamespace(content=reply, refusal=None)
         return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
 
@@ -75,6 +78,43 @@ def test_rejected_response_format_falls_back_to_the_prompt() -> None:
     assert llm.generate(REQUEST) == inbox().analysis
     assert "response_format" not in calls.calls[1]
     assert "JSON Schema" in calls.calls[1]["messages"][0]["content"]
+
+
+@pytest.mark.parametrize(
+    ("base_url", "field", "other"),
+    [
+        (None, "max_completion_tokens", "max_tokens"),
+        ("https://api.openai.com/v1", "max_completion_tokens", "max_tokens"),
+        ("https://api.featherless.ai/v1", "max_tokens", "max_completion_tokens"),
+    ],
+)
+def test_the_output_cap_uses_the_field_the_host_honors(base_url: str | None, field: str, other: str) -> None:
+    completions = _Completions([GOOD])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = OpenAICompatibleLlm(model="m", api_key="k", base_url=base_url, max_tokens=40, client=client)  # type: ignore[arg-type]
+    llm.generate(REQUEST)
+    assert completions.calls[0][field] == 40
+    assert other not in completions.calls[0]
+
+
+def test_no_cap_sends_neither_field() -> None:
+    llm, calls = scripted(GOOD)
+    llm.generate(REQUEST)
+    assert "max_tokens" not in calls.calls[0]
+    assert "max_completion_tokens" not in calls.calls[0]
+
+
+def test_a_blank_cap_defaults_to_16k_and_zero_leaves_it_to_the_provider() -> None:
+    assert load_settings({}).llm_max_tokens == 16_384
+    assert load_settings({"LLM_MAX_TOKENS": "0"}).llm_max_tokens is None
+    assert load_settings({"LLM_MAX_TOKENS": "8000"}).llm_max_tokens == 8000
+
+
+def test_hitting_the_cap_does_not_blame_the_material() -> None:
+    truncated = SimpleNamespace(content='{"verdict": "cut', refusal=None)
+    llm, _ = scripted(SimpleNamespace(choices=[SimpleNamespace(message=truncated, finish_reason="length")]))
+    with pytest.raises(LlmError, match="Try again, or pick another model"):
+        llm.generate(REQUEST)
 
 
 def test_auth_errors_name_the_variable_to_fix() -> None:

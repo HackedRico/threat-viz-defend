@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -9,6 +10,7 @@ from app.domain.models import ThreatAnalysis
 from app.errors import AppError
 from app.llm.backboard import BackboardLlm
 from app.llm.base import LlmError, LlmRequest
+from app.providers import service
 from app.providers.netguard import check_base_url
 from app.providers.secrets_box import SecretBox
 from tests.conftest import ClientFactory, sign_up
@@ -113,6 +115,23 @@ def test_a_saved_provider_analyzes_the_users_boards(make_client: ClientFactory) 
     chosen = client.app.state.services.providers.for_user(client.get("/api/auth/me").json()["user"]["id"])  # type: ignore[attr-defined]
     assert chosen.own_key
     assert chosen.analyst.label == "gpt-test via api.example.com"
+
+
+def test_a_saved_provider_gets_the_servers_output_cap(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    built: list[dict[str, Any]] = []
+
+    def record(**kwargs: Any) -> SimpleNamespace:
+        built.append(kwargs)
+        return SimpleNamespace(label="recorded")
+
+    monkeypatch.setattr(service, "OpenAICompatibleLlm", record)
+    client = make_client(resolver=public_dns)
+    sign_up(client)
+    client.put("/api/provider", json=provider_body())
+    client.app.state.services.providers.for_user(client.get("/api/auth/me").json()["user"]["id"])  # type: ignore[attr-defined]
+    assert built[0]["max_tokens"] == 16_384
 
 
 # -----------------------------------------------------------------
