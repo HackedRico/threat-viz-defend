@@ -6,7 +6,7 @@ This guide walks through every screen of ThreatViz Defend in the order you meet 
 
 You need an invite code from whoever runs the deployment. On a local server the code is `local-dev`.
 
-1. Open the app. The home page shows a sample of code, the threat path a scan finds in it, and two buttons, **Create an account** and **Sign in**. The sample is an illustration, not a live scan. Below it, the page explains the two ways to feed a board, from your own material or from a coding agent, then walks through the steps and the example board.
+1. Open the app. The home page plays a short replay of the example board, from adding material to a Defend answer, beside two buttons, **Create an account** and **Sign in**. The numbered steps under the replay jump to a step and pause it; **Play** and **Pause** control it. The replay is fixed, not a live run. Below it, the page explains the two ways to feed a board, from your own material or from a coding agent, then walks through the steps and the example board.
 2. Choose **Create an account**. The form also lives at `/signup`.
 3. Pick a **Username** of 3 to 24 characters: letters, digits, dots, dashes and underscores, starting with a letter or digit. It is stored in lowercase.
 4. Pick a **Password** of at least 10 characters. It must not contain your username or be a common password. **Show** reveals what you typed.

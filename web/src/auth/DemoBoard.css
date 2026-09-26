@@ -1,0 +1,332 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The home page demo: a board window with the app's header, a dotted canvas
+   where the map draws itself, and a panel for the current step, then the step
+   buttons. Pins, the trifecta ring and the lit element fade in per step. */
+
+.demo {
+  position: relative;
+  min-height: 590px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  gap: 14px;
+  padding: 20px 0 30px 20px;
+}
+
+.demo-window {
+  width: min(100%, 600px);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+}
+
+.demo-bar {
+  min-height: 52px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.demo-title {
+  font-size: var(--hand-md);
+  line-height: 1;
+}
+
+.demo-counts {
+  display: flex;
+  gap: var(--space-1);
+  animation: demo-in 0.4s var(--ease-out) both;
+}
+
+.demo-counts.is-waiting {
+  visibility: hidden;
+  animation: none;
+}
+
+.demo-canvas {
+  position: relative;
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+.demo-canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.demo-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+  font-size: var(--hand-lg);
+}
+
+.demo-fill {
+  fill: var(--surface);
+  transition: fill var(--dur-med) var(--ease-out);
+}
+
+/* A wash of the highlight, not the full color, so the label stays readable in both themes. */
+.demo-fill.is-lit {
+  fill: color-mix(in srgb, var(--highlight) 40%, var(--surface));
+  filter: drop-shadow(0 0 10px var(--highlight-glow));
+}
+
+.demo-canvas .sketch-label {
+  font-size: 23px;
+}
+
+.demo-canvas .sketch-zone {
+  font-size: 18px;
+}
+
+.sketch-stroke.demo-crossing {
+  stroke: var(--crossing);
+}
+
+.demo-threats {
+  animation: demo-in 0.5s var(--ease-out) both;
+}
+
+.demo-ring {
+  fill: none;
+  stroke: var(--ai);
+  stroke-width: 2.4;
+  stroke-dasharray: 5 4;
+}
+
+.demo-pin circle {
+  fill: var(--sev-critical);
+}
+
+.demo-pin text {
+  fill: var(--pin-digit-critical);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.demo-pin.is-high circle {
+  fill: var(--sev-high);
+}
+
+.demo-pin.is-high text {
+  fill: var(--pin-digit-high);
+}
+
+/* ---------- the step panel ---------- */
+
+/* Tall enough for the longest step, so the window keeps its size as the steps change. */
+.demo-panel {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-top: 1px solid var(--line);
+  animation: demo-in 0.35s var(--ease-out) both;
+}
+
+.demo-panel-title {
+  font-weight: 700;
+}
+
+.demo-panel-text,
+.demo-panel-note {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.demo-sources,
+.demo-threat-list,
+.demo-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.demo-sources li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  animation: demo-in 0.35s var(--ease-out) both;
+}
+
+.demo-sources li:nth-child(2) {
+  animation-delay: 0.35s;
+}
+.demo-sources li:nth-child(3) {
+  animation-delay: 0.7s;
+}
+.demo-sources li:nth-child(4) {
+  animation-delay: 1.2s;
+}
+
+.demo-tag {
+  min-width: 64px;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 9px;
+  text-align: center;
+}
+
+.demo-sources li.is-agent .demo-tag {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.demo-confirm {
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--ink-inverse);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+.demo-threat-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.demo-pin-dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sev-critical);
+  color: var(--pin-digit-critical);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.demo-pin-dot.is-high {
+  background: var(--sev-high);
+  color: var(--pin-digit-high);
+}
+
+.demo-options {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.demo-options li {
+  padding: 4px var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+
+.demo-options li.is-right {
+  border-color: var(--ok);
+  background: var(--marker-green-wash);
+  font-weight: 650;
+}
+
+/* ---------- step buttons ---------- */
+
+.demo-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(100%, 600px);
+}
+
+.demo-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-step:hover {
+  border-color: var(--accent);
+}
+
+.demo-step[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.demo-step-number {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.demo-play {
+  margin-left: auto;
+}
+
+.demo-caption {
+  color: var(--ink-faint);
+  font-size: 10px;
+}
+
+@keyframes demo-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 850px) {
+  .demo {
+    min-height: 0;
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .demo-play {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-counts,
+  .demo-threats,
+  .demo-panel,
+  .demo-sources li {
+    animation: none;
+  }
+}

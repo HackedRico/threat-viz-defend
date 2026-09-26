@@ -1,9 +1,8 @@
 /* =============================================================================
    Module Overview
    =============================================================================
-   The home page: the pitch on the left and the sample scan on the right. A
-   beam sweeps the sample code, then the threat path it found rises in below.
-   It stacks on narrow screens, and reduced motion shows the scan at rest. */
+   The home page hero: the pitch on the left and the demo board on the right.
+   It stacks on narrow screens. */
 
 .landing {
   width: 100%;
@@ -11,7 +10,7 @@
   min-height: min(780px, calc(100vh - 151px));
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   gap: var(--space-6);
   padding: 50px clamp(var(--space-5), 6vw, 104px);
@@ -66,279 +65,11 @@
   color: var(--accent);
 }
 
-/* ---------- the sample scan ---------- */
-
-.scan {
-  position: relative;
-  min-height: 590px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 14px;
-  padding: 20px 0 30px 20px;
-}
-
-.scan-window,
-.scan-path {
-  width: min(100%, 570px);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-}
-
-.scan-window {
-  position: relative;
-  overflow: hidden;
-  background: var(--surface);
-  box-shadow: var(--shadow-3);
-}
-
-.scan-bar {
-  height: 45px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.scan-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.scan-dots i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--marker-red);
-}
-
-.scan-dots i:nth-child(2) {
-  background: var(--marker-amber);
-}
-
-.scan-dots i:nth-child(3) {
-  background: var(--marker-green);
-}
-
-.scan-state {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  color: var(--accent);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.scan-code {
-  position: relative;
-  overflow: hidden;
-  padding: 14px 0;
-  background: repeating-linear-gradient(
-    transparent 0 35px,
-    color-mix(in srgb, var(--ink) 5%, transparent) 35px 36px
-  );
-}
-
-.scan-row {
-  position: relative;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 20px;
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: pre;
-}
-
-.scan-row code {
-  font: inherit;
-}
-
-.scan-row.is-risk {
-  background: var(--marker-red-wash);
-  box-shadow: inset 2px 0 0 var(--danger);
-}
-
-.scan-line-no {
-  min-width: 22px;
-  color: var(--ink-faint);
-  user-select: none;
-}
-
-.syntax-keyword {
-  color: var(--marker-blue);
-}
-
-.syntax-declare {
-  color: var(--marker-teal);
-}
-
-.syntax-string {
-  color: var(--marker-green);
-}
-
-.scan-marker {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin-left: auto;
-  border: 1px solid var(--danger);
-  border-radius: 50%;
-  color: var(--danger);
-  font-family: var(--font-body);
-  font-weight: 700;
-}
-
-.scan-beam {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--accent);
-  box-shadow:
-    0 0 14px var(--accent),
-    0 15px 35px color-mix(in srgb, var(--accent) 20%, transparent);
-  pointer-events: none;
-  animation: scan-sweep 5s ease-in-out infinite alternate;
-}
-
-.scan-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 18px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-faint);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.scan-foot-next {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--accent);
-}
-
-.scan-down {
-  width: 12px;
-  height: 12px;
-  transform: rotate(90deg);
-}
-
-.scan-path {
-  padding: 14px 18px;
-  background: var(--surface-2);
-  box-shadow: var(--shadow-2);
-  animation: scan-reveal 0.65s var(--ease-out) 2.3s both;
-}
-
-.scan-path-label {
-  color: var(--accent);
-  font-size: 10px;
-}
-
-.scan-flow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin: 12px 0;
-}
-
-.scan-node {
-  flex: 1;
-  padding: 10px 7px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.scan-node.is-risk {
-  border-color: var(--danger);
-  background: var(--marker-red-wash);
-  color: var(--danger);
-}
-
-.scan-arrow {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  color: var(--accent);
-}
-
-.scan-verdict {
-  color: var(--ink-soft);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.scan-verdict strong {
-  margin-right: 4px;
-  color: var(--danger);
-}
-
-.scan-caption {
-  position: absolute;
-  bottom: 4px;
-  left: 20px;
-  color: var(--ink-faint);
-  font-size: 10px;
-}
-
-@keyframes scan-sweep {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(215px);
-  }
-}
-
-@keyframes scan-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 850px) {
   .landing {
     grid-template-columns: 1fr;
     min-height: auto;
     padding-top: 75px;
-  }
-  .scan {
-    min-height: 490px;
-    padding-left: 0;
-  }
-  .scan-caption {
-    left: 0;
   }
 }
 
@@ -348,40 +79,6 @@
   }
   .landing-actions .auth-button {
     width: 100%;
-  }
-  .scan {
-    min-height: 410px;
-    padding: 20px 0 44px;
-  }
-  .scan-bar {
-    gap: 8px;
-    padding: 0 10px;
-    font-size: 9px;
-  }
-  .scan-state {
-    font-size: 8px;
-  }
-  .scan-row {
-    gap: 9px;
-    padding: 0 10px;
-    font-size: 10px;
-  }
-  .scan-path {
-    padding: 10px;
-  }
-  .scan-node {
-    padding: 9px 3px;
-    font-size: 8px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .scan-beam {
-    top: calc(50% - 2px);
-    animation: none;
-  }
-  .scan-path {
-    animation: none;
   }
 }
 

@@ -2,6 +2,7 @@ import type { Ref } from "react";
 
 import type { ConfigOut } from "../api/types.ts";
 import { ArrowRightIcon, ArrowUpRightIcon, SparkIcon } from "../shell/icons.tsx";
+import { DemoBoard } from "./DemoBoard.tsx";
 import { Pitch } from "./Pitch.tsx";
 import { ViewLink } from "./ViewLink.tsx";
 import "./Landing.css";
@@ -10,24 +11,8 @@ import "./Landing.css";
 // Module Overview
 // =============================================================================
 // The home page a signed-out visitor sees first: the hero with the ways in and
-// `SampleScan`, a picture of a scan that finds a command injection path, then
-// the longer `Pitch` below it. The sample is fixed markup, never a live scan,
-// and says so on the page.
-
-type Tone = "keyword" | "declare" | "string";
-
-interface CodeLine {
-  runs: [text: string, tone?: Tone][];
-  risk?: boolean;
-}
-
-const SAMPLE: CodeLine[] = [
-  { runs: [["function", "keyword"], [" runCommand(userInput) {"]] },
-  { runs: [["  "], ["const", "declare"], [" command = "], ['"git "', "string"], [" + userInput;"]] },
-  { runs: [[""]] },
-  { runs: [["  exec(command);"]], risk: true },
-  { runs: [["}"]] },
-];
+// `DemoBoard`, a replay of the app on the example board, then the longer
+// `Pitch` below it.
 
 /** The signed-out home page. */
 export function Landing({ config, headingRef }: { config: ConfigOut; headingRef: Ref<HTMLHeadingElement> }) {
@@ -47,8 +32,9 @@ export function Landing({ config, headingRef }: { config: ConfigOut; headingRef:
           </h1>
           <p className="landing-lead">
             Your coding agent wrote it. Now see how it works: a map of how data moves through your system, the threats
-            pinned to it, and a quiz that checks you can defend it at a whiteboard. Add your code once, or connect Claude
-            Code or Cursor so the map keeps up as you build.
+            pinned to it, and a quiz that gets you ready for when a reviewer, a teammate or a stakeholder asks how it
+            could be attacked and what stops it. Add your code once, or connect Claude Code or Cursor so the map keeps
+            up as you build.
           </p>
           <div className="landing-actions">
             {open && (
@@ -68,75 +54,9 @@ export function Landing({ config, headingRef }: { config: ConfigOut; headingRef:
             See how it works <ArrowRightIcon className="landing-more-icon" />
           </a>
         </div>
-        <SampleScan />
+        <DemoBoard />
       </section>
       <Pitch config={config} />
     </>
-  );
-}
-
-/** A still picture of a scan: sample code with a risky line, then the threat path that line opens. */
-function SampleScan() {
-  return (
-    <div
-      className="scan"
-      role="img"
-      aria-label="Example: sample code is scanned, then a threat path shows user input flowing into a shell command, a possible command injection."
-    >
-      <div className="scan-window" aria-hidden="true">
-        <div className="scan-bar">
-          <span className="scan-dots">
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>commands.js</span>
-          <span className="scan-state">
-            <span className="auth-dot" />
-            Reviewing code
-          </span>
-        </div>
-        <div className="scan-code">
-          {SAMPLE.map((line, i) => (
-            <div key={i} className={line.risk ? "scan-row is-risk" : "scan-row"}>
-              <span className="scan-line-no">{String(i + 1).padStart(2, "0")}</span>
-              <code>
-                {line.runs.map(([text, tone], j) => (
-                  <span key={j} className={tone ? `syntax-${tone}` : undefined}>
-                    {text}
-                  </span>
-                ))}
-              </code>
-              {line.risk && <span className="scan-marker">!</span>}
-            </div>
-          ))}
-          <div className="scan-beam" />
-        </div>
-        <div className="scan-foot">
-          <span>Sample code</span>
-          <span className="scan-foot-next">
-            Threat path <ArrowRightIcon className="scan-down" />
-          </span>
-        </div>
-      </div>
-
-      <div className="scan-path" aria-hidden="true">
-        <span className="auth-caps scan-path-label">Possible threat path</span>
-        <div className="scan-flow">
-          <span className="scan-node">User input</span>
-          <ArrowRightIcon className="scan-arrow" />
-          <span className="scan-node">Command builder</span>
-          <ArrowRightIcon className="scan-arrow" />
-          <span className="scan-node is-risk">Shell execution</span>
-        </div>
-        <p className="scan-verdict">
-          <strong>!</strong> Untrusted input may change the command the program runs.
-        </p>
-      </div>
-
-      <span className="auth-caps scan-caption" aria-hidden="true">
-        Illustrative example, not a live scan
-      </span>
-    </div>
   );
 }
