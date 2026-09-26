@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "python3 /absolute/path/to/your-repo/.threatviz/threatviz_hook.py"
+      }
+    ],
+    "stop": [
+      {
+        "command": "python3 /absolute/path/to/your-repo/.threatviz/threatviz_hook.py"
+      }
+    ]
+  }
+}

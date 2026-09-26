@@ -1,0 +1,151 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   Every design token in one place: colors, fonts, radii, spacing, shadows and
+   motion. Light is an enamel whiteboard with marker colors; dark is a glass
+   board with chalk-bright markers. Components read tokens, never raw values. */
+
+:root {
+  /* ---------- fonts ---------- */
+  --font-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+  --font-body: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.375rem;
+  --hand-md: 1.35rem;
+  --hand-lg: 1.85rem;
+  --hand-xl: 2.6rem;
+
+  /* ---------- spacing ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* ---------- radii ---------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ---------- layout ---------- */
+  --sidebar-width: 272px;
+  --sidebar-collapsed: 56px;
+  --panel-width: 380px;
+
+  /* ---------- motion ---------- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-med: 220ms;
+  --dur-slow: 480ms;
+
+  /* ---------- light: enamel whiteboard ---------- */
+  --board: #f6f4ee;
+  --board-dot: rgba(46, 56, 78, 0.12);
+  --board-edge: #c9c3b4;
+  --tray: #e7e2d6;
+  --surface: #fffdf8;
+  --surface-2: #f1eee5;
+  --surface-3: #e8e4d9;
+  --line: #d8d2c3;
+  --line-strong: #b9b2a1;
+
+  --ink: #1b2231;
+  --ink-soft: #485063;
+  --ink-faint: #7d8392;
+  --ink-inverse: #fffdf8;
+
+  --marker-blue: #1d5bbf;
+  --marker-blue-wash: rgba(29, 91, 191, 0.1);
+  --marker-red: #c8321f;
+  --marker-red-wash: rgba(200, 50, 31, 0.1);
+  --marker-orange: #cf6a12;
+  --marker-amber: #a87f00;
+  --marker-green: #23804a;
+  --marker-green-wash: rgba(35, 128, 74, 0.12);
+  --marker-teal: #0d7f86;
+  --marker-teal-wash: rgba(13, 127, 134, 0.1);
+
+  --sev-critical: var(--marker-red);
+  --sev-high: var(--marker-orange);
+  --sev-medium: var(--marker-amber);
+  --sev-low: var(--marker-green);
+
+  --accent: var(--marker-blue);
+  --accent-wash: var(--marker-blue-wash);
+  --danger: var(--marker-red);
+  --ok: var(--marker-green);
+  --ai: var(--marker-teal);
+  --crossing: #b0379a;
+
+  --highlight: #ffd84a;
+  --highlight-glow: rgba(255, 196, 0, 0.55);
+
+  --sticky: #ffe88a;
+  --sticky-edge: #efd35c;
+  --sticky-ink: #3a3110;
+
+  --focus: #1d5bbf;
+
+  --shadow-1: 0 1px 2px rgba(27, 34, 49, 0.08), 0 1px 1px rgba(27, 34, 49, 0.04);
+  --shadow-2: 0 6px 18px rgba(27, 34, 49, 0.1), 0 2px 4px rgba(27, 34, 49, 0.06);
+  --shadow-3: 0 18px 50px rgba(27, 34, 49, 0.18), 0 4px 10px rgba(27, 34, 49, 0.08);
+  --shadow-sticky: 2px 6px 14px rgba(58, 49, 16, 0.18);
+
+  color-scheme: light;
+}
+
+/* ---------- dark: glass board ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --board: #15191e;
+    --board-dot: rgba(220, 230, 245, 0.08);
+    --board-edge: #2c333c;
+    --tray: #0f1216;
+    --surface: #1b2027;
+    --surface-2: #222831;
+    --surface-3: #2a313b;
+    --line: #313843;
+    --line-strong: #46505d;
+
+    --ink: #ebe8df;
+    --ink-soft: #b6b3aa;
+    --ink-faint: #858a93;
+    --ink-inverse: #15191e;
+
+    --marker-blue: #74a9ff;
+    --marker-blue-wash: rgba(116, 169, 255, 0.14);
+    --marker-red: #ff7462;
+    --marker-red-wash: rgba(255, 116, 98, 0.14);
+    --marker-orange: #ffa552;
+    --marker-amber: #f0c94a;
+    --marker-green: #62d08b;
+    --marker-green-wash: rgba(98, 208, 139, 0.14);
+    --marker-teal: #4fd0c8;
+    --marker-teal-wash: rgba(79, 208, 200, 0.14);
+    --crossing: #f08ad8;
+
+    --highlight: #ffd84a;
+    --highlight-glow: rgba(255, 216, 74, 0.35);
+
+    --sticky: #d8c160;
+    --sticky-edge: #bfa840;
+    --sticky-ink: #221d08;
+
+    --focus: #8fb8ff;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 8px 22px rgba(0, 0, 0, 0.45);
+    --shadow-3: 0 20px 60px rgba(0, 0, 0, 0.6);
+    --shadow-sticky: 2px 8px 18px rgba(0, 0, 0, 0.5);
+
+    color-scheme: dark;
+  }
+}

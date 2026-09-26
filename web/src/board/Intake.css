@@ -1,0 +1,269 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The intake card on the board: paste on the left, files and folders on the
+   right, the GitHub field and the draw button along the bottom, and the lists
+   of staged and skipped files. */
+
+.intake {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-5);
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+.intake-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-6);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+
+.intake-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.intake-title {
+  font-size: var(--hand-xl);
+  line-height: 1;
+}
+
+.intake-sub {
+  max-width: 64ch;
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+}
+
+.intake-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.intake-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.intake-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.intake-note {
+  flex: 1;
+}
+
+.intake-note .textarea {
+  flex: 1;
+  min-height: 220px;
+  font-size: var(--text-sm);
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--board);
+  text-align: center;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.dropzone.is-over {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.dropzone-title {
+  font-size: var(--hand-lg);
+  line-height: 1;
+}
+
+.dropzone-hint {
+  max-width: 44ch;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.intake-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.staged {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.staged-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.staged-list,
+.skipped ul,
+.intake-existing ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.staged-list li,
+.intake-existing li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px var(--space-3);
+  font-size: var(--text-xs);
+  border-top: 1px solid var(--line);
+}
+
+.staged-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staged-size {
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.staged-kind {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.staged-kind.kind-code {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.skipped,
+.intake-existing {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.skipped summary,
+.intake-existing summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: var(--space-1) 0;
+}
+
+.skipped li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 2px 0;
+  border-top: 1px dashed var(--line);
+}
+
+.skipped li .mono {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skipped-reason {
+  flex: none;
+  color: var(--ink-faint);
+}
+
+.intake-error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--danger);
+  background: var(--marker-red-wash);
+  font-size: var(--text-sm);
+}
+
+.intake-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1.5px dashed var(--line);
+}
+
+.intake-github {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 280px;
+  max-width: 560px;
+}
+
+.intake-github-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.intake-submit {
+  min-height: 44px;
+  padding: 0 var(--space-6);
+  font-size: var(--text-md);
+}
+
+@media (max-width: 900px) {
+  .intake-grid {
+    grid-template-columns: 1fr;
+  }
+  .intake-card {
+    padding: var(--space-4);
+  }
+}

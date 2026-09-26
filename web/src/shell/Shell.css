@@ -1,0 +1,78 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The signed-in page frame, sidebar beside main, and the welcome screen for a
+   user with no boards. */
+
+.shell {
+  position: relative;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.shell-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-blank {
+  flex: 1;
+  background: var(--board);
+}
+
+.welcome {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-7);
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+  overflow: auto;
+}
+
+.welcome-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 480px;
+}
+
+.welcome-title {
+  font-size: var(--hand-xl);
+  line-height: 1;
+}
+
+.welcome-text {
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.welcome-error {
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.welcome-sketch {
+  max-width: 460px;
+}
+
+@media (max-width: 900px) {
+  .welcome {
+    grid-template-columns: 1fr;
+    padding: var(--space-5);
+  }
+}

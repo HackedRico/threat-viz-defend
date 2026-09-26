@@ -1,0 +1,586 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The whiteboard canvas: dotted board surface, marker strokes for nodes and
+   flows, dashed trust boundaries, highlighter marks for lit elements, threat
+   pins, the lethal trifecta ring, the view controls and the map key. */
+
+.canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}
+
+.canvas:focus-visible {
+  outline: 2.5px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.canvas-svg {
+  display: block;
+}
+
+/* ---------- boundaries ---------- */
+
+.boundary-fill {
+  fill: color-mix(in srgb, var(--ink) 2.5%, transparent);
+  stroke: none;
+}
+
+.boundary-stroke {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.7;
+  stroke-dasharray: 10 7;
+  stroke-linecap: round;
+}
+
+.boundary-label {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 21px;
+  fill: var(--ink-soft);
+}
+
+.boundary-kind {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+}
+
+/* ---------- nodes ---------- */
+
+.map-node {
+  cursor: pointer;
+  outline: none;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
+.node-fill {
+  fill: var(--surface);
+  stroke: none;
+}
+
+.kind-external .node-fill {
+  fill: var(--surface-2);
+}
+
+.node-stroke {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.node-glyph {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.node-label {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 20px;
+  fill: var(--ink);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.node-tech {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  fill: var(--ink-faint);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.node-tag rect {
+  stroke-width: 1.2;
+}
+
+.node-tag text {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  text-anchor: middle;
+  letter-spacing: 0.04em;
+}
+
+.tag-ai rect {
+  fill: var(--surface);
+  stroke: var(--ai);
+}
+.tag-ai text {
+  fill: var(--ai);
+}
+.tag-sensitive rect {
+  fill: var(--surface);
+  stroke: var(--sev-high);
+}
+.tag-sensitive text {
+  fill: var(--sev-high);
+}
+
+.focus-ring {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2.5;
+  pointer-events: none;
+}
+
+.map-node:focus-visible .focus-ring {
+  stroke: var(--focus);
+  stroke-dasharray: 4 3;
+}
+
+.map-node.is-selected .focus-ring {
+  stroke: var(--accent);
+  stroke-dasharray: none;
+}
+
+.map-node:hover .node-stroke {
+  stroke-width: 2.3;
+}
+
+.node-highlighter {
+  fill: none;
+  stroke: var(--highlight);
+  stroke-width: 22;
+  stroke-linejoin: round;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+}
+
+/* ---------- lethal trifecta ---------- */
+
+.trifecta-ring {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 2.2;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+  animation: trifecta-pulse 2.4s ease-in-out infinite;
+}
+
+.trifecta-label {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 16px;
+  fill: var(--danger);
+  text-anchor: middle;
+}
+
+@keyframes trifecta-pulse {
+  50% {
+    stroke-width: 3.4;
+    opacity: 0.7;
+  }
+}
+
+/* ---------- flows ---------- */
+
+.map-flow {
+  cursor: pointer;
+  outline: none;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
+.flow-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+}
+
+.flow-line {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.is-crossing .flow-line {
+  stroke: var(--crossing);
+  stroke-width: 4.2;
+}
+
+.flow-inner {
+  fill: none;
+  stroke: var(--board);
+  stroke-width: 1.4;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+}
+
+.map-flow.is-selected .flow-line {
+  stroke: var(--accent);
+}
+
+.map-flow.is-selected:not(.is-crossing) .flow-line {
+  stroke-width: 2.6;
+}
+
+.map-flow:hover .flow-line {
+  stroke-width: 2.4;
+}
+
+.map-flow.is-crossing:hover .flow-line {
+  stroke-width: 5;
+}
+
+.flow-highlighter {
+  fill: none;
+  stroke: var(--highlight);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.6;
+  mix-blend-mode: multiply;
+}
+
+.arrow-head {
+  fill: var(--ink-soft);
+}
+.arrow-head.is-crossing {
+  fill: var(--crossing);
+}
+.arrow-head.is-selected {
+  fill: var(--accent);
+}
+
+.flow-chip rect {
+  fill: var(--board);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.is-crossing .flow-chip rect {
+  stroke: var(--crossing);
+  stroke-dasharray: 3 2;
+}
+
+.map-flow.is-selected .flow-chip rect {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.map-flow:focus-visible .flow-chip rect {
+  stroke: var(--focus);
+  stroke-width: 2.2;
+}
+
+.flow-chip text {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 17px;
+  fill: var(--ink);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.flow-chip .flow-diff {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- review diff ---------- */
+
+.diff-tag rect {
+  stroke-width: 1.2;
+}
+
+.diff-tag text {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  text-anchor: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.diff-tag-new rect {
+  fill: var(--marker-green);
+  stroke: var(--marker-green);
+}
+.diff-tag-new text {
+  fill: var(--ink-inverse);
+}
+.flow-diff.diff-tag-new {
+  fill: var(--marker-green);
+}
+
+.diff-tag-edited rect {
+  fill: var(--surface);
+  stroke: var(--accent);
+}
+.diff-tag-edited text,
+.flow-diff.diff-tag-edited {
+  fill: var(--accent);
+}
+
+.map-node.diff-new .node-stroke {
+  stroke: var(--marker-green);
+}
+
+.map-flow.diff-new:not(.is-crossing) .flow-line {
+  stroke: var(--marker-green);
+}
+
+/* ---------- pins ---------- */
+
+.pin {
+  cursor: pointer;
+  outline: none;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
+.pin-shape {
+  fill: currentColor;
+  stroke: var(--board);
+  stroke-width: 2;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.25));
+}
+
+.pin-number {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  fill: #fff;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
+.sev-medium .pin-number {
+  fill: #1b1600;
+}
+
+.pin:hover .pin-shape,
+.pin:focus-visible .pin-shape {
+  stroke: var(--focus);
+  stroke-width: 2.6;
+}
+
+.pin-mark.sev-critical {
+  color: var(--sev-critical);
+}
+.pin-mark.sev-high {
+  color: var(--sev-high);
+}
+.pin-mark.sev-medium {
+  color: var(--sev-medium);
+}
+.pin-mark.sev-low {
+  color: var(--sev-low);
+}
+
+.pin-badge {
+  flex: none;
+  overflow: visible;
+}
+
+.pin-badge .pin-shape {
+  stroke: var(--surface);
+  filter: none;
+}
+
+/* ---------- dimming around a highlight ---------- */
+
+.has-highlight .is-dim {
+  opacity: 0.28;
+}
+
+.has-highlight .is-lit .node-stroke {
+  stroke-width: 2.4;
+}
+
+/* ---------- draft stamp ---------- */
+
+.canvas-stamp {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  padding: 0 12px;
+  border: 3px solid var(--marker-blue);
+  border-radius: 8px;
+  color: var(--marker-blue);
+  font-size: 2rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transform: rotate(4deg);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* ---------- controls ---------- */
+
+.canvas-controls {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  cursor: default;
+}
+
+.canvas-controls .btn {
+  width: 32px;
+  min-height: 32px;
+  border-color: transparent;
+}
+
+.canvas-controls .btn[aria-pressed="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.canvas-zoom {
+  min-width: 44px;
+  padding: 0 6px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+/* ---------- legend ---------- */
+
+.map-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 64px;
+  width: 290px;
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  cursor: default;
+  user-select: text;
+}
+
+.map-legend-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.map-legend h2 {
+  font-size: var(--hand-md);
+}
+
+.map-legend ul {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+
+.map-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.map-legend li > svg {
+  width: 40px;
+  height: 24px;
+  flex: none;
+}
+
+.legend-stroke {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+
+.legend-dashed {
+  stroke: var(--ink-faint);
+  stroke-dasharray: 5 4;
+}
+
+.legend-flow {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.legend-cross {
+  fill: none;
+  stroke: var(--crossing);
+  stroke-width: 4.2;
+}
+
+.legend-cross-inner {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 1.4;
+}
+
+.legend-ring {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+}
+
+.legend-pins {
+  flex-wrap: wrap;
+  gap: var(--space-2) !important;
+}
+
+.legend-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: capitalize;
+}
+
+.map-legend-foot {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+@media (prefers-color-scheme: dark) {
+  .node-highlighter,
+  .flow-highlighter {
+    mix-blend-mode: screen;
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trifecta-ring {
+    animation: none;
+  }
+}

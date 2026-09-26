@@ -1,0 +1,86 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The work-in-progress board: the looping sketch beside a short account of what
+   is happening, with the sources being read and the latest activity. */
+
+.drawing {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  overflow: auto;
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+.drawing-sketch {
+  justify-self: end;
+  width: min(460px, 100%);
+}
+
+.drawing-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 460px;
+}
+
+.drawing-title {
+  font-size: var(--hand-xl);
+  line-height: 1;
+}
+
+.drawing-step {
+  font-family: var(--font-hand);
+  font-size: var(--hand-md);
+  font-weight: 600;
+  color: var(--accent);
+  animation: step-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.drawing-note {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.drawing-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.drawing-sources ul {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+.drawing-sources li {
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+@media (max-width: 900px) {
+  .drawing {
+    grid-template-columns: 1fr;
+    padding: var(--space-4);
+  }
+  .drawing-sketch {
+    justify-self: center;
+    max-width: 320px;
+  }
+}

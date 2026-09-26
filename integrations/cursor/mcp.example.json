@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "threatviz": {
+      "url": "${env:THREATVIZ_API_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:THREATVIZ_TOKEN}"
+      }
+    }
+  }
+}

@@ -1,0 +1,118 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The account button at the foot of the sidebar and the menu that opens above
+   it, with today's usage meters. */
+
+.user-menu {
+  position: relative;
+}
+
+.user-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-button:hover {
+  background: var(--surface-2);
+}
+
+.user-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--ink-inverse);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-usage {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.user-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 264px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+}
+
+.user-pop-name {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.user-pop-item {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.usage-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.usage-track {
+  height: 6px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.usage-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.usage-track.is-near .usage-fill {
+  background: var(--danger);
+}
