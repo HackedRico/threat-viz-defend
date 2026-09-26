@@ -17,13 +17,15 @@ interface BoardUi {
   highlightSource: HighlightSource | null;
   hoverPath: string | null;
   pinnedPath: string | null;
-  focusThreat: string | null;
+  /** The threat the list opens and scrolls to: a new object per request, so asking for the same threat twice works. */
+  focusThreat: { id: string } | null;
   select: (id: string | null) => void;
   setHighlight: (ids: string[], source: HighlightSource) => void;
   clearHighlight: () => void;
   setHoverPath: (id: string | null) => void;
   togglePinnedPath: (id: string) => void;
   showThreat: (id: string | null) => void;
+  openThreat: (id: string) => void;
   reset: () => void;
 }
 
@@ -52,6 +54,9 @@ export const useBoardUi = create<BoardUi>()((set) => ({
   clearHighlight: () => set({ highlight: [], highlightSource: null, pinnedPath: null }),
   setHoverPath: (id) => set({ hoverPath: id }),
   togglePinnedPath: (id) => set((state) => ({ pinnedPath: state.pinnedPath === id ? null : id })),
-  showThreat: (id) => set({ focusThreat: id }),
+  showThreat: (id) => set({ focusThreat: id === null ? null : { id } }),
+  // The threat opens in the list, which the details would cover, so the selection steps aside
+  // and the threat lights its pin and element instead.
+  openThreat: (id) => set({ selected: null, focusThreat: { id }, highlight: [id], highlightSource: "threat", pinnedPath: null }),
   reset: () => set({ ...EMPTY, highlight: [] }),
 }));

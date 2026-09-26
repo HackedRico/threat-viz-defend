@@ -83,7 +83,7 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
   const drag = useRef<{ id: number; startX: number; startY: number; view: View; dragging: boolean } | null>(null);
   const selected = useBoardUi((s) => s.selected);
   const select = useBoardUi((s) => s.select);
-  const showThreat = useBoardUi((s) => s.showThreat);
+  const openThreat = useBoardUi((s) => s.openThreat);
   const hintId = useId();
   const layout = layouts[direction ?? "DOWN"];
 
@@ -387,10 +387,7 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
                   key={pin.threat.id}
                   pin={pin}
                   state={litState(pin.threat.id) || litState(pin.threat.element)}
-                  onOpen={() => {
-                    showThreat(pin.threat.id);
-                    select(pin.threat.element);
-                  }}
+                  onOpen={() => openThreat(pin.threat.id)}
                 />
               ))}
           </g>
