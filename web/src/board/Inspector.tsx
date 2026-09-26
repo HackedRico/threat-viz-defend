@@ -1,7 +1,7 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
 import type { ElementKind, ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
-import { CloseIcon, TrashIcon } from "../shell/icons.tsx";
+import { BackIcon, TrashIcon } from "../shell/icons.tsx";
 import { SeverityBadge } from "../shell/SeverityBadge.tsx";
 import { flowLabel, isInferred } from "./elements.ts";
 import { flowsTouching, removeElement, updateFlow, updateNode } from "./mapEdit.ts";
@@ -12,8 +12,9 @@ import "./Inspector.css";
 // =============================================================================
 // Module Overview
 // =============================================================================
-// The card that opens over the canvas for the selected node or flow. It always
-// shows the evidence the map was drawn from; in review it also edits the
+// The details for the selected node or flow, laid over the side panel's lists
+// so nothing covers the map. A bar where the tabs were leads back to them. It
+// always shows the evidence the map was drawn from; in review it also edits the
 // element, and on a finished board it lists the threats pinned there and what
 // an AI part is exposed to.
 
@@ -26,6 +27,8 @@ const KINDS: { value: ElementKind; label: string }[] = [
 interface InspectorProps {
   map: SystemMap;
   id: string;
+  /** The name of what the panel shows under the details, for the way back to it. */
+  backTo: string;
   editable: boolean;
   threats: readonly Threat[];
   exposure: readonly ExposureOut[];
@@ -35,63 +38,109 @@ interface InspectorProps {
 }
 
 /** The inspector for element `id`, or nothing when the id is not a node or flow. */
-export function Inspector({ map, id, editable, threats, exposure, crossings, onChange, onAsk }: InspectorProps) {
+export function Inspector({ map, id, backTo, editable, threats, exposure, crossings, onChange, onAsk }: InspectorProps) {
   const select = useBoardUi((s) => s.select);
+  const openThreat = useBoardUi((s) => s.openThreat);
+  const root = useRef<HTMLElement>(null);
+  const nav = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const node = map.nodes.find((n) => n.id === id);
   const flow = map.flows.find((f) => f.id === id);
+
+  useEffect(() => {
+    const details = root.current;
+    if (!details) return;
+    body.current?.scrollTo({ top: 0 });
+    // A narrow window stacks the panel under the map, below the fold. Scroll up only the top of
+    // the details, the bar's scroll margin in Inspector.css, so most of the map stays in view.
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    nav.current?.scrollIntoView({ block: "nearest", behavior: motion });
+    // A link that selected this may have left with what it sat in, or gone inert under the details.
+    const active = document.activeElement;
+    if (active === null || active === document.body || active.closest("[inert]")) details.focus({ preventScroll: true });
+  }, [id]);
+
   if (!node && !flow) return null;
   const pinned = rankThreats(threats.filter((t) => t.element === id));
+  const close = () => {
+    select(null);
+    focusOnMap(id);
+  };
 
   return (
-    <aside className="inspector" aria-label={`Details for ${node ? node.label : flow!.label}`}>
-      <div className="inspector-head">
-        <span className="inspector-kind mono">{node ? node.kind : crossings.includes(id) ? "flow, crosses a boundary" : "flow"}</span>
-        <span className="inspector-id mono">{id}</span>
-        <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="Close details" onClick={() => select(null)}>
-          <CloseIcon />
+    <section
+      ref={root}
+      className="inspector"
+      aria-label={`Details for ${node ? node.label : flow!.label}`}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          close();
+        }
+      }}
+    >
+      {/* Built from the tab bar's own classes, so it sits exactly where the tabs were. */}
+      <div ref={nav} className="tab-bar inspector-nav">
+        <button type="button" className="tab inspector-back" aria-label={`Back to ${backTo}`} onClick={close}>
+          <BackIcon width={15} height={15} /> {backTo}
         </button>
       </div>
-      {node ? (
-        <NodeDetails map={map} node={node} editable={editable} exposure={exposure.find((x) => x.node === node.id)} onChange={onChange} />
-      ) : (
-        <FlowDetails map={map} flow={flow!} editable={editable} onChange={onChange} />
-      )}
+      <div ref={body} className="inspector-body">
+        <div className="inspector-head">
+          <span className="inspector-kind mono">{node ? node.kind : crossings.includes(id) ? "flow, crosses a boundary" : "flow"}</span>
+          <span className="inspector-id mono">{id}</span>
+        </div>
+        {node ? (
+          <NodeDetails map={map} node={node} editable={editable} exposure={exposure.find((x) => x.node === node.id)} onChange={onChange} />
+        ) : (
+          <FlowDetails map={map} flow={flow!} editable={editable} onChange={onChange} />
+        )}
 
-      {pinned.length > 0 && (
-        <section className="inspector-section">
-          <h3 className="inspector-label">Threats here</h3>
-          <ul className="inspector-threats">
-            {pinned.map((threat) => (
-              <li key={threat.id}>
-                <button type="button" className="inspector-threat" onClick={() => useBoardUi.getState().showThreat(threat.id)}>
-                  <span className="mono">{threat.id}</span>
-                  <span className="inspector-threat-title">{threat.title}</span>
-                  <SeverityBadge severity={threat.severity} />
-                  <span className="chip">{STRIDE[threat.stride].name}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {pinned.length > 0 && (
+          <section className="inspector-section">
+            <h3 className="inspector-label">Threats here</h3>
+            <ul className="inspector-threats">
+              {pinned.map((threat) => (
+                <li key={threat.id}>
+                  <button type="button" className="inspector-threat" onClick={() => openThreat(threat.id)}>
+                    <span className="mono">{threat.id}</span>
+                    <span className="inspector-threat-title">{threat.title}</span>
+                    <SeverityBadge severity={threat.severity} />
+                    <span className="chip">{STRIDE[threat.stride].name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {onAsk && (
-        <button type="button" className="btn btn-sm inspector-ask" onClick={onAsk}>
-          Ask about this
-        </button>
-      )}
-      {editable && (
-        <DeleteButton
-          label={node ? node.label : flow!.label}
-          extra={node ? flowsTouching(map, node.id).length : 0}
-          onDelete={() => {
-            onChange(removeElement(map, id));
-            select(null);
-          }}
-        />
-      )}
-    </aside>
+        {onAsk && (
+          <button type="button" className="btn btn-sm inspector-ask" onClick={onAsk}>
+            Ask about this
+          </button>
+        )}
+        {editable && (
+          <DeleteButton
+            label={node ? node.label : flow!.label}
+            extra={node ? flowsTouching(map, node.id).length : 0}
+            onDelete={() => {
+              onChange(removeElement(map, id));
+              select(null);
+              focusOnMap(null);
+            }}
+          />
+        )}
+      </div>
+    </section>
   );
+}
+
+// Closing from inside the details hands the keyboard back to the element on the map, or to the
+// map itself when the element is gone, so focus never falls to the top of the page.
+function focusOnMap(id: string | null) {
+  const element = id === null ? null : document.querySelector<SVGElement>(`[data-el="${CSS.escape(id)}"]`);
+  (element ?? document.querySelector<HTMLElement>(".canvas"))?.focus();
 }
 
 function NodeDetails({

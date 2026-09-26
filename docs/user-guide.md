@@ -138,7 +138,7 @@ On an updated map, elements carry a `new` or `edited` tag. An update keeps the d
 
 ### The inspector
 
-Selecting a node or flow opens a card over the canvas with its id and kind. It always shows the **Evidence** the model cited. Evidence that starts with `inferred:` is shown under "Inferred, not quoted", which means the material did not say it outright.
+Selecting a node or flow shows its details in the side panel, over the panel's lists, so the whole map stays in view. The details give the element's id and kind and always show the **Evidence** the model cited. The bar at the top of the panel, where the tabs were, leads back: **Threat model** on a finished board, **Review** while you check the map. Escape, a click on empty canvas, or a second click on the element also goes back. The lists wait underneath unchanged, so the tab you were on, where you had scrolled and a quiz in progress are all still there. If the panel is hidden, selecting shows it for the details and hides it again when you go back. Evidence that starts with `inferred:` is shown under "Inferred, not quoted", which means the material did not say it outright.
 
 In review you can edit a node:
 
@@ -150,7 +150,7 @@ In review you can edit a node:
 
 For a flow you can edit its **Label** and **What it carries**, and jump to either end.
 
-The node card also lists its flows. **Delete** removes the element, and for a node, every flow that touches it.
+A node's details also list its flows; choose one to see it. On a finished board they list the threats pinned there, and choosing one opens it in the Threats tab. **Delete** removes the element, and for a node, every flow that touches it.
 
 ### The review panel
 
@@ -173,22 +173,22 @@ Choose **Looks right, find threats**. The board goes to **Finding threats**, the
 A ready board opens with the whole map in view when it fits at a readable size, and otherwise centered on the element with the worst threat.
 
 - **The short version.** The sticky note across the top of the canvas explains the board to someone new. Side by side it says what the system is, how many threats were found by severity and what to fix first, with how to read the map underneath. Fold it away with its button; it stays folded on later boards until you open it again.
-- **Pins.** Each threat is a numbered pin on its node's top right corner, or beside its flow's label. The shape shows severity without relying on color: octagon for critical, triangle for high, circle for medium, square for low, and a critical pin also wears a ring. Clicking a pin selects its element and opens the threat in the list. The pin button in the view controls hides every pin, so you can read the system on its own, and shows them again.
+- **Pins.** Each threat is a numbered pin on its node's top right corner, or beside its flow's label. The shape shows severity without relying on color: octagon for critical, triangle for high, circle for medium, square for low, and a critical pin also wears a ring. Clicking a pin opens the threat in the Threats tab and lights it and its element on the map. The pin button in the view controls hides every pin, so you can read the system on its own, and shows them again.
 - **Lethal trifecta.** A ring around an AI part. Select it to see "Reads sensitive data from", "Takes untrusted input from" and "Can send data out to".
 - **Crossings.** Double lines mark flows that cross a trust boundary; the inspector says "flow, crosses a boundary".
 - **Highlights.** When something lights up part of the map, a chip names the source, such as "Lit by the answer", with **Clear**.
-- **Hide panel.** The button at the top right of the canvas hides or shows the side panel.
-- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag, and the page scrolls down to it.
+- **Hide panel.** The button at the top right of the canvas hides or shows the side panel. Hiding it also closes any details it shows.
+- **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag, and the page scrolls down to it. Selecting an element there scrolls up just the top of its details, so most of the map stays in view.
 
 ### Ask
 
-The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. To say the question instead, choose the mic beside **Ask**, speak, and choose it again to stop; the words appear in the box for you to check and fix before you ask. A recording stops by itself after a minute, and Escape throws it away. Each recording uses one dictation, and the mic shows only when the server has dictation. Starter questions, which name parts of this board such as its AI part or the store that holds its most sensitive data, fill the box for you until you send your first question. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in the inspector puts the cursor in the ask bar. Drag the top edge of the ask bar to make it taller or shorter; the answer, or the box when there is no answer, takes the room. The height is remembered in this browser, and a double click on the edge fits the bar to its content again.
+The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. To say the question instead, choose the mic beside **Ask**, speak, and choose it again to stop; the words appear in the box for you to check and fix before you ask. A recording stops by itself after a minute, and Escape throws it away. Each recording uses one dictation, and the mic shows only when the server has dictation. Starter questions, which name parts of this board such as its AI part or the store that holds its most sensitive data, fill the box for you until you send your first question. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in its details puts the cursor in the ask bar. Drag the top edge of the ask bar to make it taller or shorter; the answer, or the box when there is no answer, takes the room. The height is remembered in this browser, and a double click on the edge fits the bar to its content again.
 
 The side panel has four tabs.
 
 ### Threats
 
-Every threat, worst first, with where it sits, its severity and its STRIDE category. Open a card for the full statement, the impact, "Fixes to start today", catalog references such as CWE or OWASP ids, and the evidence. Opening a card lights its element on the map.
+Every threat, worst first, with where it sits, its severity and its STRIDE category. Open a card for the full statement, the impact, "Fixes to start today", catalog references such as CWE or OWASP ids, and the evidence. Opening a card lights its element on the map and keeps the list in place; select the element on the map for its details.
 
 ### Paths
 

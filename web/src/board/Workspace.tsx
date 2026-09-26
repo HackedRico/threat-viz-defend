@@ -28,7 +28,8 @@ import "./Workspace.css";
 // the right, and on a finished board the ask bar docked under the canvas. In
 // review the map is a local draft the user edits and saves; once ready it is
 // read only and lights up from answers, quiz results, the voice coach and
-// attack paths.
+// attack paths. The selected node or flow shows its details in the side panel,
+// over the panel's lists, so nothing ever covers the map.
 
 const SOURCE_TEXT: Record<HighlightSource, string> = {
   ask: "Lit by the answer",
@@ -83,6 +84,7 @@ export function Workspace({
   const threats = analysis?.threats ?? [];
 
   const selected = useBoardUi((s) => s.selected);
+  const select = useBoardUi((s) => s.select);
   const highlight = useBoardUi((s) => s.highlight);
   const source = useBoardUi((s) => s.highlightSource);
   const hoverPath = useBoardUi((s) => s.hoverPath);
@@ -107,10 +109,15 @@ export function Workspace({
   const busy = isBusy(board.status);
   const asking = analysis !== null;
   const shownLabels = highlight.slice(0, 4).map((id) => labelOf(id, map, analysis));
+  // Only a node or flow still on the map has details; a deleted one shows none.
+  const inspected = selected !== null && (map.nodes.some((n) => n.id === selected) || map.flows.some((f) => f.id === selected)) ? selected : null;
+  // The panel is where details show, so selecting opens a hidden panel, and it hides again
+  // when the details close: the reader who hid it gets the whole map back.
+  const panelShown = panelOpen || inspected !== null;
 
   return (
     <div
-      className={`workspace ${panelOpen ? "" : "panel-closed"}`}
+      className={`workspace ${panelShown ? "" : "panel-closed"}`}
       style={{ "--panel-width": `${panelWidth}px` } as CSSProperties}
     >
       <div className="workspace-stage">
@@ -150,19 +157,6 @@ export function Workspace({
             </div>
           )}
 
-          {selected && (
-            <Inspector
-              map={map}
-              id={selected}
-              editable={review}
-              threats={threats}
-              exposure={board.status === "ready" ? board.exposure : []}
-              crossings={board.crossings}
-              onChange={edit}
-              onAsk={asking ? () => setAskSignal((n) => n + 1) : null}
-            />
-          )}
-
           {busy && (
             <div className="workspace-busy" role="status">
               <span className="spinner" aria-hidden="true" />
@@ -173,18 +167,22 @@ export function Workspace({
           <button
             type="button"
             className="btn btn-sm panel-toggle"
-            aria-expanded={panelOpen}
+            aria-expanded={panelShown}
             aria-controls="workspace-panel"
-            onClick={() => setPanelOpen((open) => !open)}
+            onClick={() => {
+              // Hiding the panel puts away the details it holds, or they would open it again.
+              if (panelShown) select(null);
+              setPanelOpen(!panelShown);
+            }}
           >
-            <SidebarIcon /> {panelOpen ? "Hide panel" : "Show panel"}
+            <SidebarIcon /> {panelShown ? "Hide panel" : "Show panel"}
           </button>
         </div>
 
         {asking && <AskDock board={board} map={map} focusSignal={askSignal} />}
       </div>
 
-      {panelOpen && (
+      {panelShown && (
         <aside id="workspace-panel" className="workspace-panel" aria-label={review ? "Review the map" : "Threat model"}>
           <ResizeHandle
             label="Resize side panel"
@@ -195,39 +193,56 @@ export function Workspace({
             fallback={PANEL_DEFAULT}
             onResize={setPanelWidth}
           />
-          {busy ? (
-            <div className="panel">
-              <p className="muted">
-                {board.status === "analyzing"
-                  ? "Threats appear here once the analysis finishes."
-                  : "The map is being redrawn from the new material."}
-              </p>
-              <ProviderLine />
-              <ActivityLog board={board} open />
-            </div>
-          ) : review ? (
-            <ReviewPanel
-              board={board}
-              draft={draft}
-              dirty={dirty}
-              staleEdits={staleEdits}
-              diff={diff}
-              onSaved={(next) => {
-                setDirty(false);
-                setEditBase(null);
-                seenRevision.current = next.revision;
-                setDraft(next.map ?? draft);
-                onApply(next);
-              }}
-              onDiscard={() => {
-                setDraft(serverMap);
-                setDirty(false);
-                setEditBase(null);
-              }}
-              onApply={onApply}
+          {/* Stays mounted under the details, so the tab, scroll, open cards, quiz and voice
+              session are all still there after a look at one element. */}
+          <div className="workspace-panel-main" inert={inspected !== null}>
+            {busy ? (
+              <div className="panel">
+                <p className="muted">
+                  {board.status === "analyzing"
+                    ? "Threats appear here once the analysis finishes."
+                    : "The map is being redrawn from the new material."}
+                </p>
+                <ProviderLine />
+                <ActivityLog board={board} open />
+              </div>
+            ) : review ? (
+              <ReviewPanel
+                board={board}
+                draft={draft}
+                dirty={dirty}
+                staleEdits={staleEdits}
+                diff={diff}
+                onSaved={(next) => {
+                  setDirty(false);
+                  setEditBase(null);
+                  seenRevision.current = next.revision;
+                  setDraft(next.map ?? draft);
+                  onApply(next);
+                }}
+                onDiscard={() => {
+                  setDraft(serverMap);
+                  setDirty(false);
+                  setEditBase(null);
+                }}
+                onApply={onApply}
+              />
+            ) : (
+              <ReadyPanel board={board} map={map} />
+            )}
+          </div>
+          {inspected && (
+            <Inspector
+              map={map}
+              id={inspected}
+              backTo={review ? "Review" : "Threat model"}
+              editable={review}
+              threats={threats}
+              exposure={board.status === "ready" ? board.exposure : []}
+              crossings={board.crossings}
+              onChange={edit}
+              onAsk={asking ? () => setAskSignal((n) => n + 1) : null}
             />
-          ) : (
-            <ReadyPanel board={board} map={map} />
           )}
         </aside>
       )}

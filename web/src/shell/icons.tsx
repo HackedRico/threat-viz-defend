@@ -40,6 +40,8 @@ export const LogoutIcon = (p: IconProps) => <Icon {...p}><path d="M15 4h4v16h-4M
 export const DownloadIcon = (p: IconProps) => <Icon {...p}><path d="M12 3v12M7 10l5 5 5-5M4 20h16" /></Icon>;
 /** Close. */
 export const CloseIcon = (p: IconProps) => <Icon {...p}><path d="M6 6l12 12M18 6L6 18" /></Icon>;
+/** A chevron pointing left, for going back a level. */
+export const BackIcon = (p: IconProps) => <Icon {...p}><path d="M15 5l-7 7 7 7" /></Icon>;
 /** Zoom in. */
 export const ZoomInIcon = (p: IconProps) => <Icon {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4M11 8v6M8 11h6" /></Icon>;
 /** Zoom out. */
