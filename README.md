@@ -1,137 +1,164 @@
+<div align="center">
+
 # ThreatViz Defend
 
-ThreatViz Defend draws a threat model of your system from its code and docs, then quizzes you until you can defend that model at a whiteboard.
+**See the code. Understand the threat.**
 
-It is for developers who ship code that a coding agent helped write, and who need to explain how that code can be attacked and what stops it. It does not tell you a system is secure. It shows you where to look, why, and checks that you understood.
+Your coding agent wrote it. ThreatViz Defend maps how it can be attacked, then quizzes you until you can defend it at a whiteboard.
 
-It is a hosted, invite-only web app. Coding agents such as Claude Code and Cursor can connect to it, so the map keeps up with the code as it changes.
+[![hackUMBC 2026](https://img.shields.io/badge/hackUMBC-2026-f5c542)](https://hackumbc-2026.devpost.com/)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
+![DigitalOcean](https://img.shields.io/badge/DigitalOcean-0080ff?logo=digitalocean&logoColor=white)
+![ElevenLabs](https://img.shields.io/badge/ElevenLabs-000000?logo=elevenlabs&logoColor=white)
 
-**Live:** `<deployed URL goes here>`
+<!-- TODO: point Live app and Demo video at the real URLs before submitting -->
+**[Live app](#)** · **[Demo video](#)** · **[Devpost](https://hackumbc-2026.devpost.com/)**
 
-## hackUMBC 2026
+</div>
 
-ThreatViz Defend is our entry for [hackUMBC 2026](https://hackumbc-2026.devpost.com/). We wrote all of its code during the event, from Sat 2026-09-26 12:00 ET to Sun 2026-09-27 11:45 ET.
-
-**Demo video:** `<video link goes here>`
-
-### Submission checklist
-
-| Requirement | Where |
-|---|---|
-| Public GitHub repository | This repo |
-| Demo video, at least 30 seconds | Linked above and on the Devpost entry |
-| In-person demo, 3 to 5 minutes | A judge signs in and answers the voice quiz about the app's own threat model |
-| Devpost entry created by Sun 11:00 ET, final by 11:45 ET | [hackumbc-2026.devpost.com](https://hackumbc-2026.devpost.com/) |
-| One submission, at most four members | See [Team](#team) |
-
-### Tracks
-
-| Track | How ThreatViz Defend enters it | Status |
-|---|---|---|
-| Cybersecurity Application | A defensive tool for developers: evidence-cited threat models, STRIDE, boundary and lethal trifecta coverage decided by code, and a quiz that checks the developer understood them. The app's own threat model, every control and the known limits are in [docs/security.md](docs/security.md). | Built |
-| Best Use of ElevenLabs | The voice coach runs the Defend quiz out loud through a private ElevenLabs agent, and dictation turns spoken questions into text with ElevenLabs Speech to Text. The server mints a short-lived conversation token per signed-in user, so the agent id alone is useless to a scraper. | Built |
-| Best Use of DigitalOcean | The API, the web app and a Managed Postgres database run on App Platform from [.do/app.yaml](.do/app.yaml). [docs/deploy.md](docs/deploy.md) covers the setup. | Built |
-| Best Domain Name from GoDaddy Registry | The domain is registered through GoDaddy Registry, with DNS pointing at App Platform. | `<domain goes here>` |
-| Best Use of Backboard | Any user can route analysis through Backboard, and add Backboard memory to any provider so progress carries across sessions. | Built |
-| Most Engaging Demo | A judge speaks with the voice coach, live, about how this app could be attacked. | Demo day |
-| Best Overall, 1st and 2nd | The whole path runs end to end: material in, map confirmed, threats found, quiz passed, and coding agents keep the map current. | Demo day |
-
-### Access and teardown
-
-The hosted app is for event attendees only. Sign up takes a username, a password and an invite code we hand out in person, and every model and voice route spends from a daily budget per user, so bots cannot burn the credits. After judging we destroy the deployment, its database with every attendee account, the DNS records and every key. The repo stays public.
-
-### Team
-
-| Member | Area |
-|---|---|
-| Ricky | Core engine: the API, static and dynamic workflows, coding agent and model provider integrations |
-| MD | Diagrams: how the model draws the map and how the canvas shows it |
-| Eman | Voice: the ElevenLabs coach |
-| Jonathan | Hosting and credits: DigitalOcean, the GoDaddy domain, platform accounts |
-
-[docs/team.md](docs/team.md) maps each area to its folders.
+![The example board: a data flow map with numbered threat pins, and the ranked threats beside it](docs/images/map.png)
 
 ## How it works
 
-1. **Add material.** Paste design notes, add files, pick a whole code folder, or paste a public GitHub repository URL. Files that may hold credentials are skipped in the browser, and credential-shaped values are masked on the server.
-2. **Check the map.** A language model draws a data flow diagram: external entities, processes, data stores, flows and trust boundaries. Every element cites the evidence it came from. You fix names, kinds, boundaries and flags, delete what is wrong, then confirm the map.
-3. **Read the threats.** Rules in code decide what each element must be checked for: STRIDE per element, every flow that crosses a trust boundary, and the lethal trifecta on AI components (sensitive data, untrusted content and a way to send data out). The model then writes the 5 to 8 threats that matter most, each pinned to a map element, plus attack paths and a verdict on what to fix first.
-4. **Defend it.** The Defend tab asks up to 7 questions about your own system: which flows cross a boundary, who reads sensitive data, where the worst threat happens, the STRIDE category of another top threat, how to break the trifecta, then two open questions in your own words. Code computes every answer key from the map. Only the open answers go to a model for grading. You get an explanation, the evidence behind it and a mastery score. A voice coach can run the same quiz out loud when the server has it set up.
-5. **Keep it current.** Make a personal token and connect Claude Code or Cursor through the MCP server at `/mcp`, or install the hook. When the agent changes how the system is built, the board redraws its map and waits for you to review it.
+```mermaid
+flowchart LR
+    IN["Your code and docs,<br/>or an agent's edits"] --> MAP["Model drafts<br/>the map"]
+    MAP --> OK{"You<br/>confirm it"}
+    OK --> T["Rules pick checks,<br/>model writes threats"]
+    T --> Q(["Defend quiz"])
+```
 
-## Design choices
+| Know what to fix first | Prove you understand it |
+|:---:|:---:|
+| ![The short version card: what the system is, what could go wrong, and what to fix first](docs/images/summary.png) | ![The Defend tab asking which flows cross a trust boundary](docs/images/defend.png) |
 
-- **Map first, threats second.** Threats are pinned to map elements, so a wrong map would give wrong threats.
-- **Rules decide coverage, the model writes.** The STRIDE checklist, boundary crossings and trifecta come from code, so coverage never depends on the model.
-- **Quiz keys come from code.** A model never decides what the right answer to a choice question is.
-- **Every model reply is validated and cleaned.** Replies must match a JSON schema, get one repair attempt, then pass sanitizers that drop ids the map does not contain.
-- **Uploaded content is not stored.** Only each source's name, kind and size are kept, so there is less to leak.
-- **Model output renders as plain text.** A poisoned upload cannot inject HTML or links into the page or the exported report.
-- **The analysis model has no tools.** It can read untrusted material, but it cannot act, so our own pipeline has no lethal trifecta.
-- **Invite codes and daily budgets.** The server's model bill has a ceiling per user and overall.
-- **Bring your own model.** Each user can point analysis at their own OpenAI-compatible endpoint or at Backboard, and add Backboard memory to any of them.
-- **Admin by command line only.** There is no admin page for an attacker to reach from the web.
+## hackUMBC 2026
+
+| Track | What we built for it | |
+|---|---|:---:|
+| 🛡️ Cybersecurity Application | Evidence-cited threat models and a quiz that proves you understood them. [Our own threat model](docs/security.md) | ✅ |
+| 🎙️ ElevenLabs | A voice coach that runs the quiz out loud, and dictation for questions | ✅ |
+| 🌊 DigitalOcean | App Platform, Managed Postgres, and serverless inference for the default model | ✅ |
+| 🌐 GoDaddy Registry | Our domain: `<domain goes here>` | ⏳ |
+| 🧠 Backboard | Analysis through Backboard, with memory across sessions | ✅ |
+| 🎤 Most Engaging Demo | A judge talks with the voice coach about how this app can be attacked | 🎬 |
+| 🏆 Best Overall | The whole path, end to end | 🎬 |
+
+<sub>✅ done · ⏳ before submission · 🎬 at the live demo</sub>
+
+| Submission | |
+|---|:---:|
+| Public repo | ✅ |
+| Demo video, 30 seconds or more | ⏳ |
+| Live demo, 3 to 5 minutes | 🎬 |
+| Devpost entry by Sun 11:00 ET, final by 11:45 ET | ⏳ |
+
+**Team:** Ricky (core engine), MD (diagrams), Eman (voice), Jonathan (hosting). [Who owns what](docs/team.md)
+
+All code was written during the event. Sign up needs an invite code handed out in person, and we delete the deployment, its accounts and every key after judging.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    B["Browser"] -- "GoDaddy domain" --> API
+    A["Claude Code or Cursor"] -- "MCP or hook" --> API
+    B -. "voice" .-> EL
+    API["FastAPI on DigitalOcean"] --> DB[("DigitalOcean Postgres")]
+    API --> LLM["Model"]
+    API --> GH["GitHub"]
+    API --> EL["ElevenLabs"]
+```
+
+## Security by design
+
+Every model reply is untrusted until code checks it.
+
+```mermaid
+flowchart LR
+    IN["Untrusted input"] --> F["Masked and<br/>fenced as data"]
+    F --> M["Model with<br/>no tools"]
+    M --> V{"Valid<br/>schema?"}
+    V -- "retry once" --> M
+    V -- "yes" --> S["Unknown ids<br/>dropped"]
+    S --> OUT["Shown as<br/>plain text"]
+```
+
+- Uploads are never stored, only their names and sizes.
+- API keys never reach the browser or the logs.
+- Quiz answer keys come from code, never a model.
+- No admin page: admin runs from the command line.
+
+[docs/security.md](docs/security.md) has every control and our known limits.
 
 ## Quick start
 
-You need Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 24.
-
-One command starts both halves, creates `.env` on the first run and installs what is missing:
+Needs Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 24.
 
 ```sh
 ./scripts/dev.sh
 ```
 
-Or run each half in its own terminal. Start the API on port 8000:
+Open http://localhost:5173 and sign in with `DEV_USERNAME` and `DEV_PASSWORD` from `.env`. With no model key set, the app runs in demo mode on a finished example board.
+
+<details>
+<summary>Run each half on its own</summary>
 
 ```sh
 cp .env.example .env          # once; the API reads the repo-root .env on its own
-cd api
-uv sync
+cd api && uv sync
 uv run uvicorn app.main:app_from_env --factory --port 8000
 ```
 
-In a second terminal, start the web app:
-
 ```sh
-cd web
-npm install
-npm run dev
+cd web && npm install && npm run dev
 ```
 
-Open http://localhost:5173, choose **Sign in** on the home page, and use the development account from `.env` (`DEV_USERNAME` and `DEV_PASSWORD`). The server creates it at startup, with the example board, and resets it to that password if you change it. To try sign up instead, choose **Create an account** with the invite code `local-dev`. Development creates a SQLite database in `api/data/app.db`.
+The server creates the development account at startup, with the example board, and resets it to that password if you change it. To try sign up instead, choose **Create an account** with the invite code `local-dev`. Development uses a SQLite database in `api/data/app.db`.
 
-On a deployed server, `DEV_USERNAME` is refused; an operator creates accounts without an invite code with `uv run python -m app.cli create-user <name>`, which prompts for the password.
+</details>
 
-### Demo mode
+<details>
+<summary>Demo mode and real models</summary>
 
-With no model configured, the server runs in demo mode. Every new account gets a finished example board ("Example: Inbox Helper") that you can explore, ask recorded questions about, and quiz yourself on. Demo mode cannot map your own material, and it grades open quiz answers by keyword.
+In demo mode every new account gets the example board ("Example: Inbox Helper") to explore, ask recorded questions about, and quiz yourself on. It cannot map your own material, and it grades open answers by keyword.
 
-### Use a real model
+To use a real model, pick one:
 
-Pick one:
+- **Server default.** Set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` in `.env`, then restart the API.
+- **Your own provider.** Account menu > **Model provider**: save an OpenAI-compatible base URL, model and key, or a Backboard key. Under **Memory**, a Backboard key lets any of them remember your progress. This works in demo mode too, and only for your account.
 
-- **Server default.** In the repo-root `.env`, set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`, then restart the API.
+</details>
 
-- **Your own provider.** Open the account menu, choose **Model provider**, and save an OpenAI-compatible base URL, model and key, or a Backboard key. Under **Memory**, a Backboard key lets any of them remember your progress. This works in demo mode too, and only for your account.
+<details>
+<summary>Docker</summary>
 
-### Run with Docker
+`docker compose up --build` starts Postgres and one container that serves the API and the built web app at http://localhost:8080. It reads `.env` from the repo root. [docs/deploy.md](docs/deploy.md) covers production.
 
-`docker compose up --build` starts Postgres and one container that serves the API and the built web app together at http://localhost:8080. It reads `.env` from the repo root. [docs/deploy.md](docs/deploy.md) covers production.
+</details>
 
-### Admin commands
+<details>
+<summary>Admin commands</summary>
 
 There is no admin page. On the server, from `api/`:
 
 ```sh
 uv run python -m app.cli users              # list accounts
+uv run python -m app.cli create-user <name> # add an account without an invite code; prompts for the password
 uv run python -m app.cli disable <name>     # block an account and end its sessions
 uv run python -m app.cli enable <name>
 uv run python -m app.cli delete <name>      # delete an account and everything it owns
 uv run python -m app.cli stats              # counts of accounts, boards and usage records
 ```
 
-### Checks
+A deployed server refuses `DEV_USERNAME`, so operators create accounts this way.
+
+</details>
+
+<details>
+<summary>Checks</summary>
 
 ```sh
 cd api && uv run pytest && uv run ruff check . && uv run mypy
@@ -139,6 +166,8 @@ cd web && npm run typecheck && npm test && npm run build
 ```
 
 After changing `api/app/schemas.py` or a route, run `npm run gen:api` in `web/` to regenerate the TypeScript types.
+
+</details>
 
 ## Docs
 
@@ -154,7 +183,8 @@ After changing `api/app/schemas.py` or a route, run `npm run gen:api` in `web/` 
 | [docs/team.md](docs/team.md) | Who owns each area, how the areas attach to the core engine, and how to work in parallel |
 | [docs/conventions.md](docs/conventions.md) | Code style, tests, docs, commits and pull requests |
 
-## Project layout
+<details>
+<summary>Project layout</summary>
 
 ```
 threat-viz-defend/
@@ -199,6 +229,8 @@ threat-viz-defend/
 ├── .env.example                  every server setting
 └── AGENTS.md
 ```
+
+</details>
 
 ## Tech stack
 
