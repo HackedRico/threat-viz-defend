@@ -177,7 +177,7 @@ A ready board opens centered on the element with the worst threat.
 
 ### Ask
 
-The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. Starter questions fill the box for you until you send your first question. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in the inspector puts the cursor in the ask bar. Drag the top edge of the ask bar to make it taller or shorter; the answer, or the box when there is no answer, takes the room. The height is remembered in this browser, and a double click on the edge fits the bar to its content again.
+The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. To say the question instead, choose the mic beside **Ask**, speak, and choose it again to stop; the words appear in the box for you to check and fix before you ask. A recording stops by itself after a minute, and Escape throws it away. Each recording uses one dictation, and the mic shows only when the server has dictation. Starter questions fill the box for you until you send your first question. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in the inspector puts the cursor in the ask bar. Drag the top edge of the ask bar to make it taller or shorter; the answer, or the box when there is no answer, takes the room. The height is remembered in this browser, and a double click on the edge fits the bar to its content again.
 
 The side panel has four tabs.
 
@@ -296,6 +296,7 @@ The account menu shows what you have used today. Allowances reset at midnight UT
 | Model calls per day on the server's model | 60 |
 | Model calls per minute, any model | 6 |
 | Voice sessions per day | 10 |
+| Dictations per day | 30 |
 | Boards | 30 |
 | Personal tokens | 10 |
 | Coding agent changes per hour | 30 |
@@ -329,7 +330,10 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 | "The server restarted while this was running." | Run the step again: add the material again, or confirm again. |
 | The quiz says a question is out of date | The board changed. Reload the quiz. |
 | **Talk it through** is greyed out | The server has no voice coach. Use the text quiz. |
-| "Microphone access is blocked." | Allow the microphone in the browser's site settings, then start again. |
+| "Microphone access is blocked." | Allow the microphone in the browser's site settings, then start again. This covers the coach and the mic beside **Ask**. |
 | "No voice sessions left today." | Use the text quiz until midnight UTC. |
+| There is no mic beside **Ask** | The server has no dictation. Type the question. |
+| "No speech was heard." | Speak closer to the microphone, or type the question. |
+| "You have used today's 30 dictations." | Type your questions until midnight UTC. |
 | A coding agent gets 401 | The token was revoked or mistyped. Create a new one. |
 | A coding agent's change does not show | The board may have been busy; the change is retried or refused with a message. Check the board's activity log. |
