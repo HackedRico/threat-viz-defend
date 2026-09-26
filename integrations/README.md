@@ -15,7 +15,7 @@ They work well together: MCP for asking and quizzing, the hook for keeping the m
 
 | Variable | Used by | Value |
 | --- | --- | --- |
-| `THREATVIZ_API_URL` | both | API origin, like `https://api.example.com`. Plain `http` only works for localhost. |
+| `THREATVIZ_API_URL` | both | API origin, like `https://api.example.com`. Plain `http` only works for localhost. The hook can use the origin `init` recorded instead. |
 | `THREATVIZ_TOKEN` | both | Your personal token. Only ever read from the environment, never from a file. |
 | `THREATVIZ_BOARD_ID` | hook | Board id. Optional once `init` has written `.threatviz.json`. |
 
@@ -56,8 +56,11 @@ Copy [`cursor/mcp.example.json`](cursor/mcp.example.json) to `.cursor/mcp.json`.
    python3 .threatviz/threatviz_hook.py init --board <board id> --api-url https://api.example.com
    ```
 
-   `init` checks the token and the board, writes `.threatviz.json` (`api_url` and `board_id`, safe to commit),
-   and records the current state as the base, so only changes from now on are reported.
+   `init` checks the token and the board, writes `.threatviz.json` (only `board_id`, safe to commit), keeps the
+   API origin it checked in `.git/threatviz/config.json`, which git never commits, and records the current state as
+   the base, so only changes from now on are reported. Everyone who clones the repo runs `init` once, or exports
+   `THREATVIZ_API_URL`. The hook never takes the API origin from `.threatviz.json`, since anyone can change that file
+   in a pull request.
 3. Register the hook in one editor:
    - Claude Code: merge [`claude-code/settings.example.json`](claude-code/settings.example.json) into
      `.claude/settings.json`. `init` prints the same snippet.
@@ -91,12 +94,16 @@ config for that editor.
   skips.
 - Files the server's file policy skips are never sent: env files and other credential stores, private keys,
   lockfiles, binaries, and vendored or generated folders such as `node_modules`. The hook reads the policy from
-  `GET /api/config` and falls back to a built in list. Skipped files are left out of the snapshot and filtered from
+  `GET /api/config` and adds its own built in list, which also skips `.envrc`, `kubeconfig`, `.kube/config`,
+  `.docker/config.json` and `.ppk`, `.gpg` and `.asc` files. Skipped files are left out of the snapshot and filtered from
   both sides of the diff, so even a committed `.env` never appears. Files over the size cap are left out too.
-- Credential-shaped values in the diff and prompts (keys, tokens, passwords in assignments, URL passwords, bearer
-  tokens, private key blocks) are masked before posting, and the server masks them again on arrival.
-- The token goes only to `THREATVIZ_API_URL`, over https unless it is localhost, and the hook never follows
-  redirects.
+- Credential-shaped values in the diff and prompts are masked before posting, and the server masks them again on
+  arrival: private key blocks, known key and token formats, secret assignments (quoted values too), URL passwords,
+  bearer and basic auth headers, Slack and Discord webhook URLs, kubeconfig client keys, Docker registry logins and
+  Azure account keys.
+- The token goes only to `THREATVIZ_API_URL` or the origin `init` recorded, over https unless it is localhost, and
+  the hook never follows redirects. If `.threatviz.json` names a different `api_url`, the hook sends nothing and
+  records the refusal.
 - The MCP server receives only what the agent puts in a tool call.
 - Snapshots stay in your repo's local git objects. To remove all hook state:
   `git update-ref -d refs/threatviz/base; git update-ref -d refs/threatviz/pending; rm -rf .git/threatviz`
@@ -108,7 +115,8 @@ it reports.
 
 | Symptom | Fix |
 | --- | --- |
-| `last run: never` | The hook found no config in the editor's environment, usually a missing `THREATVIZ_TOKEN`. Export it and restart the editor from that shell. |
+| `last run: never` | The hook found no config, usually a missing `THREATVIZ_TOKEN` in the editor's environment, or no API origin in this clone. Export the token and restart the editor from that shell, and run `init` if `api url` says missing. |
+| `refused: .threatviz.json names api_url ...` | Someone changed `api_url` in the committed file. Nothing was sent. Check who changed it, then remove `api_url` from `.threatviz.json`. |
 | `skipped: no architectural change` | Expected for UI or refactor work. To report anyway, ask the agent to call `report_change` over MCP. |
 | `kept: the board is busy` | The board was mapping or analyzing. The next turn retries with this change folded in. |
 | `kept: the token was rejected` | The token was revoked. Create a new one in Settings and export it. |

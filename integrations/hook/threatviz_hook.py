@@ -28,6 +28,8 @@ AGENT_CURSOR = "Cursor"
 BASE_REF = "refs/threatviz/base"
 PENDING_REF = "refs/threatviz/pending"
 CONFIG_FILE = ".threatviz.json"
+# Lives in the hook's folder under the git dir, so it is never committed and a pull request cannot change it.
+ORIGIN_FILE = "config.json"
 MAX_PROMPTS = 5
 # Five prompts at this length plus separators stay under the API's 4000 character summary cap.
 MAX_PROMPT_CHARS = 750
@@ -119,13 +121,17 @@ class FilePolicy:
         )
 
 
-# A small copy of the server's lists, used as a floor and when the API cannot be reached.
+# A small copy of the server's lists, used as a floor and when the API cannot be reached. The secret
+# lists go further than the server's (`.envrc`, `kubeconfig`, `ppk`, `gpg`, `asc`), since the hook
+# decides what leaves the developer's machine.
 BUILTIN_POLICY = FilePolicy(
     secret_names=frozenset(
-        {".env", ".npmrc", ".pypirc", ".netrc", ".git-credentials", ".htpasswd", ".pgpass", ".dockercfg",
-         "credentials", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}
+        {".env", ".envrc", ".npmrc", ".pypirc", ".netrc", ".git-credentials", ".htpasswd", ".pgpass", ".dockercfg",
+         "credentials", "kubeconfig", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}
     ),
-    secret_extensions=frozenset({"pem", "key", "p12", "pfx", "jks", "keystore", "tfstate", "tfvars", "ovpn", "kdbx"}),
+    secret_extensions=frozenset(
+        {"pem", "key", "p12", "pfx", "jks", "keystore", "tfstate", "tfvars", "ovpn", "kdbx", "ppk", "gpg", "asc"}
+    ),
     safe_env_suffixes=frozenset({"example", "sample", "template", "dist", "defaults"}),
     ignored_dirs=frozenset(
         {".git", "node_modules", "vendor", ".venv", "venv", "__pycache__", "dist", "build", ".next", ".terraform"}
@@ -144,6 +150,8 @@ BUILTIN_POLICY = FilePolicy(
 # The server also treats config files named like secrets as credential stores; these are not in `file_policy`.
 _SECRET_WORDS = re.compile(r"secret|credential|service-?account")
 _CONFIG_EXTENSIONS = frozenset({"json", "yaml", "yml", "toml", "txt", "ini", "xml", "cfg", "conf"})
+# Credential stores whose file name is too generic to skip on its own, keyed by their parent folder.
+_SECRET_PATHS = frozenset({(".kube", "config"), (".docker", "config.json")})
 
 
 def skip_reason(path: str, policy: FilePolicy) -> str | None:
@@ -154,7 +162,7 @@ def skip_reason(path: str, policy: FilePolicy) -> str | None:
     name = parts[-1].lower()
     if any(part.lower() in policy.ignored_dirs for part in parts[:-1]):
         return "vendored or generated folder"
-    if is_secret_file(name, policy):
+    if is_secret_file(name, policy) or tuple(part.lower() for part in parts[-2:]) in _SECRET_PATHS:
         return "may hold credentials"
     if name in policy.lockfiles:
         return "dependency lockfile"
@@ -182,43 +190,112 @@ def _extension(name: str) -> str:
 # Masking credential-shaped values before anything is posted
 # =============================================================================
 
-# The server masks again on arrival; masking here too keeps values off the wire. Every
-# pattern is linear: no nested quantifiers, and repeats before more pattern are bounded.
-_PRIVATE_KEY = re.compile(
-    r"-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----[\s\S]{0,12000}?-----END [A-Z ]{0,40}PRIVATE KEY-----"
+# The server masks again on arrival; masking here too keeps values off the wire, so the hook
+# masks at least what the server does. Every pattern is linear: no nested quantifiers, and
+# repeats before more pattern are bounded.
+_PRIVATE_KEY_BEGIN = re.compile(r"-----BEGIN [A-Z ]{0,40}PRIVATE KEY(?: BLOCK)?-----")
+_PRIVATE_KEY_END = re.compile(r"-----END [A-Z ]{0,40}PRIVATE KEY(?: BLOCK)?-----")
+_END_PREFIX = "-----END "
+# How far past a BEGIN marker its END may be; a 4096 bit RSA key is about 3300 characters.
+PRIVATE_KEY_SPAN = 12_000
+PRIVATE_KEY_REMOVED = "[private key removed]"
+# Matches names like `DB_PASSWORD` or `apiToken` that hold a credential.
+_CREDENTIAL_NAME = (
+    r"[A-Za-z0-9_.-]{0,40}?(?:api[_-]?key|secret|token|passw(?:or)?d|pwd|private[_-]?key|access[_-]?key|credential)"
+    r"[A-Za-z0-9_.-]{0,40}"
 )
 _ASSIGNMENT = re.compile(
-    r"\b([A-Za-z0-9_.-]{0,40}?(?:api[_-]?key|secret|token|passw(?:or)?d|pwd|private[_-]?key|access[_-]?key|credential)"
-    r"[A-Za-z0-9_.-]{0,40})"
-    r"([\"']?\s{0,3}[:=]\s{0,3}[\"']?)"
-    r"(?!\[)([^\s\"'`,;#]{8,})",
+    r"\b(" + _CREDENTIAL_NAME + r")([\"']?\s{0,3}[:=]\s{0,3}[\"']?)(?!\[)([^\s\"'`,;#]{8,})",
+    re.IGNORECASE,
+)
+# Quoted values can hold spaces or be short, which `_ASSIGNMENT` leaves alone: `DB_PASSWORD="Summer 2024!"`.
+_QUOTED_ASSIGNMENT = re.compile(
+    r"\b(" + _CREDENTIAL_NAME + r"[\"']?\s{0,3}[:=]\s{0,3})(?:\"[^\"\n]{1,200}\"|'[^'\n]{1,200}')",
     re.IGNORECASE,
 )
 _URL_PASSWORD = re.compile(r"(\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@]{1,64}:)([^\s@/]{1,256})(@)", re.IGNORECASE)
 _BEARER = re.compile(r"\b(Bearer\s{1,3})([A-Za-z0-9._~+/=-]{16,})")
+# Labels that always precede a base64 credential: basic auth headers, kubeconfig client
+# certificates and keys, Docker registry logins and Azure storage keys.
+_LABELLED_BASE64 = re.compile(
+    r"(\bAuthorization[\"'\]\s,:=]{1,8}Basic\s{1,3}"
+    r"|\bclient-(?:key|certificate)-data\s{0,3}:\s{0,3}[\"']?"
+    r"|\"auth\"\s{0,3}:\s{0,3}\""
+    r"|\bAccountKey\s{0,3}=\s{0,3})"
+    r"[A-Za-z0-9+/]{8,}={0,2}",
+    re.IGNORECASE,
+)
+_WEBHOOK = re.compile(r"(hooks\.slack\.com/services/|discord(?:app)?\.com/api/webhooks/)[A-Za-z0-9/_-]{16,}")
 _KNOWN_KEYS = re.compile(
     r"\b(?:"
     r"sk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}"
     r"|[sr]k_(?:live|test)_[A-Za-z0-9]{16,}"
+    r"|sk_[A-Za-z0-9]{32,}"
     r"|AKIA[0-9A-Z]{16}"
     r"|AIza[0-9A-Za-z_-]{35}"
     r"|gh[pousr]_[A-Za-z0-9]{36,}"
     r"|github_pat_[A-Za-z0-9_]{40,}"
+    r"|glpat-[A-Za-z0-9_-]{20,}"
+    r"|npm_[A-Za-z0-9]{36,}"
     r"|xox[abprs]-[A-Za-z0-9-]{10,}"
+    r"|SG\.[A-Za-z0-9_-]{16,100}\.[A-Za-z0-9_-]{16,}"
     r"|tvd_[A-Za-z0-9_-]{20,}"
-    r"|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+    r"|eyJ[A-Za-z0-9_-]{10,2000}\.eyJ[A-Za-z0-9_-]{10,20000}\.[A-Za-z0-9_-]{10,}"
     r")"
 )
 REDACTED = "[redacted]"
 
 
 def mask_secrets(text: str) -> str:
-    """Replace private keys, credential assignments, URL passwords, bearer tokens and known key formats."""
-    out = _PRIVATE_KEY.sub("[private key removed]", text)
+    """Replace private keys, credential assignments, URL passwords, auth headers, webhooks and known key formats."""
+    out = remove_private_keys(text)
+    out = _QUOTED_ASSIGNMENT.sub(rf'\1"{REDACTED}"', out)
     out = _ASSIGNMENT.sub(rf"\1\2{REDACTED}", out)
     out = _URL_PASSWORD.sub(rf"\1{REDACTED}\3", out)
     out = _BEARER.sub(rf"\1{REDACTED}", out)
+    out = _LABELLED_BASE64.sub(rf"\1{REDACTED}", out)
+    out = _WEBHOOK.sub(rf"\1{REDACTED}", out)
     return _KNOWN_KEYS.sub(REDACTED, out)
+
+
+def remove_private_keys(text: str) -> str:
+    """Replace each private key block, or a BEGIN line with no END in range, with `PRIVATE_KEY_REMOVED`."""
+    pieces: list[str] = []
+    copied = 0
+    # The next END marker and line break are found once and reused until a BEGIN passes them. Both
+    # lookups only move forward, so text full of BEGIN markers costs one pass instead of one per marker.
+    end: re.Match[str] | None = None
+    no_more_ends = False
+    line_end = -1
+    for begin in _PRIVATE_KEY_BEGIN.finditer(text):
+        if begin.start() < copied:
+            # Inside a block or line that was already removed.
+            continue
+        if not no_more_ends and (end is None or end.start() < begin.end()):
+            end = _next_private_key_end(text, begin.end())
+            no_more_ends = end is None
+        if end is not None and end.start() - begin.end() <= PRIVATE_KEY_SPAN:
+            stop = end.end()
+        else:
+            if line_end < begin.end():
+                newline = text.find("\n", begin.end())
+                line_end = newline if newline >= 0 else len(text)
+            stop = line_end
+        pieces += [text[copied : begin.start()], PRIVATE_KEY_REMOVED]
+        copied = stop
+    pieces.append(text[copied:])
+    return "".join(pieces)
+
+
+def _next_private_key_end(text: str, start: int) -> re.Match[str] | None:
+    """The first private key END marker at or after `start`, skipping other END lines such as certificates."""
+    at = text.find(_END_PREFIX, start)
+    while at >= 0:
+        match = _PRIVATE_KEY_END.match(text, at)
+        if match:
+            return match
+        at = text.find(_END_PREFIX, at + 1)
+    return None
 
 
 # =============================================================================
@@ -314,11 +391,15 @@ def parse_event(payload: object, fallback_cwd: Path | None = None) -> HookEvent 
 
 @dataclass(frozen=True)
 class Config:
-    """Where to post and as whom. The token only ever comes from the environment."""
+    """Where to post and as whom. The token only comes from the environment, the origin never from a committed file."""
 
     api_url: str
     token: str
     board_id: str
+
+
+class UntrustedOriginError(ValueError):
+    """`.threatviz.json` names an API origin other than the trusted one, so nothing is sent anywhere."""
 
 
 def normalize_api_url(url: str) -> str:
@@ -345,15 +426,41 @@ def read_config_file(root: Path) -> dict[str, str]:
     return {key: value for key, value in data.items() if isinstance(value, str)}
 
 
-def load_config(root: Path, env: Mapping[str, str]) -> Config | None:
-    """Merge `.threatviz.json` with the environment (env wins), or return `None` when anything is missing."""
-    stored = read_config_file(root)
-    api_url = env.get("THREATVIZ_API_URL") or stored.get("api_url", "")
-    board_id = env.get("THREATVIZ_BOARD_ID") or stored.get("board_id", "")
+def trusted_api_url(repo: Repo, env: Mapping[str, str]) -> str:
+    """`THREATVIZ_API_URL`, else the origin `init` verified and kept under the git dir, else `''`."""
+    recorded = _read_json(repo.state_dir / ORIGIN_FILE)
+    kept = recorded.get("api_url") if isinstance(recorded, dict) else None
+    return env.get("THREATVIZ_API_URL") or (kept if isinstance(kept, str) else "")
+
+
+def check_committed_origin(committed: Mapping[str, str], origin: str) -> None:
+    """Raise `UntrustedOriginError` when `.threatviz.json` names an `api_url` other than the trusted `origin`."""
+    claimed = committed.get("api_url")
+    if claimed is None:
+        return
+    try:
+        same = normalize_api_url(claimed) == origin
+    except ValueError:
+        same = False
+    if not same:
+        # Anyone can change a committed file in a pull request; a different origin there means the token would leak.
+        raise UntrustedOriginError(
+            f"{CONFIG_FILE} names api_url {claimed[:200]!r}, not the trusted {origin}; refusing to post. "
+            f"Remove `api_url` from {CONFIG_FILE}."
+        )
+
+
+def load_config(repo: Repo, env: Mapping[str, str]) -> Config | None:
+    """Build the config from the environment, the kept origin and the board in `.threatviz.json`, or `None`."""
+    committed = read_config_file(repo.root)
+    api_url = trusted_api_url(repo, env)
+    board_id = env.get("THREATVIZ_BOARD_ID") or committed.get("board_id", "")
     token = env.get("THREATVIZ_TOKEN", "")
     if not (api_url and board_id and token):
         return None
-    return Config(api_url=normalize_api_url(api_url), token=token, board_id=board_id)
+    origin = normalize_api_url(api_url)
+    check_committed_origin(committed, origin)
+    return Config(api_url=origin, token=token, board_id=board_id)
 
 
 # =============================================================================
@@ -749,9 +856,9 @@ def run_hook(raw: str, env: Mapping[str, str]) -> None:
     if repo is None:
         return
     try:
-        config = load_config(repo.root, env)
+        config = load_config(repo, env)
     except ValueError as exc:
-        record_outcome(repo, "error", str(exc))
+        record_outcome(repo, "refused" if isinstance(exc, UntrustedOriginError) else "error", str(exc))
         raise
     if config is None:
         return
@@ -803,12 +910,13 @@ def _require_repo() -> Repo:
 
 
 def cmd_init(board_id: str, api_url: str | None) -> int:
-    """Write `.threatviz.json`, check the token and board, and take the first snapshot as the base."""
+    """Check the token and board, keep the origin under the git dir, write `.threatviz.json` and take the base."""
     repo = _require_repo()
     token = os.environ.get("THREATVIZ_TOKEN", "")
     if not token:
         raise SystemExit("threatviz: set THREATVIZ_TOKEN to a personal token (tvd_...) from the web app first.")
-    chosen = api_url or os.environ.get("THREATVIZ_API_URL") or read_config_file(repo.root).get("api_url", "")
+    # Never falls back to `.threatviz.json`: the token is about to be sent there.
+    chosen = api_url or trusted_api_url(repo, os.environ)
     if not chosen:
         raise SystemExit("threatviz: pass `--api-url https://your-api` or set THREATVIZ_API_URL.")
     try:
@@ -826,15 +934,19 @@ def cmd_init(board_id: str, api_url: str | None) -> int:
     if board_id not in boards:
         listed = "\n".join(f"  {bid}  {title}" for bid, title in boards.items()) or "  (none yet)"
         raise SystemExit(f"threatviz: board {board_id!r} is not one of yours. Your boards:\n{listed}")
-    stored = {key: value for key, value in read_config_file(repo.root).items() if key != "token"}
-    stored.update({"api_url": origin, "board_id": board_id})
+    _write_json(repo.state_dir / ORIGIN_FILE, {"api_url": origin})
+    # `api_url` is dropped too, since the hook refuses to post while a committed one differs from the kept origin.
+    stored = {key: value for key, value in read_config_file(repo.root).items() if key not in ("token", "api_url")}
+    stored["board_id"] = board_id
     (repo.root / CONFIG_FILE).write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8")
     policy, note = fetch_policy(origin)
     snapshot = take_snapshot(repo, policy)
     _git(["update-ref", BASE_REF, snapshot], repo.root)
     record_outcome(repo, "initialized", note)
     print(f"Tracking board {boards[board_id]!r} ({board_id}) from {repo.root}.")
-    print(f"Wrote {CONFIG_FILE}; it holds no secrets and can be committed. The token stays in THREATVIZ_TOKEN.")
+    print(f"Wrote {CONFIG_FILE}; it holds no secrets or API origin and can be committed.")
+    print(f"Kept the API origin in {repo.state_dir / ORIGIN_FILE}, which git never commits.")
+    print("The token stays in THREATVIZ_TOKEN.")
     print("Changes from now on are reported. Add this to .claude/settings.json (or run `print-config cursor`):\n")
     print(json.dumps(settings_snippet(repo, "claude"), indent=2))
     return 0
@@ -845,7 +957,8 @@ def cmd_status() -> int:
     repo = _require_repo()
     stored = read_config_file(repo.root)
     env = os.environ
-    api_url = env.get("THREATVIZ_API_URL") or stored.get("api_url") or "(missing)"
+    trusted = trusted_api_url(repo, env)
+    api_url = trusted or "(missing, run `init` or export THREATVIZ_API_URL)"
     board = env.get("THREATVIZ_BOARD_ID") or stored.get("board_id") or "(missing)"
     base = _ref_commit(repo, BASE_REF)
     last = _read_json(repo.state_dir / "last.json")
@@ -862,6 +975,11 @@ def cmd_status() -> int:
         print("last run: never")
     if "token" in stored:
         print(f"warning:  remove `token` from {CONFIG_FILE}; the hook ignores it and it should not be committed.")
+    if trusted:
+        try:
+            check_committed_origin(stored, normalize_api_url(trusted))
+        except ValueError as exc:
+            print(f"warning:  {exc}")
     return 0
 
 

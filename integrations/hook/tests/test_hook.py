@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -134,18 +136,34 @@ def isolated_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-@pytest.fixture
-def api() -> Iterator[StubApi]:
-    """A running stub API on a free local port."""
+@contextlib.contextmanager
+def serve_stub() -> Iterator[StubApi]:
+    """Run a stub API on a free local port for the block."""
     stub = StubApi()
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     server.stub = stub  # type: ignore[attr-defined]
     stub.url = f"http://127.0.0.1:{server.server_address[1]}"
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    yield stub
-    server.shutdown()
-    server.server_close()
+    try:
+        yield stub
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.fixture
+def api() -> Iterator[StubApi]:
+    """The real API the developer configured."""
+    with serve_stub() as stub:
+        yield stub
+
+
+@pytest.fixture
+def attacker() -> Iterator[StubApi]:
+    """A second API on another port, standing in for a host named by a malicious pull request."""
+    with serve_stub() as stub:
+        yield stub
 
 
 def git(repo: Path, *args: str, env: dict[str, str] | None = None) -> str:
@@ -230,6 +248,21 @@ def run_hook(payload: dict[str, Any], cwd: Path, env: dict[str, str]) -> subproc
     return proc
 
 
+def run_init(repo: Path, api_url: str | None, board: str = BOARD) -> subprocess.CompletedProcess[str]:
+    """Run `init` in `repo` with the token as the only ThreatViz variable in the environment."""
+    args = [sys.executable, str(HOOK_PATH), "init", "--board", board]
+    if api_url is not None:
+        args += ["--api-url", api_url]
+    return subprocess.run(  # noqa: S603
+        args,
+        cwd=repo,
+        env={**os.environ, "THREATVIZ_TOKEN": TOKEN},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def ref(repo: Path, name: str) -> str | None:
     """The commit a ref points at, or `None`."""
     proc = subprocess.run(  # noqa: S603
@@ -295,6 +328,87 @@ def test_refuses_plain_http_to_a_remote_host() -> None:
 
 
 # =============================================================================
+# Where the token goes: never to an origin from a committed file
+# =============================================================================
+
+
+def test_a_committed_api_url_never_receives_a_request(
+    repo: Path, hook_env: dict[str, str], api: StubApi, attacker: StubApi
+) -> None:
+    write(repo, hook.CONFIG_FILE, json.dumps({"api_url": attacker.url, "board_id": BOARD}))
+    write(repo, "app.py", ROUTE_CHANGE)
+
+    run_hook(claude_payload("UserPromptSubmit", repo, "add a payments client"), repo, hook_env)
+    run_hook(claude_payload("Stop", repo), repo, hook_env)
+
+    assert attacker.requests == []
+    assert api.requests == []
+    last = last_outcome(repo)
+    assert last["outcome"] == "refused"
+    assert attacker.url in last["detail"]
+
+
+def test_a_committed_api_url_is_refused_next_to_the_origin_init_kept(
+    repo: Path, api: StubApi, attacker: StubApi
+) -> None:
+    assert run_init(repo, api.url).returncode == 0
+    write(repo, hook.CONFIG_FILE, json.dumps({"api_url": attacker.url, "board_id": BOARD}))
+    write(repo, "app.py", ROUTE_CHANGE)
+
+    run_hook(claude_payload("Stop", repo), repo, {"THREATVIZ_TOKEN": TOKEN, hook.FOREGROUND_ENV: "1"})
+
+    assert attacker.requests == []
+    assert api.posts() == []
+    assert last_outcome(repo)["outcome"] == "refused"
+
+
+def test_a_committed_api_url_alone_is_not_an_origin(repo: Path, attacker: StubApi) -> None:
+    write(repo, hook.CONFIG_FILE, json.dumps({"api_url": attacker.url, "board_id": BOARD}))
+    write(repo, "app.py", ROUTE_CHANGE)
+
+    run_hook(claude_payload("Stop", repo), repo, {"THREATVIZ_TOKEN": TOKEN, hook.FOREGROUND_ENV: "1"})
+
+    assert attacker.requests == []
+    assert ref(repo, hook.PENDING_REF) is None
+
+
+def test_init_never_sends_the_token_to_a_committed_api_url(repo: Path, attacker: StubApi) -> None:
+    write(repo, hook.CONFIG_FILE, json.dumps({"api_url": attacker.url, "board_id": BOARD}))
+
+    proc = run_init(repo, None)
+
+    assert proc.returncode != 0
+    assert "--api-url" in proc.stderr
+    assert attacker.requests == []
+
+
+def test_posts_to_the_origin_init_kept(repo: Path, api: StubApi) -> None:
+    assert run_init(repo, api.url).returncode == 0
+    write(repo, "app.py", ROUTE_CHANGE)
+
+    run_hook(claude_payload("Stop", repo), repo, {"THREATVIZ_TOKEN": TOKEN, hook.FOREGROUND_ENV: "1"})
+
+    [post] = api.posts()
+    assert post["auth"] == f"Bearer {TOKEN}"
+
+
+@pytest.mark.parametrize("committed_url", [False, True])
+def test_posts_to_the_env_origin(repo: Path, hook_env: dict[str, str], api: StubApi, committed_url: bool) -> None:
+    committed = {"board_id": BOARD}
+    if committed_url:
+        # A file written by an older `init` still holds the same origin; a trailing slash is the same origin.
+        committed["api_url"] = f"{api.url}/"
+    write(repo, hook.CONFIG_FILE, json.dumps(committed))
+    write(repo, "app.py", ROUTE_CHANGE)
+    env = {key: value for key, value in hook_env.items() if key != "THREATVIZ_BOARD_ID"}
+
+    run_hook(claude_payload("Stop", repo), repo, env)
+
+    assert len(api.posts()) == 1
+    assert last_outcome(repo)["outcome"] == "reported"
+
+
+# =============================================================================
 # Prompts
 # =============================================================================
 
@@ -314,6 +428,103 @@ def test_prompts_are_bounded_and_masked(repo: Path, hook_env: dict[str, str], ap
         "use api_key=[redacted] for the call",
     ]
     assert api.requests == []
+
+
+# =============================================================================
+# Masking
+# =============================================================================
+
+# Fake values built from repeated characters, so no scanner mistakes them for real credentials.
+BASIC = base64.b64encode(b"deploy:" + b"p" * 16).decode()
+MASKED_CASES = [
+    ("SG." + "a" * 22 + "." + "b" * 43, "SG." + "a" * 22),
+    ("STRIPE=sk_" + "c" * 32, "sk_" + "c" * 32),
+    ("sk_live_" + "d" * 24, "d" * 24),
+    ("rk_live_" + "e" * 24, "e" * 24),
+    ("https://hooks.slack.com/services/T0000/B0000/" + "f" * 24, "f" * 24),
+    ("https://discord.com/api/webhooks/" + "1" * 18 + "/" + "g" * 60, "g" * 60),
+    ("glpat-" + "h" * 20, "h" * 20),
+    ("npm_" + "i" * 36, "i" * 36),
+    (f"Authorization: Basic {BASIC}", BASIC),
+    (f'headers["Authorization"] = "Basic {BASIC}"', BASIC),
+    ("    client-key-data: " + "J" * 80, "J" * 80),
+    ("    client-certificate-data: " + "K" * 80, "K" * 80),
+    ('{"auths": {"registry.example.com": {"auth": "' + BASIC + '"}}}', BASIC),
+    ("AccountName=shop;AccountKey=" + "L" * 86 + "==;EndpointSuffix=core.windows.net", "L" * 86),
+    ('DB_PASSWORD="Summer 2024!"', "Summer 2024!"),
+    ("db_password: 'hunter2'", "hunter2"),
+    ('const apiToken = "short"', "short"),
+]
+
+
+@pytest.mark.parametrize(("text", "secret"), MASKED_CASES)
+def test_masks_credential_formats(text: str, secret: str) -> None:
+    masked = hook.mask_secrets(text)
+
+    assert secret not in masked
+    assert hook.REDACTED in masked
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Use Basic authentication for the admin page.",
+        "password_hint = None",
+        'Read the "auth" section first.',
+        "-----END CERTIFICATE-----",
+    ],
+)
+def test_leaves_ordinary_text_alone(text: str) -> None:
+    assert hook.mask_secrets(text) == text
+
+
+def test_removes_private_key_blocks() -> None:
+    rsa = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpA\n-----END RSA PRIVATE KEY-----"
+    pgp = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBF\n-----END PGP PRIVATE KEY BLOCK-----"
+    # A certificate's END line inside the block is not the key's END.
+    chained = "-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END CERTIFICATE-----\nMIIBaA\n-----END PRIVATE KEY-----"
+
+    masked = hook.mask_secrets(f"a\n{rsa}\nb\n{pgp}\nc\n{chained}\nd\n")
+
+    assert masked == "a\n[private key removed]\nb\n[private key removed]\nc\n[private key removed]\nd\n"
+
+
+def test_a_private_key_with_no_end_in_range_loses_its_marker_line() -> None:
+    far = "+-----BEGIN PRIVATE KEY----- MIIEvQ\n" + "x" * (hook.PRIVATE_KEY_SPAN + 1) + "\n-----END PRIVATE KEY-----\n"
+
+    masked = hook.mask_secrets(far)
+
+    assert masked.startswith("+[private key removed]\nxxx")
+    assert "MIIEvQ" not in masked
+
+
+@pytest.mark.parametrize(("separator", "tail"), [("\n", "-----END PRIVATE KEY-----\n"), ("", "")])
+def test_masking_repeated_begin_markers_is_fast(separator: str, tail: str) -> None:
+    marker = "-----BEGIN PRIVATE KEY-----" + separator
+    text = marker * (2_000_000 // len(marker)) + tail
+
+    started = time.perf_counter()
+    masked = hook.mask_secrets(text)
+    elapsed = time.perf_counter() - started
+
+    # A lazy span up to the END scans 12000 characters per marker here; a forward only scan reads the text once.
+    assert elapsed < 1.0
+    assert "BEGIN" not in masked
+
+
+@pytest.mark.parametrize(
+    "path",
+    [".envrc", "deploy/kubeconfig", "home/.kube/config", ".docker/config.json", "ops/me.ppk", "db.sql.gpg", "k.asc"],
+)
+def test_skips_more_credential_stores(path: str) -> None:
+    policy = hook.FilePolicy.from_api(POLICY).merged(hook.BUILTIN_POLICY)
+
+    assert hook.skip_reason(path, policy) == "may hold credentials"
+
+
+@pytest.mark.parametrize("path", ["app/config", "docker/config.json", "src/envrc.py"])
+def test_generic_config_names_are_not_skipped(path: str) -> None:
+    assert hook.skip_reason(path, hook.BUILTIN_POLICY) is None
 
 
 # =============================================================================
@@ -348,6 +559,8 @@ def test_secret_files_never_leave_the_machine(repo: Path, hook_env: dict[str, st
     write(repo, "certs/server.pem", "pem-marker\n")
     write(repo, "config/secrets.yaml", "db: yaml-marker\n")
     write(repo, "node_modules/lib/index.js", "vendored-marker\n")
+    write(repo, ".envrc", "export PAYMENTS_HOST=envrc-marker\n")
+    write(repo, "ops/.kube/config", "server: kube-marker\n")
     write(repo, "app.py", ROUTE_CHANGE + 'API_KEY = "inline-value-12345678"\n')
 
     run_hook(cursor_payload("stop", repo), repo, hook_env)
@@ -356,7 +569,9 @@ def test_secret_files_never_leave_the_machine(repo: Path, hook_env: dict[str, st
     body = post["body"]
     posted = json.dumps(body)
     # Markers are plain values the masking regexes leave alone, so only the file filter keeps them out.
-    for marker in ("committed-marker", "untracked-marker", "changed-marker", "pem-marker", "yaml-marker", "vendored"):
+    markers = ("committed-marker", "untracked-marker", "changed-marker", "pem-marker", "yaml-marker", "vendored",
+               "envrc-marker", "kube-marker")  # fmt: skip
+    for marker in markers:
         assert marker not in posted
     assert "inline-value-12345678" not in posted
     assert body["files"] == ["app.py"]
@@ -493,33 +708,20 @@ def test_stop_detaches_and_posts_in_the_background(repo: Path, hook_env: dict[st
 
 def test_init_writes_config_and_takes_the_base(repo: Path, api: StubApi) -> None:
     write(repo, "app.py", ROUTE_CHANGE)
-    env = {**os.environ, "THREATVIZ_TOKEN": TOKEN}
+    write(repo, hook.CONFIG_FILE, json.dumps({"api_url": "https://old.example.com", "board_id": "old"}))
 
-    proc = subprocess.run(  # noqa: S603
-        [sys.executable, str(HOOK_PATH), "init", "--board", BOARD, "--api-url", api.url],
-        cwd=repo,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    proc = run_init(repo, api.url)
 
     assert proc.returncode == 0, proc.stderr
-    assert json.loads((repo / hook.CONFIG_FILE).read_text()) == {"api_url": api.url, "board_id": BOARD}
+    assert json.loads((repo / hook.CONFIG_FILE).read_text()) == {"board_id": BOARD}
+    assert json.loads((repo / ".git" / "threatviz" / hook.ORIGIN_FILE).read_text()) == {"api_url": api.url}
     assert ref(repo, hook.BASE_REF) == ref(repo, hook.PENDING_REF)
     assert '"UserPromptSubmit"' in proc.stdout
     assert TOKEN not in (repo / hook.CONFIG_FILE).read_text()
 
 
 def test_init_rejects_a_board_the_token_cannot_see(repo: Path, api: StubApi) -> None:
-    proc = subprocess.run(  # noqa: S603
-        [sys.executable, str(HOOK_PATH), "init", "--board", "other", "--api-url", api.url],
-        cwd=repo,
-        env={**os.environ, "THREATVIZ_TOKEN": TOKEN},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    proc = run_init(repo, api.url, board="other")
 
     assert proc.returncode != 0
     assert "not one of yours" in proc.stderr
