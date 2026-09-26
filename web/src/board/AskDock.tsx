@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { Answer, BoardOut, SystemMap } from "../api/types.ts";
@@ -8,6 +8,7 @@ import { ResizeHandle } from "../shell/ResizeHandle.tsx";
 import { clampWidth, parseWidth } from "../shell/resize.ts";
 import { useSession } from "../shell/session.tsx";
 import { labelOf } from "./elements.ts";
+import { starterQuestions } from "./starters.ts";
 import { useBoardUi } from "./store.ts";
 import "./AskDock.css";
 
@@ -18,13 +19,8 @@ import "./AskDock.css";
 // so the question sits next to the map it lights. The selected element, if
 // any, goes along as the focus; the answer comes back as plain text plus ids
 // that light up on the map. The bar fits its content until the user drags its
-// top edge, and the starter questions go away once the first question is sent.
-
-const STARTERS = [
-  "What should I fix first, and why?",
-  "Where can untrusted input reach an AI part?",
-  "What happens if the database leaks?",
-];
+// top edge. The starter questions name this board's own parts and go away
+// once the first question is sent.
 
 const HEIGHT_KEY = "ask-height";
 const HEIGHT_MIN = 100;
@@ -90,6 +86,10 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   const input = useRef<HTMLTextAreaElement>(null);
   const id = useId();
   const analysis = board.analysis;
+  const starters = useMemo(
+    () => (analysis ? starterQuestions(map, analysis, board.exposure) : []),
+    [map, analysis, board.exposure],
+  );
 
   useEffect(() => {
     if (focusSignal > 0) input.current?.focus();
@@ -205,7 +205,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
         </div>
         {!asked && question === "" && (
           <div className="ask-starters">
-            {STARTERS.map((starter) => (
+            {starters.map((starter) => (
               <button key={starter} type="button" className="chip ask-starter" onClick={() => pickStarter(starter)}>
                 {starter}
               </button>

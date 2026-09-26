@@ -4,6 +4,7 @@ import re
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.domain.rules import ai_exposure, checklist_text, label_of
+from app.examples import load_examples
 
 # =============================================================================
 # Module Overview
@@ -68,6 +69,8 @@ Processes are code the team runs. Stores are where data rests: databases, bucket
 privilege zone when the material says so, and the user's browser or device when the team's client code runs there. \
 Put every process and store in a boundary. Leave people and vendor systems outside every boundary.
 - A flow points the way the data moves. Name sensitive data plainly.
+- `summary` is the first thing a reader outside the team sees, so say in one plain sentence what the system does \
+and for whom, without security or framework jargon.
 - Aim for 6 to 14 nodes. Merge small pieces that share one job. Never invent a component the material gives no hint of.
 - Set `ai` on anything that is or calls a language model or agent, and `sensitive` on stores that hold credentials, \
 personal, financial or regulated data.
@@ -114,32 +117,27 @@ impact>, resulting in reduced <confidentiality|integrity|availability> of <impac
 - When an AI component has the lethal trifecta (sensitive data, untrusted content and a way to send data out), one \
 threat must cover it.
 - Write 1 to 3 attack paths from an entry point to an impact, as node ids in order, and a verdict on what to fix first.
-- <style_example> is one threat from a different system. Copy its style, never its content.
+- The board opens on the verdict for a reader with no security background. Start it with "Fix <component> first:", \
+say in everyday words what an attacker could do there and the change that stops it, then name the next fix.
+- In the verdict, titles, summaries and path stories, name components by their labels on the map, never by id, and \
+leave out threat ids. Each path's story runs from the attacker's first move to the harm.
+- <style_example> holds the verdict, one threat and one attack path from a different system. Copy their style, never \
+their content.
 
 {untrusted("map", "checklist", "ai_exposure")}"""
 
-_STYLE_EXAMPLE = json.dumps(
-    {
-        "id": "T1",
-        "element": "agent",
-        "stride": "E",
-        "severity": "critical",
-        "title": "A malicious email takes over the triage agent",
-        "summary": "Anyone can email a user instructions that the agent follows, such as forwarding private mail.",
-        "statement": (
-            "An outside sender who can email any user can hide instructions in a message that the triage agent "
-            "reads and follows, which leads to the agent calling send_email to forward private mail to the sender, "
-            "resulting in reduced confidentiality of users' inboxes."
-        ),
-        "impact": "Private mail leaks from every account that receives the email, without anyone clicking anything.",
-        "fixes": [
-            "Turn off auto-send and require the user to approve every send_email call",
-            "Allow send_email only to addresses already in the thread",
-        ],
-        "refs": ["OWASP LLM01:2025", "OWASP LLM06:2025", "CWE-1427"],
-        "evidence": "Auto-send is on by default for replies under 50 words, and anyone can email a user.",
-    }
-)
+
+def _style_example() -> str:
+    """The built-in example's verdict, worst threat and worst attack path, the style every board should read in."""
+    # Read from the example itself, so the board the UI is designed around and what the model copies never drift apart.
+    analysis = load_examples()[0].analysis
+    return json.dumps(
+        {
+            "verdict": analysis.verdict,
+            "threat": analysis.threats[0].model_dump(),
+            "path": analysis.paths[0].model_dump(include={"title", "severity", "story"}),
+        }
+    )
 
 
 def find_threats_content(system: SystemMap) -> str:
@@ -159,7 +157,7 @@ def find_threats_content(system: SystemMap) -> str:
             fence("map", system.model_dump_json()),
             fence("checklist", checklist_text(system)),
             fence("ai_exposure", json.dumps(exposure)),
-            fence("style_example", _STYLE_EXAMPLE),
+            fence("style_example", _style_example()),
             "Write the threat model for this map.",
         ]
     )
