@@ -29,5 +29,4 @@ def report_change(board_id: str, body: AgentChangeIn, user: AgentUser, svc: Svc,
     material = agent_material(body.agent, body.summary, body.diff, body.files, utcnow())
     svc.boards.add_material(user.id, board_id, material)
     row = svc.boards.get(session, user.id, board_id)
-    origin = svc.settings.public_origin or ""
-    return AgentChangeOut(board_id=row.id, status=row.status, review_url=f"{origin}/boards/{row.id}")
+    return AgentChangeOut(board_id=row.id, status=row.status, review_url=f"{svc.settings.web_origin}/boards/{row.id}")

@@ -154,7 +154,7 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
             services.limiter.hit(f"agent-change:{user_id}", 30, 3600, "Too many agent changes this hour.")
             material = agent_material("Coding agent", summary[:4000], diff[:200_000], files[:500], utcnow())
             services.boards.add_material(user_id, board_id, material)
-            origin = services.settings.public_origin or ""
+            origin = services.settings.web_origin
             return f"The map is being updated. The developer can review it at {origin}/boards/{board_id}."
 
         return await _as_user(work)

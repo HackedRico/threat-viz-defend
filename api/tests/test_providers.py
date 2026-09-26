@@ -185,3 +185,13 @@ def test_backboard_auth_errors_are_explained() -> None:
 
 def test_provider_routes_need_a_session(client: TestClient) -> None:
     assert client.get("/api/provider").status_code == 401
+
+
+def test_a_saved_key_is_not_reused_for_another_host(make_client: ClientFactory) -> None:
+    client = make_client(resolver=public_dns)
+    sign_up(client)
+    client.put("/api/provider", json=provider_body())
+    moved = provider_body(base_url="https://attacker.example/v1", api_key=None)
+    assert client.put("/api/provider", json=moved).status_code == 400
+    assert client.post("/api/provider/test", json=moved).status_code == 400
+    assert client.put("/api/provider", json=provider_body(api_key=None, model="gpt-2")).status_code == 200

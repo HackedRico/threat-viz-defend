@@ -85,3 +85,14 @@ def test_tokens_are_shown_once_and_revocable(signed_in: TestClient) -> None:
     assert "token" not in listed[0]
     assert signed_in.delete(f"/api/tokens/{listed[0]['id']}").status_code == 204
     assert signed_in.get("/api/tokens").json() == []
+
+
+def test_a_stranger_on_another_network_cannot_lock_an_account(client: TestClient) -> None:
+    sign_up(client, "hana")
+    client.post("/api/auth/logout")
+    for _ in range(5):
+        client.post("/api/auth/login", json={"username": "hana", "password": "wrong password"})
+    services = client.app.state.services  # type: ignore[attr-defined]
+    signed_in = services.accounts.login  # the real user signs in from a different network
+    with services.db.session() as session:
+        assert signed_in(session, username="hana", password=PASSWORD, ip="198.51.100.7").user.username == "hana"

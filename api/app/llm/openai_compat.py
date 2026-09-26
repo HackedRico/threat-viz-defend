@@ -37,7 +37,14 @@ class OpenAICompatibleLlm:
         self._model = model
         self._json_mode: JsonMode = json_mode
         self._max_tokens = max_tokens
-        self._client = client or openai.OpenAI(api_key=api_key, base_url=base_url, timeout=timeout_s, max_retries=2)
+        self._client = client or openai.OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout_s,
+            max_retries=2,
+            # A redirect could lead a checked public base URL to a private address, so none are followed.
+            http_client=openai.DefaultHttpxClient(follow_redirects=False),
+        )
         host = urlparse(base_url).hostname if base_url else "api.openai.com"
         self._label = f"{model} via {host}"
 
@@ -56,7 +63,10 @@ class OpenAICompatibleLlm:
         try:
             return parse_json(reply, request.schema)
         except (ValidationError, ValueError) as first:
-            log.warning("[llm] %s output failed validation; asking for a repair. Reason: %s", request.task, first)
+            # Log the kind of failure only: the error text quotes the model's reply, which may echo user code.
+            log.warning(
+                "[llm] %s output failed validation (%s); asking for a repair.", request.task, type(first).__name__
+            )
             messages += [{"role": "assistant", "content": reply}, {"role": "user", "content": repair_message(first)}]
         reply = self._complete(messages, request)
         try:

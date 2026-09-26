@@ -37,9 +37,7 @@ _hasher = PasswordHasher()
 # Verifying against a throwaway hash when the username is unknown keeps both paths equally slow,
 # so response time does not reveal which usernames exist.
 _DUMMY_HASH = _hasher.hash(secrets.token_urlsafe(16))
-_COMMON_PASSWORDS = frozenset(
-    {"password12", "password123", "1234567890", "qwertyuiop", "letmein123", "iloveyou12", "hackumbc2026"}
-)
+_COMMON_PASSWORDS = frozenset({"password12", "password123", "1234567890", "qwertyuiop", "letmein123", "iloveyou12"})
 
 
 def hash_secret(secret: str) -> str:
@@ -96,14 +94,18 @@ class Accounts:
         self._limiter.hit(
             f"login-ip:{ip}", 150, 300, "Too many sign in attempts from this network. Wait a few minutes."
         )
-        failures = f"login-fail:{name}"
-        if self._limiter.count(failures, 900) >= 5:
-            raise too_many("This account is locked for 15 minutes after repeated failed sign ins.", 900)
+        # Locking by username alone would let anyone lock anyone out, so the tight limit is per network
+        # and a looser one per username still stops a distributed guess.
+        failures = f"login-fail:{name}:{ip}"
+        spread = f"login-fail:{name}"
+        if self._limiter.count(failures, 900) >= 5 or self._limiter.count(spread, 900) >= 50:
+            raise too_many("Too many failed sign ins for this account. Try again in 15 minutes.", 900)
         user = session.scalar(select(UserRow).where(UserRow.username == name))
         if user is None or not _verify(user.password_hash, password):
             if user is None:
                 _verify(_DUMMY_HASH, password)
             self._limiter.hit(failures, 1000, 900, "")
+            self._limiter.hit(spread, 1000, 900, "")
             raise unauthorized("Wrong username or password.")
         if user.disabled:
             raise forbidden("This account is disabled. Ask the organizers.")

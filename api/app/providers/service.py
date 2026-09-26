@@ -132,6 +132,7 @@ class Providers:
         )
         _check_model(body)
         row = session.get(ProviderRow, user_id)
+        _key_stays_home(row, body, url)
         new_key = body.api_key
         if new_key is None and row is None:
             if body.kind == "backboard":
@@ -169,9 +170,13 @@ class Providers:
         if key is None:
             with self._db.session() as session:
                 row = session.get(ProviderRow, user_id)
+                _key_stays_home(row, body, url)
                 if row is None and body.kind == "backboard":
                     raise bad_request("Enter your Backboard API key to test.")
-                key = self._box.open(row.key_sealed, user_id) if row is not None else ""
+                try:
+                    key = self._box.open(row.key_sealed, user_id) if row is not None else ""
+                except ValueError as exc:
+                    raise bad_request(str(exc)) from exc
         label = _label(body.kind, body.model, body.memory)
         try:
             if body.kind == "backboard":
@@ -215,6 +220,12 @@ class Providers:
         )
 
 
+def _key_stays_home(row: ProviderRow | None, body: ProviderIn, url: str) -> None:
+    """Refuse to reuse a saved key for another host: whoever holds the session could otherwise send it anywhere."""
+    if body.api_key is None and row is not None and (row.base_url != url or row.kind != body.kind):
+        raise bad_request("Enter the API key again when you change the provider or its base URL.")
+
+
 def _check_model(body: ProviderIn) -> None:
     """Reject a Backboard model that is not written as `provider/model`."""
     if body.kind == "backboard" and "/" not in body.model.strip("/"):
@@ -230,7 +241,13 @@ def _label(kind: str, model: str, memory: bool) -> str:
 
 def _list_models(url: str, key: str) -> list[str]:
     """Model ids an OpenAI-compatible endpoint lists, as proof the key works."""
-    client = openai.OpenAI(api_key=key or "none", base_url=url, timeout=10.0, max_retries=0)
+    client = openai.OpenAI(
+        api_key=key or "none",
+        base_url=url,
+        timeout=10.0,
+        max_retries=0,
+        http_client=openai.DefaultHttpxClient(follow_redirects=False),
+    )
     try:
         return sorted(model.id for model in client.models.list())
     except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:

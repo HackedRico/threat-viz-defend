@@ -23,6 +23,7 @@ ErrorCode = Literal[
     "model_error",
     "voice_error",
     "not_configured",
+    "internal_error",
 ]
 
 

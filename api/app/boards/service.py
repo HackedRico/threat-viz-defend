@@ -182,6 +182,7 @@ class Boards:
             lambda row, session: _event(session, row.id, "confirmed", "Map confirmed. Finding threats."),
         )
         if system is None:
+            self._fail(board_id, "review", "The stored map no longer loads. Edit and save it, then confirm again.")
             return
 
         def work() -> None:

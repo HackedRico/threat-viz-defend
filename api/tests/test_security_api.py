@@ -59,6 +59,7 @@ def test_agent_change_updates_the_board_with_a_token(signed_in: TestClient) -> N
     response = signed_in.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers)
     assert response.status_code == 202
     assert response.json()["status"] == "review"
+    assert response.json()["review_url"].endswith(f"/boards/{board['id']}")
 
 
 def test_mcp_needs_a_token(client: TestClient) -> None:

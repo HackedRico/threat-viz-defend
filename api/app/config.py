@@ -82,6 +82,11 @@ class Settings:
         return "__Host-tvd_session" if self.cookie_secure else "tvd_session"
 
     @property
+    def web_origin(self) -> str:
+        """Where the web app lives, for links sent to coding agents: the first CORS origin, else this server."""
+        return self.cors_origins[0] if self.cors_origins else (self.public_origin or "")
+
+    @property
     def trusted_origins(self) -> tuple[str, ...]:
         """Browser origins allowed to call the API with the user's cookie."""
         own = (self.public_origin,) if self.public_origin else ()

@@ -185,7 +185,7 @@ def _add_error_handlers(app: FastAPI) -> None:
     async def unexpected(_: Request, exc: Exception) -> JSONResponse:
         log.exception("[http] Unhandled error", exc_info=exc)
         return JSONResponse(
-            {"error": {"code": "bad_request", "message": "Something went wrong on our side. Try again."}}, 500
+            {"error": {"code": "internal_error", "message": "Something went wrong on our side. Try again."}}, 500
         )
 
 
