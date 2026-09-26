@@ -1,0 +1,144 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The ask bar docked under the canvas: its header line, the input and send
+   button, the starter questions, and the latest answer stacked above them. */
+
+.ask-dock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1.5px solid var(--line);
+  background: var(--surface);
+}
+
+.ask-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ask-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.ask-mark {
+  color: var(--accent);
+}
+
+.ask-head .panel-label {
+  color: var(--ink-soft);
+}
+
+.ask-focus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.ask-hint {
+  margin-left: auto;
+}
+
+.ask-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.ask-input {
+  flex: 1;
+  min-height: 42px;
+  max-height: 128px;
+  resize: none;
+  field-sizing: content;
+}
+
+.ask-send {
+  flex: none;
+  min-height: 42px;
+  padding-inline: var(--space-5);
+}
+
+.ask-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.ask-starter,
+.ask-lit .chip {
+  cursor: pointer;
+}
+
+.ask-starter:hover,
+.ask-lit .chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- answer ---------- */
+
+.ask-answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 34vh;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1.5px solid var(--line);
+  border-left: 4px solid var(--highlight);
+  border-radius: var(--radius-md);
+  background: var(--board);
+  animation: ask-answer-in var(--dur-med) var(--ease-out);
+}
+
+@keyframes ask-answer-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.ask-answer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ask-question {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.ask-reply {
+  font-family: var(--font-hand);
+  font-size: 1.3rem;
+  line-height: 1.25;
+  white-space: pre-wrap;
+}
+
+.ask-lit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.ask-lit .panel-label {
+  margin-right: var(--space-1);
+}
+
+@media (max-width: 720px) {
+  .ask-hint {
+    display: none;
+  }
+}

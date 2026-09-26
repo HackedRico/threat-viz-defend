@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import type { BoardOut, SystemMap } from "../api/types.ts";
 import { DefendPanel } from "../quiz/DefendPanel.tsx";
 import { ActivityLog } from "./ActivityLog.tsx";
-import { AskBox } from "./AskBox.tsx";
 import { AttackPaths } from "./AttackPaths.tsx";
 import { useBoardUi } from "./store.ts";
 import { ThreatList } from "./ThreatList.tsx";
@@ -13,13 +12,13 @@ import "./Panel.css";
 // Module Overview
 // =============================================================================
 // The side panel of a finished board, in tabs: the threat list, attack paths,
-// questions to the analyst, the defend panel with the quiz and voice coach, and
-// the activity log. A pin click or an "ask about this" jumps to its tab.
+// the defend panel with the quiz and voice coach, and the activity log. A pin
+// click jumps to the threat. Asking lives in the bar under the canvas.
 
-type Tab = "threats" | "paths" | "ask" | "defend" | "activity";
+type Tab = "threats" | "paths" | "defend" | "activity";
 
 /** The panel for a board with a threat model. */
-export function ReadyPanel({ board, map, askSignal }: { board: BoardOut; map: SystemMap; askSignal: number }) {
+export function ReadyPanel({ board, map }: { board: BoardOut; map: SystemMap }) {
   const [tab, setTab] = useState<Tab>("threats");
   const focusThreat = useBoardUi((s) => s.focusThreat);
   const analysis = board.analysis;
@@ -27,9 +26,6 @@ export function ReadyPanel({ board, map, askSignal }: { board: BoardOut; map: Sy
   useEffect(() => {
     if (focusThreat) setTab("threats");
   }, [focusThreat]);
-  useEffect(() => {
-    if (askSignal > 0) setTab("ask");
-  }, [askSignal]);
 
   if (analysis === null) {
     return (
@@ -43,7 +39,6 @@ export function ReadyPanel({ board, map, askSignal }: { board: BoardOut; map: Sy
   const tabs: { id: Tab; label: string }[] = [
     { id: "threats", label: `Threats ${analysis.threats.length}` },
     { id: "paths", label: `Paths ${analysis.paths.length}` },
-    { id: "ask", label: "Ask" },
     { id: "defend", label: "Defend" },
     { id: "activity", label: "Log" },
   ];
@@ -79,7 +74,6 @@ export function ReadyPanel({ board, map, askSignal }: { board: BoardOut; map: Sy
       <div className="tab-panel" role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "threats" && <ThreatList analysis={analysis} map={map} />}
         {tab === "paths" && <AttackPaths analysis={analysis} map={map} />}
-        {tab === "ask" && <AskBox board={board} map={map} />}
         {tab === "defend" && <DefendPanel board={board} map={map} />}
         {tab === "activity" && <ActivityLog board={board} open />}
       </div>

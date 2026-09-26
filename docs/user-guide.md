@@ -175,7 +175,11 @@ A ready board opens centered on the element with the worst threat.
 - **Hide panel.** The button on the canvas hides or shows the side panel.
 - **Resize panel.** Drag the side panel's left edge to widen it, up to 900 pixels or 60 percent of the window, whichever is smaller. The keys and double click work as they do on the sidebar edge. On a window narrower than 1100 pixels the panel sits under the map at full width and has no edge to drag.
 
-The side panel has five tabs.
+### Ask
+
+The ask bar runs along the bottom of the canvas. Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. Starter questions fill the box for you. Each question uses one model call. The answer shows above the box as plain text with chips that light the elements it names; **All of them** lights every one, and the close button dismisses it. On a selected element, **Ask about this** in the inspector puts the cursor in the ask bar.
+
+The side panel has four tabs.
 
 ### Threats
 
@@ -184,10 +188,6 @@ Every threat, worst first, with where it sits, its severity and its STRIDE categ
 ### Paths
 
 Attack paths, worst first, each with its story, its steps in order, and the threats it goes through. Hover or focus a path to light it on the map. Click it to keep it lit; click again to let go. Click a threat id to jump to it.
-
-### Ask
-
-Ask the analyst a question about this board. If an element is selected, the question is about it; choose **Ask about the whole board** to drop that focus. Type in the box and choose **Ask**, or press Ctrl or Cmd with Enter. Starter questions fill the box for you. Each question uses one model call. The answer comes back as plain text with chips that light the elements it names; **All of them** lights every one. On a selected element, **Ask about this** in the inspector jumps here.
 
 ### Defend
 
