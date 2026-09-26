@@ -329,7 +329,7 @@ def sanitize_map(system: SystemMap) -> SystemMap:
 
 
 def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnalysis:
-    """Drop threats and path steps the map does not contain, sort by severity and renumber."""
+    """Drop threats and path steps the map does not contain, sort by severity, renumber and fold text onto one line."""
     places = element_ids(system)
     seen: set[str] = set()
     kept: list[Threat] = []
@@ -347,13 +347,13 @@ def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnal
         threat.model_copy(
             update={
                 "id": renumbered[threat.id],
-                "title": _clip(threat.title, MAX_LABEL),
-                "summary": _clip(threat.summary, MAX_TEXT),
-                "statement": _clip(threat.statement, MAX_TEXT),
-                "impact": _clip(threat.impact, MAX_TEXT),
-                "fixes": [_clip(fix, MAX_TEXT) for fix in threat.fixes[:3]],
-                "refs": [_clip(ref, 40) for ref in threat.refs[:6]],
-                "evidence": _clip(threat.evidence, MAX_TEXT),
+                "title": _one_line(threat.title, MAX_LABEL),
+                "summary": _one_line(threat.summary, MAX_TEXT),
+                "statement": _one_line(threat.statement, MAX_TEXT),
+                "impact": _one_line(threat.impact, MAX_TEXT),
+                "fixes": [_one_line(fix, MAX_TEXT) for fix in threat.fixes[:3]],
+                "refs": [_one_line(ref, 40) for ref in threat.refs[:6]],
+                "evidence": _one_line(threat.evidence, MAX_TEXT),
             }
         )
         for threat in kept
@@ -372,17 +372,17 @@ def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnal
             path.model_copy(
                 update={
                     "id": f"P{len(paths) + 1}",
-                    "title": _clip(path.title, MAX_LABEL),
+                    "title": _one_line(path.title, MAX_LABEL),
                     "steps": steps,
                     "threats": along,
-                    "story": _clip(path.story, MAX_TEXT),
+                    "story": _one_line(path.story, MAX_TEXT),
                 }
             )
         )
         if len(paths) >= MAX_PATHS:
             break
 
-    return ThreatAnalysis(verdict=_clip(analysis.verdict, MAX_TEXT), threats=threats, paths=paths)
+    return ThreatAnalysis(verdict=_one_line(analysis.verdict, MAX_TEXT), threats=threats, paths=paths)
 
 
 def remove_element(system: SystemMap, item_id: str) -> SystemMap:
@@ -397,17 +397,12 @@ def remove_element(system: SystemMap, item_id: str) -> SystemMap:
     return trimmed.model_copy(update={"boundaries": [b for b in trimmed.boundaries if b.id in used]})
 
 
-def _clip(text: str, limit: int) -> str:
-    """Trim whitespace and cut `text` to `limit` characters, marking the cut."""
-    stripped = text.strip()
-    return stripped if len(stripped) <= limit else stripped[: limit - 1].rstrip() + "…"
-
-
 def _one_line(text: str, limit: int) -> str:
-    """`_clip` after folding every run of whitespace, line breaks included, into one space."""
-    # Agents read map text line by line in `get_board` and `describe_element`, where a line break
-    # could pose as another id or threat. `str.split()` also breaks on `\r`, `\x85` and U+2028.
-    return _clip(" ".join(text.split()), limit)
+    """Fold every run of whitespace, line breaks included, into one space and cut to `limit`, marking the cut."""
+    # Agents read map and threat text line by line in `get_board` and `describe_element`, where a line
+    # break could pose as another id or threat. `str.split()` also breaks on `\r`, `\x85` and U+2028.
+    folded = " ".join(text.split())
+    return folded if len(folded) <= limit else folded[: limit - 1].rstrip() + "…"
 
 
 def _one_line_optional(text: str | None, limit: int) -> str | None:
