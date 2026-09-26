@@ -64,8 +64,8 @@ export function BoardView({ boardId }: { boardId: string }) {
   }
 
   const showIntake = board.status === "empty" || adding;
-  return (
-    <section className="board-view" aria-labelledby="board-title">
+  const top = (
+    <>
       <BoardHeader board={board} onApply={apply} onAddMaterial={() => setAdding(true)} adding={adding} />
       <ErrorBanner board={board} />
       {/* The failure banner already carries the error; a notice repeating it is noise. */}
@@ -78,6 +78,22 @@ export function BoardView({ boardId }: { boardId: string }) {
           </button>
         </div>
       )}
+    </>
+  );
+
+  // With a map on screen, the header moves into the map column so the side panel can run the
+  // full height beside it, mirroring the sidebar on the left.
+  if (!showIntake && board.map !== null) {
+    return (
+      <section className="board-view" aria-labelledby="board-title">
+        <Workspace board={board} onApply={apply} top={top} />
+      </section>
+    );
+  }
+
+  return (
+    <section className="board-view" aria-labelledby="board-title">
+      {top}
       <div className="board-body">
         {showIntake ? (
           <Intake
@@ -88,10 +104,8 @@ export function BoardView({ boardId }: { boardId: string }) {
             }}
             onCancel={board.status === "empty" ? null : () => setAdding(false)}
           />
-        ) : board.map === null ? (
-          <Drawing board={board} />
         ) : (
-          <Workspace board={board} onApply={apply} />
+          <Drawing board={board} />
         )}
       </div>
     </section>
