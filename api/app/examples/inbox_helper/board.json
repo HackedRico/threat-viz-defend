@@ -1,0 +1,200 @@
+{
+  "title": "Example: Inbox Helper",
+  "map": {
+    "name": "Inbox Helper",
+    "summary": "An AI email assistant that syncs a user's Gmail, summarizes threads and can send replies on their behalf.",
+    "boundaries": [
+      { "id": "browser", "label": "User's browser" },
+      { "id": "backend", "label": "Backend on Fly.io and Supabase" }
+    ],
+    "nodes": [
+      { "id": "user", "label": "User", "kind": "external", "tech": null, "boundary": null, "ai": false, "sensitive": false, "evidence": "Users sign in with Google." },
+      { "id": "senders", "label": "Email senders", "kind": "external", "tech": null, "boundary": null, "ai": false, "sensitive": false, "evidence": "Anyone can email a user, so message bodies are untrusted." },
+      { "id": "google", "label": "Gmail API", "kind": "external", "tech": "Google OAuth and Gmail", "boundary": null, "ai": false, "sensitive": false, "evidence": "polls the Gmail API every two minutes" },
+      { "id": "openai", "label": "OpenAI API", "kind": "external", "tech": "OpenAI", "boundary": null, "ai": true, "sensitive": false, "evidence": "built on the OpenAI API" },
+      { "id": "websites", "label": "Any website", "kind": "external", "tech": null, "boundary": null, "ai": false, "sensitive": false, "evidence": "fetch_url makes an outbound HTTP request to any URL" },
+      { "id": "logs", "label": "Log service", "kind": "external", "tech": "Better Stack", "boundary": null, "ai": false, "sensitive": false, "evidence": "Logs go to Better Stack, including full agent prompts" },
+      { "id": "web", "label": "Web app", "kind": "process", "tech": "React", "boundary": "browser", "ai": false, "sensitive": false, "evidence": "React single page app." },
+      { "id": "api", "label": "API", "kind": "process", "tech": "FastAPI on Fly.io", "boundary": "backend", "ai": false, "sensitive": false, "evidence": "FastAPI service on Fly.io." },
+      { "id": "sync", "label": "Mail sync worker", "kind": "process", "tech": null, "boundary": "backend", "ai": false, "sensitive": false, "evidence": "polls the Gmail API every two minutes with each user's OAuth refresh token" },
+      { "id": "agent", "label": "Triage agent", "kind": "process", "tech": "OpenAI tool calling", "boundary": "backend", "ai": true, "sensitive": false, "evidence": "can call tools: send_email, fetch_url, search_mail" },
+      { "id": "db", "label": "Postgres", "kind": "store", "tech": "Supabase Postgres", "boundary": "backend", "ai": false, "sensitive": true, "evidence": "OAuth refresh tokens (encrypted ...), message bodies and summaries" },
+      { "id": "queue", "label": "Job queue", "kind": "store", "tech": "Redis", "boundary": "backend", "ai": false, "sensitive": false, "evidence": "the job queue between the sync worker and the agent" }
+    ],
+    "flows": [
+      { "id": "f1", "source": "senders", "target": "google", "label": "send email", "data": "Message bodies and links, untrusted", "evidence": "Anyone can email a user" },
+      { "id": "f2", "source": "google", "target": "sync", "label": "new mail", "data": "Message bodies", "evidence": "pulls new mail from Gmail" },
+      { "id": "f3", "source": "user", "target": "web", "label": "sign in, review", "data": "Google sign in, reply edits", "evidence": "Users sign in with Google." },
+      { "id": "f4", "source": "web", "target": "api", "label": "API requests", "data": "Session cookie, settings, edits", "evidence": "inferred: the single page app calls the API" },
+      { "id": "f5", "source": "google", "target": "api", "label": "OAuth tokens", "data": "Refresh tokens", "evidence": "exchanges the code for a refresh token" },
+      { "id": "f6", "source": "api", "target": "db", "label": "save tokens", "data": "Encrypted refresh tokens, settings", "evidence": "The API exchanges the code for a refresh token and stores it." },
+      { "id": "f7", "source": "db", "target": "sync", "label": "read tokens", "data": "Refresh tokens", "evidence": "reads refresh tokens from Postgres" },
+      { "id": "f8", "source": "sync", "target": "db", "label": "save messages", "data": "Message bodies", "evidence": "writes messages to Postgres" },
+      { "id": "f9", "source": "sync", "target": "queue", "label": "queue triage", "data": "Thread ids", "evidence": "queues a triage job" },
+      { "id": "f10", "source": "queue", "target": "agent", "label": "triage job", "data": "Thread ids", "evidence": "the job queue between the sync worker and the agent" },
+      { "id": "f11", "source": "db", "target": "agent", "label": "read mail", "data": "The thread and earlier mail", "evidence": "reads the thread and earlier mail from Postgres" },
+      { "id": "f12", "source": "agent", "target": "openai", "label": "prompt", "data": "Email bodies and instructions", "evidence": "calls the OpenAI API" },
+      { "id": "f13", "source": "agent", "target": "db", "label": "save summary", "data": "Summaries, drafts, labels", "evidence": "writes the summary back" },
+      { "id": "f14", "source": "agent", "target": "google", "label": "send_email", "data": "Replies and forwarded mail", "evidence": "Auto-send is on by default for replies under 50 words." },
+      { "id": "f15", "source": "agent", "target": "websites", "label": "fetch_url", "data": "URLs found in emails", "evidence": "fetch_url makes an outbound HTTP request to any URL" },
+      { "id": "f16", "source": "agent", "target": "logs", "label": "prompt logs", "data": "Full prompts with email bodies", "evidence": "including full agent prompts for debugging" },
+      { "id": "f17", "source": "db", "target": "api", "label": "read summaries", "data": "Summaries and drafts", "evidence": "inferred: the API serves summaries stored in Postgres" },
+      { "id": "f18", "source": "api", "target": "web", "label": "summaries", "data": "Summaries and drafts as Markdown", "evidence": "summaries and drafts rendered as Markdown" }
+    ],
+    "assumptions": [
+      "Google sign in is the only way to log in.",
+      "The agent uses the same Gmail scopes as the sync worker, including send.",
+      "Fly.io and Supabase are one trust zone, because the API and the workers share database credentials.",
+      "The web app renders Markdown without stripping images or links."
+    ]
+  },
+  "analysis": {
+    "verdict": "Fix the triage agent first: any email can make it forward private mail or fetch an attacker's URL, so turn off auto-send and fence its tools. Then stop sending full prompts to the log service.",
+    "threats": [
+      {
+        "id": "T1",
+        "element": "agent",
+        "stride": "E",
+        "severity": "critical",
+        "title": "A malicious email takes over the triage agent",
+        "summary": "Anyone can email a user instructions that the agent follows, such as forwarding private mail to the sender.",
+        "statement": "An outside sender who can email any user can hide instructions in a message that the triage agent reads and follows, which leads to the agent calling send_email to forward private mail to the sender, resulting in reduced confidentiality of users' inboxes.",
+        "impact": "Private mail leaks from every account that receives the email, without anyone clicking anything.",
+        "fixes": [
+          "Turn off auto-send and require the user to approve every send_email call",
+          "Allow send_email only to addresses already in the thread"
+        ],
+        "refs": ["OWASP LLM01:2025", "OWASP LLM06:2025", "CWE-1427"],
+        "evidence": "Auto-send is on by default for replies under 50 words, and anyone can email a user."
+      },
+      {
+        "id": "T2",
+        "element": "f15",
+        "stride": "I",
+        "severity": "high",
+        "title": "fetch_url carries mail out in a link",
+        "summary": "Injected instructions can make the agent fetch an attacker's URL with private mail in the query string.",
+        "statement": "An outside sender whose email reaches the triage agent can instruct it to call fetch_url on an attacker's URL with summaries appended, which leads to private mail reaching the attacker's server, resulting in reduced confidentiality of users' inboxes.",
+        "impact": "Mail leaks even with auto-send off, because fetching a link looks harmless.",
+        "fixes": [
+          "Fetch only URLs that appear in the original email, never ones the model builds",
+          "Route fetches through a proxy that blocks private addresses and strips query strings"
+        ],
+        "refs": ["OWASP LLM01:2025", "CWE-918"],
+        "evidence": "fetch_url makes an outbound HTTP request to any URL found in an email."
+      },
+      {
+        "id": "T3",
+        "element": "f16",
+        "stride": "I",
+        "severity": "high",
+        "title": "Full prompts put private mail in the logs",
+        "summary": "Every email the agent reads is copied into the log service, where more people can read it.",
+        "statement": "Anyone with access to the log service can read full agent prompts, which leads to private email bodies being exposed outside the database's access controls, resulting in reduced confidentiality of users' inboxes.",
+        "impact": "A leaked log token or an over-shared dashboard exposes mail from every user.",
+        "fixes": [
+          "Log prompt ids, token counts and tool names, not prompt text",
+          "Set a short retention period on the log service"
+        ],
+        "refs": ["CWE-532"],
+        "evidence": "Logs go to Better Stack, including full agent prompts for debugging."
+      },
+      {
+        "id": "T4",
+        "element": "api",
+        "stride": "E",
+        "severity": "high",
+        "title": "Admin pages trust the ordinary session",
+        "summary": "One admin route that forgets the is_admin check gives any signed-in user admin powers.",
+        "statement": "A signed-in user who finds an /admin route without the is_admin check can call it with their normal session cookie, which leads to reading or changing any user's account, resulting in reduced confidentiality and integrity of every account.",
+        "impact": "A single missed check turns any account into an administrator.",
+        "fixes": [
+          "Guard every /admin route with one deny-by-default middleware",
+          "Give the admin dashboard its own sign in with MFA"
+        ],
+        "refs": ["CWE-862"],
+        "evidence": "The admin dashboard at /admin uses the same session cookie, guarded by an is_admin flag."
+      },
+      {
+        "id": "T5",
+        "element": "f18",
+        "stride": "I",
+        "severity": "medium",
+        "title": "Markdown images leak summaries",
+        "summary": "A summary that contains an image link makes the browser send data to the attacker's server.",
+        "statement": "An outside sender who can steer a summary can make it include a Markdown image whose URL carries private text, which leads to the user's browser sending that text to the attacker when the summary renders, resulting in reduced confidentiality of users' mail.",
+        "impact": "Mail leaks silently whenever a user opens a summary.",
+        "fixes": [
+          "Render summaries without images, or proxy images through an allowlist",
+          "Set a Content-Security-Policy that blocks images from other origins"
+        ],
+        "refs": ["OWASP LLM05:2025", "CWE-79"],
+        "evidence": "The web app shows summaries and drafts rendered as Markdown."
+      },
+      {
+        "id": "T6",
+        "element": "db",
+        "stride": "I",
+        "severity": "medium",
+        "title": "One env key unlocks every Gmail token",
+        "summary": "Whoever reads the database and the environment gets access to every user's Gmail.",
+        "statement": "An attacker who obtains a database dump and the environment variable key can decrypt every refresh token, which leads to full Gmail access for every user, resulting in reduced confidentiality of all connected inboxes.",
+        "impact": "One leaked backup plus one leaked secret exposes every connected mailbox.",
+        "fixes": [
+          "Encrypt refresh tokens with a key held in a KMS, not an environment variable",
+          "Request the narrowest Gmail scopes, and split read and send into separate grants"
+        ],
+        "refs": ["CWE-522"],
+        "evidence": "OAuth refresh tokens (encrypted with a key from an environment variable)"
+      },
+      {
+        "id": "T7",
+        "element": "f12",
+        "stride": "D",
+        "severity": "medium",
+        "title": "Email floods run up the model bill",
+        "summary": "Anyone can send thousands of emails, and each one triggers a paid model call.",
+        "statement": "An outside sender who can email a user in bulk can trigger a triage job per message, which leads to thousands of OpenAI calls and exhausted quotas, resulting in reduced availability of triage for every user.",
+        "impact": "A cheap email flood becomes an expensive outage.",
+        "fixes": [
+          "Cap model calls per user per day and skip bulk or list mail",
+          "Batch several new messages into one triage call"
+        ],
+        "refs": ["OWASP LLM10:2025"],
+        "evidence": "For each new thread it reads the messages and earlier mail."
+      }
+    ],
+    "paths": [
+      {
+        "id": "P1",
+        "title": "Poisoned email forwards the inbox",
+        "severity": "critical",
+        "steps": ["senders", "google", "sync", "db", "agent", "google"],
+        "threats": ["T1"],
+        "story": "An attacker emails the user a message with hidden instructions. During triage the agent follows them and uses send_email to forward private mail to the attacker."
+      },
+      {
+        "id": "P2",
+        "title": "Poisoned email leaks mail through a link",
+        "severity": "high",
+        "steps": ["senders", "google", "sync", "db", "agent", "websites"],
+        "threats": ["T1", "T2"],
+        "story": "The same hidden instructions tell the agent to fetch an attacker's URL with summaries in the query string, so private mail leaves even with auto-send off."
+      },
+      {
+        "id": "P3",
+        "title": "Any account reaches the admin pages",
+        "severity": "high",
+        "steps": ["user", "web", "api", "db"],
+        "threats": ["T4"],
+        "story": "A signed-in user calls an admin route that forgot the is_admin check and reads other users' accounts straight from Postgres."
+      }
+    ]
+  },
+  "questions": {
+    "What happens if an email tells the agent to forward my mail?": {
+      "answer": "The email reaches the Triage agent through the Gmail API, the sync worker and Postgres, and the agent can follow its instructions with send_email (T1), or leak mail through fetch_url (T2). Turning off auto-send and limiting send_email to addresses in the thread breaks the first route.",
+      "highlight": ["senders", "google", "sync", "db", "agent", "f14", "f15", "T1", "T2"]
+    }
+  }
+}

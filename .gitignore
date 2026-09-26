@@ -1,0 +1,29 @@
+# Secrets and local data
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+web/dist/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Agent worktrees
+.claude/worktrees/
