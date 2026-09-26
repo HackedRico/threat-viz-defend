@@ -48,6 +48,10 @@ class Llm(Protocol):
         """Call the model and return schema-valid output, or raise `LlmError`."""
         ...
 
+    def remembers(self, task: str) -> bool:
+        """Whether the provider may keep what a `task` call sends as memory that later calls see."""
+        ...
+
 
 # =============================================================================
 # Shared helpers for adapters

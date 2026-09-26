@@ -6,7 +6,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.models import ThreatAnalysis
+from app.analysis.analyst import LlmAnalyst
+from app.domain.models import Answer, OpenGrade, ThreatAnalysis
+from app.domain.quiz import build_quiz
 from app.errors import AppError
 from app.llm.backboard import BackboardLlm
 from app.llm.base import LlmError, LlmRequest
@@ -117,6 +119,21 @@ def test_a_saved_provider_analyzes_the_users_boards(make_client: ClientFactory) 
     assert chosen.analyst.label == "gpt-test via api.example.com"
 
 
+@pytest.mark.parametrize("memory", [True, False])
+def test_a_saved_backboard_provider_remembers_answers_and_grades_only_with_memory(
+    make_client: ClientFactory, memory: bool
+) -> None:
+    client = make_client(resolver=public_dns)
+    sign_up(client)
+    body = provider_body(
+        kind="backboard", base_url="https://app.backboard.io/api", model="openai/gpt-4o", memory=memory
+    )
+    client.put("/api/provider", json=body)
+    chosen = client.app.state.services.providers.for_user(client.get("/api/auth/me").json()["user"]["id"])  # type: ignore[attr-defined]
+    tasks = ["draft_map", "find_threats", "answer", "grade"]
+    assert [chosen.analyst._llm.remembers(task) for task in tasks] == [False, False, memory, memory]
+
+
 def test_a_saved_provider_gets_the_servers_output_cap(
     make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -179,11 +196,34 @@ def test_backboard_sends_the_model_and_remembers_the_assistant() -> None:
 
 
 def test_backboard_never_writes_uploaded_material_into_memory() -> None:
+    example = inbox()
+    # Marked evidence, so a quote from the uploads is easy to spot in any call that may write memory.
+    system = example.map.model_copy(
+        update={
+            "nodes": [n.model_copy(update={"evidence": f"upload-quote-{n.id}"}) for n in example.map.nodes],
+            "flows": [f.model_copy(update={"evidence": f"upload-quote-{f.id}"}) for f in example.map.flows],
+        }
+    )
+    question = next(q for q in build_quiz(system, example.analysis) if q.kind == "open")
+    replies = [
+        {"content": system.model_dump_json()},
+        {"content": example.analysis.model_dump_json()},
+        {"content": Answer(answer="Look at T1.", highlight=["T1"]).model_dump_json()},
+        {"content": OpenGrade(verdict="partial", feedback="Close.", highlight=[]).model_dump_json()},
+    ]
     seen: list[dict[str, Any]] = []
-    llm = backboard([{"content": GOOD, "assistant_id": "a1"}], seen, memory=True, assistant_id="a1")
-    llm.generate(LlmRequest("draft_map", "s", "code", ThreatAnalysis))
-    assert seen[0]["body"]["memory"] == "Readonly"
-    assert seen[0]["body"]["assistant_id"] == "a1"
+    analyst = LlmAnalyst(backboard(replies, seen, memory=True, assistant_id="a1"))
+    analyst.draft_map("upload-code", None)
+    analyst.find_threats(system)
+    analyst.answer(system, example.analysis, "Where can mail leak?", "agent")
+    analyst.grade(system, example.analysis, question, "Turn off auto-send.")
+    bodies = [s["body"] for s in seen]
+    assert [b["memory"] for b in bodies] == ["Readonly", "Readonly", "Auto", "Auto"]
+    assert all(b["assistant_id"] == "a1" for b in bodies)
+    assert "upload-quote-agent" in bodies[1]["content"]
+    for body in bodies[2:]:
+        assert "upload-" not in body["content"]
+        assert "Triage agent" in body["content"]
 
 
 def test_backboard_repairs_in_the_same_thread() -> None:
