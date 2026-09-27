@@ -21,3 +21,5 @@ The hackUMBC 2026 pitch for ThreatViz Defend: a 13 slide deck and the talk track
 13. **What's next.** A pull request check that flags a new trust boundary crossing or lethal trifecta before it merges, a team view of who can explain which threats, and private repositories through a GitHub app.
 
 The diagrams on slides 8 to 11 are also in the [README](../../README.md#how-it-is-built).
+
+[docs/images/png/](../images/png/) holds PNG copies of every README diagram, dark theme, for sites that cannot show SVG, such as Devpost.
