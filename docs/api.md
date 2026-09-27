@@ -140,7 +140,7 @@ Cookie. Body `SourcesIn`: `sources`, 1 to 400 items of `SourceIn`: `name` (up to
 ### `POST /api/boards/{board_id}/github`
 Cookie. Body `GithubIn`: `url`, a public repository such as `https://github.com/owner/repo` or `https://github.com/owner/repo/tree/<ref>`. The server downloads the tarball from `codeload.github.com` in a job and draws the map from its text files.
 
-`202` with `BoardOut` in `mapping`. Errors: `400` for any other URL, `409`, `429`. A missing repository or a tarball over 30 MB fails the job and shows in `error`.
+`202` with `BoardOut` in `mapping`. Errors: `400` for any other URL, `409`, `429`. A missing repository, a tarball over 30 MB, or one with no readable files fails the job and shows in `error`.
 
 ### `PUT /api/boards/{board_id}/map`
 Cookie. Body `MapIn`: `map`, a full `SystemMap`. The map is sanitized, the old map becomes `previous_map`, and the board goes to `review`. `200` with `BoardOut`. Errors: `400` when no nodes remain, `409` when the board is busy.
@@ -226,9 +226,9 @@ Cookie. Body `MemoryIn`. Lists the account's Backboard assistants with the typed
 Bearer. `200` with the token owner's boards as `BoardSummary`. The hook uses it to check a board id.
 
 ### `POST /api/agent/boards/{board_id}/changes`
-Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to 4,000 characters), `diff` (a unified diff, up to 200,000 characters), `files` (up to 500 paths). Diff sections for files the policy skips are dropped, values are masked, and the map is updated from the change.
+Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to 4,000 characters), `diff` (a unified diff, up to 200,000 characters), `files` (up to 500 paths of up to 1,000 characters). Diff sections for files the policy skips are dropped, values are masked, and the map is updated from the change.
 
-`202` with `AgentChangeOut`: `board_id`, `status` and `review_url`, a link to the board in the web app (the first `CORS_ORIGINS` entry, else `PUBLIC_ORIGIN`). Errors: `401`, `404`, `409` when the board is busy, `429`.
+`202` with `AgentChangeOut`: `board_id`, `status` and `review_url`, a link to the board in the web app (the first `CORS_ORIGINS` entry, else `PUBLIC_ORIGIN`). Errors: `401`, `404`, `409` when the board is busy, `429`. A busy board is refused before the hourly limit is counted, so a hook's retries do not use it up.
 
 ## MCP tools
 

@@ -1,9 +1,13 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
 from app.boards.github import parse_repo_url
 from app.config import load_settings
 from app.errors import AppError
+from app.tables import BoardRow
 from tests.conftest import ClientFactory, example_material, sign_up
 
 
@@ -161,3 +165,28 @@ def test_ipv6_clients_share_a_limit_per_64() -> None:
 def test_uploads_to_someone_elses_board_stop_before_any_work(signed_in: TestClient) -> None:
     body = {"sources": [{"name": "k.txt", "kind": "text", "text": "-----BEGIN PRIVATE KEY-----\n" * 5000}]}
     assert signed_in.post("/api/boards/not-a-board/sources", json=body).status_code == 404
+
+
+def test_retries_on_a_busy_board_do_not_use_up_agent_changes(signed_in: TestClient) -> None:
+    token = signed_in.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    board = signed_in.post("/api/boards", json={"title": "Agent board"}).json()
+    db = signed_in.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        session.execute(update(BoardRow).where(BoardRow.id == board["id"]).values(status="mapping"))
+    headers = {"Authorization": f"Bearer {token}"}
+    body = {"summary": example_material()["sources"][0]["text"]}
+    for _ in range(31):
+        busy = signed_in.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers)
+        assert busy.status_code == 409
+    with db.session() as session:
+        session.execute(update(BoardRow).where(BoardRow.id == board["id"]).values(status="empty"))
+    assert signed_in.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers).status_code == 202
+
+
+def test_the_web_app_leaves_mcp_to_the_mcp_server(make_client: ClientFactory, tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<!doctype html><title>app</title>")
+    client = make_client(static_dir=tmp_path)
+    assert client.get("/mcp").status_code == 401
+    assert client.get("/boards/abc").text.startswith("<!doctype html>")
+    assert client.get("/mcpserver-notes").status_code == 200
+    assert client.get("/api/nope").status_code == 404

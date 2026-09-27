@@ -257,7 +257,9 @@ def _outbound_question(system: SystemMap, node: Node, outbound: Sequence[str]) -
     nodes = node_index(system)
     providers = [o for o in everyone if nodes[o.id].kind == "external" and nodes[o.id].ai]
     externals = [o for o in everyone if nodes[o.id].kind == "external"]
-    options = _pick_options(everyone, ways_out[:4], [*providers, *externals, *everyone])
+    # Every way out is kept from the distractors, or a fifth one past the shown answer would be marked wrong.
+    wrong = [o for o in [*providers, *externals, *everyone] if o.id not in outbound]
+    options = _pick_options(everyone, ways_out, wrong)
     answer = [o.id for o in options if o.id in outbound]
     exits = [f.id for f in system.flows if f.source == node.id and f.target in answer]
     return QuizQuestion(

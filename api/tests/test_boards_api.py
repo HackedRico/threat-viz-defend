@@ -6,6 +6,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 
+from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
@@ -238,11 +239,31 @@ def test_threats_for_an_older_map_are_not_quizzed_or_reported(signed_in: TestCli
     assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
 
     quiz = signed_in.get(f"/api/boards/{board_id}/quiz").json()
-    assert quiz["questions"] == [] and quiz["results"] == {}
+    assert quiz["questions"] == []
+    assert quiz["results"] == {}
     assert signed_in.post(f"/api/boards/{board_id}/quiz/answers", json=right).status_code == 404
     assert signed_in.post(f"/api/boards/{board_id}/ask", json={"question": "What first?"}).status_code == 409
     assert "T1" not in signed_in.get(f"/api/boards/{board_id}/report.md").text
 
     assert signed_in.post(f"/api/boards/{board_id}/confirm").status_code == 202
     fresh = signed_in.get(f"/api/boards/{board_id}/quiz").json()
-    assert fresh["questions"] and fresh["mastery"]["answered"] == 0
+    assert fresh["questions"]
+    assert fresh["mastery"]["answered"] == 0
+
+
+def test_a_repository_with_nothing_readable_fails_without_a_model_call(signed_in: TestClient) -> None:
+    board = new_board(signed_in)
+    user_id = signed_in.get("/api/auth/me").json()["user"]["id"]
+    boards = signed_in.app.state.services.boards  # type: ignore[attr-defined]
+    boards.add_from_fetch(user_id, board["id"], lambda: Material("", [], 0), "Reading owner/repo from GitHub.")
+    failed = signed_in.get(f"/api/boards/{board['id']}").json()
+    assert failed["status"] == "empty"
+    assert "Nothing readable was found" in failed["error"]
+
+
+def test_confirming_twice_finds_threats_once(signed_in: TestClient) -> None:
+    board = new_board(signed_in)
+    signed_in.post(f"/api/boards/{board['id']}/sources", json=example_material())
+    assert signed_in.post(f"/api/boards/{board['id']}/confirm").status_code == 202
+    assert signed_in.post(f"/api/boards/{board['id']}/confirm").status_code == 409
+    assert signed_in.get(f"/api/boards/{board['id']}").json()["analysis_version"] == 1

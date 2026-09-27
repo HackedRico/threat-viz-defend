@@ -121,6 +121,11 @@ class Boards:
     # Drawing and editing the map
     # -----------------------------------------------------------------
 
+    def check_idle(self, session: Session, user_id: str, board_id: str) -> None:
+        """Raise 404 for a board the user does not own and 409 for a busy one, before any work or pace is spent."""
+        if self.get(session, user_id, board_id).status in BUSY:
+            raise conflict("The board is already working. Wait for it to finish, then try again.")
+
     def add_material(self, user_id: str, board_id: str, material: Material) -> None:
         """Record new material and start drawing, or updating, the map from it."""
         if not material.text.strip():
@@ -142,6 +147,8 @@ class Boards:
 
         def load() -> str:
             material = fetch()
+            if not material.text.strip():
+                raise ValueError("Nothing readable was found in the repository: every file was empty or skipped.")
             with self._db.session() as session:
                 target = session.get(BoardRow, board_id)
                 if target is not None:
@@ -170,16 +177,18 @@ class Boards:
 
     def confirm(self, user_id: str, board_id: str) -> None:
         """Accept the drafted map and start finding threats on it."""
-        with self._db.session() as session:
-            current = self.get(session, user_id, board_id)
-            if current.status != "review" or current.map is None:
+
+        def in_review(row: BoardRow) -> None:
+            if row.status != "review" or row.map is None:
                 raise conflict("Only a drafted map waiting for review can be confirmed.")
+
         system, _, analyst = self._begin(
             user_id,
             board_id,
             "find_threats",
             "analyzing",
             lambda row, session: _event(session, row.id, "confirmed", "Map confirmed. Finding threats."),
+            require=in_review,
         )
         if system is None:
             self._fail(board_id, "review", "The stored map no longer loads. Edit and save it, then confirm again.")
@@ -256,8 +265,9 @@ class Boards:
         task: str,
         status: str,
         record: Callable[[BoardRow, Session], None],
+        require: Callable[[BoardRow], None] | None = None,
     ) -> tuple[SystemMap | None, str, Analyst]:
-        """Check the board is idle, pick the analyst, spend one model call, and commit before any job starts."""
+        """Check the board is idle and passes `require`, pick the analyst, spend one call, and commit before a job."""
         chosen = self._analysts.for_user(user_id)
         # The commit has to land first: a job that writes the board inside this transaction would
         # deadlock on SQLite and race everywhere else.
@@ -265,6 +275,9 @@ class Boards:
             row = self.get(session, user_id, board_id)
             if row.status in BUSY:
                 raise conflict("The board is already working. Wait for it to finish, then try again.")
+            # Checked in this transaction, so two confirms that race cannot both spend and start a job.
+            if require is not None:
+                require(row)
             self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             restore = _stable_status(row)
             current = read_map(row)

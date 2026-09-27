@@ -164,8 +164,11 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
         """Update the board's map from a change you just made; the developer reviews it in the app."""
 
         def work(user_id: str) -> str:
+            with services.db.session() as session:
+                services.boards.check_idle(session, user_id, board_id)
             services.limiter.hit(f"agent-change:{user_id}", 30, 3600, "Too many agent changes this hour.")
-            material = agent_material("Coding agent", summary[:4000], diff[:200_000], files[:500], utcnow())
+            paths = [f[:1000] for f in files[:500]]
+            material = agent_material("Coding agent", summary[:4000], diff[:200_000], paths, utcnow())
             services.boards.add_material(user_id, board_id, material)
             origin = services.settings.web_origin
             return f"The map is being updated. The developer can review it at {origin}/boards/{board_id}."

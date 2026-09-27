@@ -1,5 +1,5 @@
 from app.domain.quiz import QuizQuestion, Result, build_quiz, grade_choice, mastery
-from tests.factories import analysis, inbox, threat, trifecta_map
+from tests.factories import analysis, flow, inbox, node, system, threat, trifecta_map
 
 
 def questions_by_topic() -> dict[str, QuizQuestion]:
@@ -54,6 +54,31 @@ def test_trifecta_without_a_single_breaker_asks_for_the_ways_out() -> None:
     assert set(question.answer) == {"google", "websites", "logs"}
     # The model provider is offered as the tempting wrong answer.
     assert "openai" in {o.id for o in question.options}
+
+
+def test_many_ways_out_still_leave_a_wrong_option() -> None:
+    outs = [node(f"out{n}", "external") for n in range(6)]
+    many = system(
+        [
+            *outs,
+            node("page", "external"),
+            node("feed", "external"),
+            node("agent", ai=True),
+            node("vault", "store", sensitive=True),
+            node("db", "store", sensitive=True),
+        ],
+        [
+            flow("in1", "page", "agent"),
+            flow("in2", "feed", "agent"),
+            flow("s1", "vault", "agent"),
+            flow("s2", "db", "agent"),
+            *[flow(f"o{n}", "agent", f"out{n}") for n in range(6)],
+        ],
+    )
+    question = next(q for q in build_quiz(many, None) if q.topic == "trifecta")
+    shown = {o.id for o in question.options}
+    assert set(question.answer) == {o for o in shown if o.startswith("out")}
+    assert shown - set(question.answer)
 
 
 def test_trifecta_with_a_single_breaker_asks_which_flow_breaks_it() -> None:

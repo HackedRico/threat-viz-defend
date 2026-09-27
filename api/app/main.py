@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.convertors import PathConvertor, register_url_convertor
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 
@@ -46,6 +47,15 @@ log = logging.getLogger(__name__)
 _ERRORS: dict[int | str, dict[str, object]] = {
     status: {"model": ErrorResponse} for status in (400, 401, 403, 404, 409, 413, 415, 422, 429, 502, 503)
 }
+
+
+class _WebPath(PathConvertor):
+    """Any path but `/mcp` and below, so a GET from an MCP client reaches the MCP app, not the web app."""
+
+    regex = r"(?!mcp(?:/|$)).*"
+
+
+register_url_convertor("web_path", _WebPath())
 
 
 def create_app(
@@ -129,10 +139,10 @@ def create_app(
     static_dir = settings.static_dir
     if static_dir is not None:
 
-        @app.get("/{path:path}", include_in_schema=False)
+        @app.get("/{path:web_path}", include_in_schema=False)
         def web_app(path: str) -> Response:
             """Serve the built web app, sending client-side routes to `index.html`."""
-            if path.startswith(("api/", "mcp")):
+            if path.startswith("api/"):
                 raise AppError(404, "not_found", "No such endpoint.")
             found = spa_file(static_dir, path)
             if found is None:
