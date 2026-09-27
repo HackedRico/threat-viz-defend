@@ -13,6 +13,7 @@ The spoke that runs the whiteboard defense out loud with a private ElevenLabs ag
 | The client tools | `tools.ts` | `get_next_question`, `submit_answer`, `show_on_board`, `get_board_brief`, each calling an existing route |
 | Speech text | `speech.ts`, `letters.ts` | The sentences the tools return, and "A and C" to option ids; both tested |
 | Dictation | `Dictation.tsx`, `dictation.ts`; `ElevenLabsTranscriber` in `api/app/voice.py` and `POST /api/dictation` in `api/app/routes/dictation.py` | The mic beside Ask: records up to a minute with `MediaRecorder`, posts it as base64 JSON, and hands the text back to the ask bar. Format choice, encoding and joining are in `dictation.ts` and tested |
+| Mic errors | `mic.ts` | `micProblem`: what the mic beside Ask and the coach say when the microphone will not open, by cause; tested |
 
 ## The tool contract
 
@@ -42,14 +43,15 @@ The names and parameters below must match in `tools.ts` and `scripts/elevenlabs_
 3. Put that id in `.env` as `ELEVENLABS_AGENT_ID` and restart the API. `GET /api/config` now reports `voice_enabled: true`.
 4. `./scripts/dev.sh`, sign in with the development account, open the example board, go to Defend, and start the voice coach.
 
-Dictation needs only step 1: with `ELEVENLABS_API_KEY` set, `GET /api/config` reports `dictation_enabled: true` and the mic beside Ask records instead of saying dictation is off. The key needs the Speech to Text permission.
+Dictation needs only step 1: with `ELEVENLABS_API_KEY` set, `GET /api/config` reports `dictation_enabled: true` and the mic beside Ask records instead of saying dictation is off. The key needs the Speech to Text permission, and the voice coach's agent id plays no part.
 
-`npm test` covers the letter parsing, speech text and dictation helpers without a key, and `api/tests/test_dictation.py` covers the route and the ElevenLabs request against a mock. Nothing else here runs in tests, so check the live session and a real recording by hand after each change.
+Test the mic in Chrome, Edge, Firefox or Safari at http://localhost:5173. A browser built into another app, such as the Claude app's preview pane, refuses the microphone with no setting to change, so the mic there only says it was blocked.
+
+`npm test` covers the letter parsing, speech text, dictation helpers and mic error text without a key, and `api/tests/test_dictation.py` covers the route and the ElevenLabs request against a mock. Nothing else here runs in tests, so check the live session and a real recording by hand after each change.
 
 ## Known gaps
 
-- The script's request shapes come from the API docs and have only run against a mock; watch the first real run.
-- Dictation has run end to end only with a fake transcriber; its ElevenLabs request follows the Speech to Text docs and is checked against a mock. Watch the first real recording, and the API log for "refused".
+- The script has created the agent and its tools against the real API once. Its update path, which patches an agent and tools it finds by name, has only run against a mock.
 - The free ElevenLabs plan allows 4 conversations at once. A fifth start fails; the panel should point people to the text quiz.
 - iOS Safari has had reports of the SDK's session state sticking at disconnected; start the session inside the click handler, as `VoiceCoach.tsx` does.
 - On browsers that cannot set the mic sample rate, the SDK tries to load a resampler from a CDN, which the CSP blocks. WebRTC mode avoids that path.

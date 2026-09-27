@@ -33,6 +33,12 @@
   border-bottom: 1px solid var(--line);
 }
 
+.auth-header-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
 .auth-brand {
   color: var(--ink);
   font-size: 18px;
@@ -118,11 +124,11 @@
   transform: translateY(-2px);
 }
 
-/* Ink-inverse text keeps the accent button readable in both themes, unlike white on the dark theme's light blue. */
+/* On-accent text keeps the accent button readable in every theme, unlike white on light blue or gold. */
 .auth-button-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--ink-inverse);
+  color: var(--on-accent);
 }
 
 .auth-button-primary:hover:not(:disabled) {
@@ -139,6 +145,15 @@
   .auth-header,
   .auth-footer {
     padding: 0 22px;
+  }
+  /* On the narrowest phones the theme switch wraps under the brand instead of pushing the page sideways. */
+  .auth-header {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    padding-block: var(--space-3);
+  }
+  .auth-header-end {
+    margin-left: auto;
   }
   .auth-header-label {
     display: none;

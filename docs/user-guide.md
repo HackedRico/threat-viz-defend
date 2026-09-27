@@ -17,6 +17,10 @@ To come back later, choose **Sign in** on the home page, or open `/signin`, and 
 
 There is no password reset. If you forget your password, ask the operator to delete the account, then create a new one.
 
+### Themes
+
+The picker at the top right of the home page, and in the account menu once you sign in, switches the colors. **System** follows your device's light or dark setting, and **Light** and **Dark** fix one. **hackUMBC** is a black and gold theme with Dawg, a pixel guard dog. He sits on the home page replay, the sign in and create account panels, the loading and welcome screens and, once you have a board, the expanded sidebar, and he reacts to your Defend answers. The app remembers your choice in this browser. A theme changes colors and decoration only, never what a screen does.
+
 ## The sidebar
 
 The left rail holds everything outside the open board.
@@ -28,7 +32,7 @@ The left rail holds everything outside the open board.
 - **Your boards.** Every board with its status and, once threats are found, its worst severity and threat count. The example board carries an `example` tag. The list refreshes every 15 seconds, so boards a coding agent changes show up on their own.
 - **Example board.** Opens the example. If you deleted it, the button reads **Restore the example board** and adds a fresh copy.
 - **Connect a coding agent.** Opens the coding agents settings.
-- **Account menu.** Your name and today's model calls. Open it for two meters, **Model calls today** and **Voice sessions today**, plus **Connect a coding agent**, **Model provider** and **Sign out**.
+- **Account menu.** Your name and today's model calls. Open it for two meters, **Model calls today** and **Voice sessions today**, the **Theme** picker, plus **Connect a coding agent**, **Model provider** and **Sign out**.
 
 Board statuses read the same everywhere:
 
@@ -53,7 +57,7 @@ Across the top of every board:
 - **Severity badges.** On a ready board, the number of threats at each severity.
 - **Analyzed by.** On a ready board, the model that found the threats.
 - **Add material.** Opens intake to add more to a board that already has some.
-- **Export report.** On a ready board, downloads the threat model as a Markdown file named after the board.
+- **Export.** On a ready board, saves the board as a PDF report, the map as a PNG or SVG image, or the report as Markdown. See [Export the board](#export-the-board).
 - **Connect an agent.** Opens the coding agents settings with this board picked.
 - **Delete.** The trash icon asks "Delete this board?". **Delete** removes the board, its activity and its quiz answers for good. **Keep** cancels.
 
@@ -202,9 +206,16 @@ See [Defend what you built](#defend-what-you-built).
 
 The activity log and the list of sources. See [Activity log](#activity-log).
 
-## Export the report
+## Export the board
 
-On a ready board, choose **Export report** in the header. You get a Markdown file with the summary, the verdict, a table of components, how each component works and where its code is, the flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
+On a ready board, choose **Export** in the header, then a format. Each file is named after the board.
+
+- **PDF report.** Opens the print dialog; choose **Save as PDF**. The first page has the short version and every threat at a glance. The second is the map as drawn on the board, with its key, on a page turned on its side when the map is wide. Then come each threat with its fixes and evidence, the attack paths and the lethal trifecta, and from a fresh page the parts, the data flows and the assumptions. The report is always light, whatever your theme, since it is meant for paper.
+- **PNG image.** The map as a picture at twice its size, in your theme, for slides and docs.
+- **SVG image.** The map as a drawing that stays sharp at any size, with its fonts inside, in your theme.
+- **Markdown.** The report as text, for a repo or a ticket: the summary, the verdict, the components and how each works, the flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
+
+The PDF and the images draw the map the way round the canvas shows it. Turn the map with the view controls first to export it the other way.
 
 ## Defend what you built
 

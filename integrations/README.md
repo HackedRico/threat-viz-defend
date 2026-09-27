@@ -63,7 +63,9 @@ Copy [`cursor/mcp.example.json`](cursor/mcp.example.json) to `.cursor/mcp.json`.
    in a pull request.
 3. Register the hook in one editor:
    - Claude Code: merge [`claude-code/settings.example.json`](claude-code/settings.example.json) into
-     `.claude/settings.json`. `init` prints the same snippet.
+     `.claude/settings.json`. `init` prints the same snippet. Its Stop entry is not `async`, because headless
+     `claude -p` exits without finishing async hooks. On macOS and Linux the hook forks and returns at once, so the
+     turn barely waits; Windows has no fork, so there the turn waits while the report is sent.
    - Cursor: copy [`cursor/hooks.example.json`](cursor/hooks.example.json) to `.cursor/hooks.json` and replace the
      path, or paste the output of `python3 .threatviz/threatviz_hook.py print-config cursor`.
 

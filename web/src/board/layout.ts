@@ -112,8 +112,8 @@ const BOUNDARY_PADDING = "[top=46,left=28,bottom=28,right=28]";
 // the least cramped attempt is kept if none comes out clean.
 const SPREAD = [1, 1.25, 1.5625];
 
-/** Distance between the lanes of flows that share a track. */
-export const LANE_GAP = 10;
+/** Distance between the lanes of flows that share a track: wide enough that two crossing flows, drawn thick and hollow, read as two lines and their arrowheads stay apart. */
+export const LANE_GAP = 22;
 
 // =============================================================================
 // Node text and size
@@ -137,6 +137,9 @@ export function nodeSize(node: Pick<MapNode, "label" | "tech" | "kind">): { widt
   const width = clamp(Math.ceil(needed / SIZE_STEP) * SIZE_STEP, base.width, NODE_MAX_WIDTH);
   return { width, height: base.height + (text.label.length - 1) * LINE_HEIGHT };
 }
+
+/** How far the "new" or "edited" tag a review draws on a flow label's top edge reaches above it. */
+export const FLOW_TAG_ROOM = 4;
 
 /** The size of a flow's label chip. */
 export function flowLabelSize(flow: Pick<Flow, "label">): { width: number; height: number } {
@@ -451,16 +454,17 @@ export function placeLabels(layout: MapLayout, flows: readonly Pick<Flow, "id" |
     let best: { box: Box; cost: number } | null = null;
     for (const center of labelCandidates(route.points, size, route.lane)) {
       const box = { x: center.x - size.width / 2, y: center.y - size.height / 2, ...size };
+      const room = withTag(box);
       const cost =
-        obstacles.reduce((sum, node) => sum + overlapArea(box, node) * NODE_COST, 0) +
-        placed.reduce((sum, other) => sum + overlapArea(grow(box, LABEL_MARGIN), other), 0) +
-        others.reduce((sum, line) => sum + (crossesBox(line, grow(box, 1)) ? LINE_COST : 0), 0) +
+        obstacles.reduce((sum, node) => sum + overlapArea(room, node) * NODE_COST, 0) +
+        placed.reduce((sum, other) => sum + overlapArea(grow(room, LABEL_MARGIN), other), 0) +
+        others.reduce((sum, line) => sum + (crossesBox(line, grow(room, 1)) ? LINE_COST : 0), 0) +
         zoneEdges.reduce((sum, side) => sum + (crossesBox(side, box) ? EDGE_COST : 0), 0);
       if (best === null || cost < best.cost) best = { box, cost };
       if (cost === 0) break;
     }
     if (best !== null) {
-      placed.push(best.box);
+      placed.push(withTag(best.box));
       edges[flow.id] = { ...route, label: best.box };
     }
   }
@@ -529,7 +533,7 @@ function boundaryLabelSize(boundary: Pick<Boundary, "label">): { width: number; 
 // or flow label touches, and keeps the least crossed spot when every one is taken.
 function placeBoundaryLabels(layout: MapLayout, boundaries: readonly Boundary[]): MapLayout {
   const lines = Object.values(layout.edges).flatMap((route) => segmentsOf(route.points));
-  const chips = Object.values(layout.edges).flatMap((route) => (route.label ? [route.label] : []));
+  const chips = Object.values(layout.edges).flatMap((route) => (route.label ? [withTag(route.label)] : []));
   const boundaryLabels: Record<string, Box> = {};
   for (const boundary of boundaries) {
     const zone = layout.boundaries[boundary.id];
@@ -554,7 +558,7 @@ function placeBoundaryLabels(layout: MapLayout, boundaries: readonly Boundary[])
 // Judging a layout
 // =============================================================================
 
-/** What makes `layout` read as cramped: nodes nearer than `MIN_CLEARANCE`, or flow labels covering a node or each other; empty when clean. */
+/** What makes `layout` read as cramped: nodes nearer than `MIN_CLEARANCE`, or flow labels, with their tag room, covering a node or each other; empty when clean. */
 export function layoutProblems(layout: MapLayout): string[] {
   const problems: string[] = [];
   const nodes = Object.entries(layout.nodes);
@@ -689,6 +693,12 @@ function boxGap(a: Box, b: Box): number {
   const dx = Math.max(0, Math.max(a.x, b.x) - Math.min(a.x + a.width, b.x + b.width));
   const dy = Math.max(0, Math.max(a.y, b.y) - Math.min(a.y + a.height, b.y + b.height));
   return Math.hypot(dx, dy);
+}
+
+// A flow label with the band above it where a review's tag goes. Diffs are not known when the
+// map is laid out, so every label keeps the band, and review mode never moves a label.
+function withTag(box: Box): Box {
+  return { ...box, y: box.y - FLOW_TAG_ROOM, height: box.height + FLOW_TAG_ROOM };
 }
 
 function grow(box: Box, by: number): Box {

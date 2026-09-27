@@ -771,3 +771,26 @@ def test_print_config_for_cursor(repo: Path) -> None:
 
     assert snippet["version"] == 1
     assert set(snippet["hooks"]) == {"beforeSubmitPrompt", "stop"}
+
+
+def test_claude_runs_the_stop_hook_synchronously(repo: Path) -> None:
+    hooks = hook.settings_snippet(hook.find_repo(repo), "claude")["hooks"]
+
+    # Headless `claude -p` exits without finishing async hooks, so an async Stop would never report the turn.
+    assert "async" not in hooks["Stop"][0]["hooks"][0]
+    assert hooks["UserPromptSubmit"][0]["hooks"][0]["async"] is True
+
+
+def test_the_claude_example_matches_what_init_prints(repo: Path) -> None:
+    example = json.loads((HOOK_PATH.parents[1] / "claude-code" / "settings.example.json").read_text())
+    printed = hook.settings_snippet(hook.find_repo(repo), "claude")
+
+    assert _without_commands(example) == _without_commands(printed)
+
+
+def _without_commands(config: dict[str, Any]) -> dict[str, Any]:
+    """`config` with every hook command blanked, since the command depends on where the script lives."""
+    return {
+        event: [{"hooks": [{**entry, "command": ""} for entry in group["hooks"]]} for group in groups]
+        for event, groups in config["hooks"].items()
+    }

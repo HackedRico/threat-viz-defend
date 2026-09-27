@@ -116,6 +116,7 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 - **Answer keys from code.** Injected text cannot change which quiz answer is right. Only open answers are graded by a model, and that grade affects only the user's own score.
 - **Plain text rendering.** The web app renders all model output as React text. It never uses `dangerouslySetInnerHTML` and never turns Markdown into HTML.
 - **Escaped report.** The Markdown export escapes every character that could form a link, image, HTML tag or heading in model text, so a poisoned upload cannot plant a phishing link in a report someone else opens.
+- **Plain exports.** The PDF report and the PNG and SVG images draw model text as React and SVG text, as the screen does. The SVG file holds shapes, text, inline styles and embedded fonts only, with no script, link or outside reference, so opening one someone shared runs nothing.
 - **No tools on the analysis model.** The model that reads untrusted material cannot call tools, browse or send anything. It reads sensitive data and untrusted content, but it has no way out, so our own pipeline does not have the lethal trifecta.
 - **Voice tools check their input.** The voice agent's client tools treat every parameter as untrusted, match letters to known options, and only light ids that exist on the board.
 

@@ -10,6 +10,7 @@ import { SEVERITIES } from "./severity.ts";
 // part of the drawing relies on color alone. It always sits on the canvas; a
 // reader can fold it down to its title when it covers part of the map, and it
 // stays folded on later boards. On a draft it also explains inferred parts.
+// `MapKeyItems` is the list alone, for the printed report.
 
 const FOLDED_KEY = "legend-folded";
 
@@ -43,74 +44,81 @@ export function MapLegend({ draft }: { draft: boolean }) {
         </button>
       </div>
       <div id={listId} hidden={folded}>
-        <ul>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <rect x="2" y="3" width="36" height="18" rx="3" className="legend-stroke" />
-              <circle cx="10" cy="10" r="2.6" className="legend-stroke" />
-              <path d="M6 18 Q10 13 14 18" className="legend-stroke" />
-            </svg>
-            External person or vendor
-          </li>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <rect x="2" y="3" width="36" height="18" rx="8" className="legend-stroke" />
-            </svg>
-            Process your team runs
-          </li>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <path d="M4 6 V18 A16 4 0 0 0 36 18 V6" className="legend-stroke" />
-              <ellipse cx="20" cy="6" rx="16" ry="4" className="legend-stroke" />
-            </svg>
-            Data store
-          </li>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <rect x="2" y="3" width="36" height="18" rx="6" className="legend-stroke legend-dashed" />
-            </svg>
-            Trust boundary
-          </li>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <path d="M2 12 H34" className="legend-flow" />
-              <path d="M30 8 L36 12 L30 16" className="legend-flow" />
-            </svg>
-            Flow of data
-          </li>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <path d="M2 12 H34" className="legend-cross" />
-              <path d="M2 12 H30" className="legend-cross-inner" />
-            </svg>
-            Double line: crosses a trust boundary
-          </li>
-          <li>
-            <svg viewBox="0 0 40 24" aria-hidden="true">
-              <rect x="3" y="3" width="34" height="18" rx="8" className="legend-ring" />
-            </svg>
-            Ring: AI part with the lethal trifecta
-          </li>
-          {draft && (
-            <li>
-              <svg viewBox="0 0 40 24" aria-hidden="true">
-                <rect x="2" y="3" width="36" height="18" rx="8" className="legend-stroke legend-inferred" />
-              </svg>
-              Faint outline: inferred, check it
-            </li>
-          )}
-          <li className="legend-pins">
-            {SEVERITIES.map((severity, i) => (
-              <span key={severity} className="legend-pin">
-                <PinBadge severity={severity} label={String(i + 1)} />
-                {severity}
-              </span>
-            ))}
-          </li>
-        </ul>
+        <MapKeyItems draft={draft} />
         <p className="map-legend-foot">Drag or scroll to pan. Pinch or hold Ctrl and scroll to zoom.</p>
       </div>
     </aside>
+  );
+}
+
+/** Every mark the map can show and what it means; the printed report lists the same marks. */
+export function MapKeyItems({ draft }: { draft: boolean }) {
+  return (
+    <ul>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <rect x="2" y="3" width="36" height="18" rx="3" className="legend-stroke" />
+          <circle cx="10" cy="10" r="2.6" className="legend-stroke" />
+          <path d="M6 18 Q10 13 14 18" className="legend-stroke" />
+        </svg>
+        External person or vendor
+      </li>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <rect x="2" y="3" width="36" height="18" rx="8" className="legend-stroke" />
+        </svg>
+        Process your team runs
+      </li>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <path d="M4 6 V18 A16 4 0 0 0 36 18 V6" className="legend-stroke" />
+          <ellipse cx="20" cy="6" rx="16" ry="4" className="legend-stroke" />
+        </svg>
+        Data store
+      </li>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <rect x="2" y="3" width="36" height="18" rx="6" className="legend-stroke legend-dashed" />
+        </svg>
+        Trust boundary
+      </li>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <path d="M2 12 H34" className="legend-flow" />
+          <path d="M30 8 L36 12 L30 16" className="legend-flow" />
+        </svg>
+        Flow of data
+      </li>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <path d="M2 12 H34" className="legend-cross" />
+          <path d="M2 12 H30" className="legend-cross-inner" />
+        </svg>
+        Double line: crosses a trust boundary
+      </li>
+      <li>
+        <svg viewBox="0 0 40 24" aria-hidden="true">
+          <rect x="3" y="3" width="34" height="18" rx="8" className="legend-ring" />
+        </svg>
+        Ring: AI part with the lethal trifecta
+      </li>
+      {draft && (
+        <li>
+          <svg viewBox="0 0 40 24" aria-hidden="true">
+            <rect x="2" y="3" width="36" height="18" rx="8" className="legend-stroke legend-inferred" />
+          </svg>
+          Faint outline: inferred, check it
+        </li>
+      )}
+      <li className="legend-pins">
+        {SEVERITIES.map((severity, i) => (
+          <span key={severity} className="legend-pin">
+            <PinBadge severity={severity} label={String(i + 1)} />
+            {severity}
+          </span>
+        ))}
+      </li>
+    </ul>
   );
 }
 

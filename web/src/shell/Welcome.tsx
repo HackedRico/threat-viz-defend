@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, errorMessage } from "../api/client.ts";
 import { useBoardList } from "./boards.tsx";
 import { BoardSketch } from "./BoardSketch.tsx";
+import { Mascot } from "./Mascot.tsx";
 import { useSession } from "./session.tsx";
 import { navigate } from "./useRoute.ts";
 import "./Shell.css";
@@ -11,7 +12,8 @@ import "./Shell.css";
 // Module Overview
 // =============================================================================
 // The empty state for a user with no boards: start one, or open the example
-// board to see a finished threat model first.
+// board to see a finished threat model first. Dawg waits here in the hackUMBC
+// theme.
 
 /** First screen for a user with no boards. */
 export function Welcome() {
@@ -36,6 +38,7 @@ export function Welcome() {
   return (
     <section className="welcome">
       <div className="welcome-card">
+        <Mascot bubble="Fresh board. Let's sniff it out." className="welcome-mascot" />
         <h1 className="hand welcome-title">A clean whiteboard.</h1>
         <p className="welcome-text">
           Start a board for a system you are building. {config.app_name} draws its data flow, finds threats on it, and

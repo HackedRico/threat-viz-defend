@@ -1,8 +1,8 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
 from app.boards.ingest import agent_material
 from app.boards.views import board_summary
-from app.context import AgentUser, Db, Svc
+from app.context import AgentUser, Db, Svc, web_app_origin
 from app.db import utcnow
 from app.schemas import AgentChangeIn, AgentChangeOut, BoardSummary
 
@@ -23,7 +23,9 @@ def agent_boards(user: AgentUser, svc: Svc, session: Db) -> list[BoardSummary]:
 
 
 @router.post("/boards/{board_id}/changes", status_code=status.HTTP_202_ACCEPTED)
-def report_change(board_id: str, body: AgentChangeIn, user: AgentUser, svc: Svc, session: Db) -> AgentChangeOut:
+def report_change(
+    board_id: str, body: AgentChangeIn, request: Request, user: AgentUser, svc: Svc, session: Db
+) -> AgentChangeOut:
     """Update the board's map from a coding agent's change."""
     # A hook retries a busy board on its next turn, and those retries must not use up the hour's changes.
     svc.boards.check_idle(session, user.id, board_id)
@@ -31,4 +33,5 @@ def report_change(board_id: str, body: AgentChangeIn, user: AgentUser, svc: Svc,
     material = agent_material(body.agent, body.summary, body.diff, body.files, utcnow())
     svc.boards.add_material(user.id, board_id, material)
     row = svc.boards.get(session, user.id, board_id)
-    return AgentChangeOut(board_id=row.id, status=row.status, review_url=f"{svc.settings.web_origin}/boards/{row.id}")
+    origin = web_app_origin(request, svc.settings)
+    return AgentChangeOut(board_id=row.id, status=row.status, review_url=f"{origin}/boards/{row.id}")

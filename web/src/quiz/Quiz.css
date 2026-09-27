@@ -273,7 +273,7 @@ label.option:focus-within {
 .option.is-picked .option-letter {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .option-label {
@@ -304,7 +304,7 @@ label.option:focus-within {
 .option.is-wrong .option-letter {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
+  color: var(--ink-inverse);
 }
 
 .option-mark {
@@ -330,6 +330,39 @@ label.option:focus-within {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+/* Wraps, so Dawg drops under the stamp in a narrow panel instead of squeezing it onto two lines. */
+.result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.result-head .stamp {
+  flex: none;
+  white-space: nowrap;
+}
+
+.result-mascot {
+  --mascot-size: 52px;
+  flex-direction: row;
+  align-items: flex-end;
+}
+
+.result-mascot .mascot-bubble {
+  white-space: nowrap;
+}
+
+.result-mascot .mascot-bubble::after {
+  left: auto;
+  right: -8px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 .stamp {
