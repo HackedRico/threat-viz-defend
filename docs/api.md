@@ -152,15 +152,15 @@ Cookie. No body. Accepts the drafted map and starts finding threats. `202` with 
 Cookie. Body `AskIn`: `question` (up to 2,000 characters) and optional `focus`, a node or flow id the user selected. `200` with `Answer`: `answer` (plain text) and `highlight` (ids on the board). Errors: `409` until the board has threats, `429`, `502` or `503` `model_error`.
 
 ### `GET /api/boards/{board_id}/brief`
-Cookie. `200` with `BriefOut`: `text`, a plain spoken walkthrough of the system, its boundaries, AI exposure and top threats. Error: `409` without a map.
+Cookie. `200` with `BriefOut`: `text`, a plain spoken walkthrough of the system, its boundaries, AI exposure and top threats. Threats appear only on a `ready` board, since stored threats for an edited map name parts it may no longer have. Error: `409` without a map.
 
 ### `GET /api/boards/{board_id}/report.md`
-Cookie. `200` with `text/markdown` as an attachment named `threat-model.md`: summary, verdict, components, flows, lethal trifecta, threats, attack paths and assumptions. Model text is escaped so it renders as plain text. Error: `409` without a map.
+Cookie. `200` with `text/markdown` as an attachment named `threat-model.md`: summary, verdict, components, flows, lethal trifecta, threats, attack paths and assumptions. Threats, attack paths and the verdict appear only on a `ready` board. Model text is escaped so it renders as plain text. Error: `409` without a map.
 
 ## Quiz and voice
 
 ### `GET /api/boards/{board_id}/quiz`
-Cookie. `200` with `QuizOut`: `analysis_version`, `questions` (each `id`, `topic`, `kind`, `prompt`, `options`; never the key), `results` keyed by question id, and `mastery` (`total`, `answered`, `correct`, `partial`, `score` from 0 to 1, `weak_spots`). A board without a map has no questions.
+Cookie. `200` with `QuizOut`: `analysis_version`, `questions` (each `id`, `topic`, `kind`, `prompt`, `options`; never the key), `results` keyed by question id, and `mastery` (`total`, `answered`, `correct`, `partial`, `score` from 0 to 1, `weak_spots`). A board that is not `ready` has no questions: they need the threats found on the current map. Answers are kept per `analysis_version`, so confirming an edited map starts the quiz over.
 
 ### `POST /api/boards/{board_id}/quiz/answers`
 Cookie. Body `AnswerIn`: `question_id`, `choice_ids` (up to 10, for `single` and `multi` questions) or `text` (up to 3,000 characters, for `open` questions).
@@ -232,7 +232,7 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 
 ## MCP tools
 
-`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. [integrations/README.md](../integrations/README.md) has the client setup.
+`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. Until the board is `ready`, `get_board` leaves out threats, `ask_board` is refused and the quiz tools have no questions. [integrations/README.md](../integrations/README.md) has the client setup.
 
 | Tool | Arguments | Does | Spends |
 |---|---|---|---|
@@ -242,7 +242,7 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 | `ask_board` | `board_id`, `question` | Answers a question about a finished board on one line, then lists related ids on the next | 1 model call |
 | `report_change` | `board_id`, `summary`, `diff`, `files` | Updates the map from a change the agent made; the developer reviews it in the app | 1 model call, 1 of 30 agent changes per hour |
 | `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered; a map with no questions is a tool error | nothing |
-| `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or the developer's own words, and returns the result, feedback and explanation | 1 model call for open questions |
+| `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or `A and C` (only standalone letters count; none, or one past the last option, is a tool error) or the developer's own words, and returns the result, feedback and explanation on one line | 1 model call for open questions |
 
 ## Examples
 

@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from typing import Annotated, Any
 
@@ -14,14 +15,13 @@ from sqlalchemy.orm import Session
 from starlette.applications import Starlette
 
 from app.boards.ingest import agent_material
-from app.boards.service import read_analysis, read_map
+from app.boards.service import current_analysis, read_map
 from app.boards.views import board_summary
 from app.context import Services
 from app.db import utcnow
 from app.domain.briefing import brief
 from app.domain.briefing import describe_element as describe_one
 from app.domain.models import SystemMap, ThreatAnalysis
-from app.domain.quiz import build_quiz
 from app.domain.rules import flow_label
 from app.errors import AppError
 from app.schemas import AnswerIn
@@ -33,6 +33,9 @@ from app.schemas import AnswerIn
 # token. Its tools let the agent read a board, ask about it, report a change it
 # just made, and quiz the developer inside the editor. Each tool runs the same
 # services the web app uses, as the token's owner, on a worker thread.
+
+# An option letter standing alone in a choice answer, as in `A, C` or `A and C`.
+_LETTER = re.compile(r"\b([A-Z])\b")
 
 INSTRUCTIONS = (
     "Tools for the developer's threat model boards. Call list_boards to find a board id. After you change how "
@@ -110,7 +113,7 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
                 system = read_map(row)
                 if system is None:
                     return f"Board {row.title} has no map yet. Its status is {row.status}."
-                analysis = read_analysis(row)
+                analysis = current_analysis(row)
                 nodes = [f"- {n.id}: {n.label} ({n.kind})" for n in system.nodes]
                 flows = [f"- {f.id}: {flow_label(system, f)}" for f in system.flows]
                 lines = [f"Status: {row.status}.", "Nodes:", *nodes, "Flows:", *flows]
@@ -179,7 +182,10 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
                 _board_parts(services, session, user_id, board_id)
                 state = services.quiz.state(session, user_id, board_id)
             if not state.questions:
-                raise ToolError("This board has no quiz questions yet.")
+                raise ToolError(
+                    "This board has no quiz questions yet. They follow once the developer confirms the map "
+                    "in the web app and the threats are found."
+                )
             pending = [q for q in state.questions if q.id not in state.results]
             if not pending:
                 m = state.mastery
@@ -210,18 +216,26 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
 
         def work(user_id: str) -> str:
             with services.db.session() as session:
-                questions = build_quiz(*_board_parts(services, session, user_id, board_id))
-            question = next((q for q in questions if q.id == question_id), None)
+                _board_parts(services, session, user_id, board_id)
+                question = next(
+                    (q for q in services.quiz.questions(session, user_id, board_id) if q.id == question_id), None
+                )
             if question is None:
                 raise ToolError("That question is out of date. Call next_quiz_question again.")
             if question.kind == "open":
                 body = AnswerIn(question_id=question_id, text=answer)
             else:
-                letters = [ch for ch in answer.upper() if "A" <= ch <= "Z"]
-                ids = [question.options[ord(ch) - 65].id for ch in letters if ord(ch) - 65 < len(question.options)]
-                body = AnswerIn(question_id=question_id, choice_ids=ids)
+                # Only standalone letters count, so "A and C" is A and C, not the A and D inside "and".
+                letters = list(dict.fromkeys(_LETTER.findall(answer.upper())))
+                if not letters or any(ord(ch) - 65 >= len(question.options) for ch in letters):
+                    last = chr(64 + len(question.options))
+                    raise ToolError(f"Answer with the option letters from A to {last}, such as `A, C`.")
+                body = AnswerIn(
+                    question_id=question_id, choice_ids=[question.options[ord(ch) - 65].id for ch in letters]
+                )
             graded = services.quiz.answer(user_id, board_id, body).attempt
-            return f"Result: {graded.result}. {graded.feedback} {graded.explanation}"
+            # Folded to one line, so a line break in model feedback cannot pose as another `Result:` line.
+            return " ".join(f"Result: {graded.result}. {graded.feedback} {graded.explanation}".split())
 
         return await _as_user(work)
 
@@ -237,7 +251,7 @@ def _board_parts(
             "This board has no map yet. "
             "Try again after the developer adds material and confirms the map in the web app."
         )
-    return system, read_analysis(row)
+    return system, current_analysis(row)
 
 
 async def _as_user[T](work: Callable[[str], T]) -> T:

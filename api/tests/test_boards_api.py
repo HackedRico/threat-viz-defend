@@ -227,3 +227,22 @@ def test_a_stale_session_or_new_token_does_not_lock_sqlite(make_client: ClientFa
     )
     assert response.status_code == 202, response.text
     assert time.monotonic() - started < 4
+
+
+def test_threats_for_an_older_map_are_not_quizzed_or_reported(signed_in: TestClient) -> None:
+    board_id = signed_in.get("/api/boards").json()[0]["id"]
+    right = {"question_id": "stride:T2", "choice_ids": ["I"]}
+    assert signed_in.post(f"/api/boards/{board_id}/quiz/answers", json=right).json()["attempt"]["result"] == "correct"
+    edited = signed_in.get(f"/api/boards/{board_id}").json()["map"]
+    edited["nodes"] = [n for n in edited["nodes"] if n["id"] != "logs"]
+    assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+
+    quiz = signed_in.get(f"/api/boards/{board_id}/quiz").json()
+    assert quiz["questions"] == [] and quiz["results"] == {}
+    assert signed_in.post(f"/api/boards/{board_id}/quiz/answers", json=right).status_code == 404
+    assert signed_in.post(f"/api/boards/{board_id}/ask", json={"question": "What first?"}).status_code == 409
+    assert "T1" not in signed_in.get(f"/api/boards/{board_id}/report.md").text
+
+    assert signed_in.post(f"/api/boards/{board_id}/confirm").status_code == 202
+    fresh = signed_in.get(f"/api/boards/{board_id}/quiz").json()
+    assert fresh["questions"] and fresh["mastery"]["answered"] == 0

@@ -217,7 +217,7 @@ class Boards:
         """Answer a question about a finished board."""
         with self._db.session() as session:
             row = self.get(session, user_id, board_id)
-            system, analysis = read_map(row), read_analysis(row)
+            system, analysis = read_map(row), current_analysis(row)
             if system is None or analysis is None:
                 raise conflict("Confirm the map and wait for the threats before asking about them.")
             chosen = self._analysts.for_user(user_id)
@@ -340,6 +340,13 @@ def read_analysis(row: BoardRow) -> ThreatAnalysis | None:
     return _validated(row.analysis, ThreatAnalysis, row.id)
 
 
+def current_analysis(row: BoardRow) -> ThreatAnalysis | None:
+    """The analysis only while it describes the board's map: on a `ready` board, else `None`."""
+    # An edit or a new draft keeps the old threats stored until the next confirm, but they name parts of
+    # the map before it, so quiz keys, answers, briefs and reports must not read them.
+    return read_analysis(row) if row.status == "ready" else None
+
+
 def read_previous_map(row: BoardRow) -> SystemMap | None:
     """The map before the latest update, if any."""
     return _validated(row.previous_map, SystemMap, row.id)
@@ -360,6 +367,9 @@ def _stable_status(row: BoardRow) -> str:
     """The status a board returns to when a job fails, from what it holds."""
     if row.status not in BUSY:
         return row.status
+    if row.status == "analyzing":
+        # Threats are found only from review, and the stored ones, if any, are for an older map.
+        return "review"
     if row.analysis is not None and row.map is not None:
         return "ready"
     return "review" if row.map is not None else "empty"
