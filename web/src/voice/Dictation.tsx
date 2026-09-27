@@ -9,10 +9,10 @@ import {
   DICTATION_BITS_PER_SECOND,
   DICTATION_MAX_SECONDS,
   DICTATION_MIN_BYTES,
-  micProblem,
   preferredRecordingType,
   toBase64,
 } from "./dictation.ts";
+import { micProblem } from "./mic.ts";
 import "./Dictation.css";
 
 // =============================================================================
