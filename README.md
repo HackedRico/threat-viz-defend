@@ -177,10 +177,10 @@ DigitalOcean is the backbone the product runs on. One App Platform spec, [.do/ap
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/digitalocean-dark.svg">
-  <img alt="DigitalOcean App Platform in NYC: GitHub main deploys on push to the web app and the API service, the API reads encrypted secrets and stores boards in Postgres 16, the browser comes in through GoDaddy DNS with HTTPS, and model calls go to Gradient AI serverless inference." src="docs/images/digitalocean-light.svg" width="100%">
+  <img alt="DigitalOcean App Platform in the New York region: GitHub main deploys on push to the web app and the API service, the API reads encrypted secrets and stores boards in Postgres 16, the browser reaches threat-viz-defend.vip through GoDaddy DNS with HTTPS, and model calls go to Gradient AI serverless inference." src="docs/images/digitalocean-light.svg" width="100%">
 </picture>
 
-- **One spec, two components.** The API as a Docker service and the web app as a static site, in NYC, on our GoDaddy domain.
+- **One spec, two components.** The API as a Docker service and the web app as a static site, in DigitalOcean's New York region, served at our GoDaddy domain.
 - **Deploy on push.** Every merge to main rebuilds both, behind a health check, with alerts when a deploy fails.
 - **Gradient AI serverless inference.** The default model, `openai-gpt-oss-120b`, drafts maps, finds threats and grades answers.
 - **Postgres 16 and encrypted secrets.** The database holds accounts, boards and progress. Keys live in encrypted App Platform secrets, and daily budgets cap what any one account can spend.
