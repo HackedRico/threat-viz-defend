@@ -5,6 +5,7 @@ import type { BoardSummary } from "../api/types.ts";
 import { topSeverity, totalThreats } from "../board/severity.ts";
 import { useBoardList } from "./boards.tsx";
 import { BookIcon, PlugIcon, PlusIcon, SidebarIcon } from "./icons.tsx";
+import { Mascot } from "./Mascot.tsx";
 import { useSession } from "./session.tsx";
 import { SeverityShape } from "./SeverityBadge.tsx";
 import { isBusy, STATUS_LABEL } from "./statusText.ts";
@@ -202,6 +203,9 @@ export function Sidebar({
           ))}
         </ul>
       </div>
+
+      {/* With no boards the welcome screen already shows Dawg, so the rail keeps him only once a board exists. */}
+      {!collapsed && boards.length > 0 && <Mascot className="sidebar-mascot" />}
 
       <div className="sidebar-foot">
         <button

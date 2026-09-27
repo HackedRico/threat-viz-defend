@@ -25,7 +25,7 @@ How code, tests, docs and commits look in this repo. Match the file you are in f
 - TypeScript strict, `npm run typecheck`, `npm test` and `npm run build` pass. No `any` outside an SDK boundary, and that one carries a comment.
 - API shapes come only from the generated `web/src/api/schema.d.ts`, aliased once in `web/src/api/types.ts`. Calls go through `api` in `web/src/api/client.ts`.
 - Components are small. Logic without React goes in a `.ts` module with a `node:test` file beside it (`layout.test.ts` next to `layout.ts`), and imports use the `.ts` extension.
-- Each component keeps its CSS in a file beside it. Colors, fonts, radii, spacing and shadows come from `web/src/styles/tokens.css`, which defines light and dark. No hard-coded colors.
+- Each component keeps its CSS in a file beside it. Colors, fonts, radii, spacing and shadows come from `web/src/styles/tokens.css`, which defines the light, dark and hackUMBC themes, keyed on `data-theme` on `<html>`. No hard-coded colors, and no `prefers-color-scheme` queries in components: `useTheme.ts` already turns the system setting into a theme.
 - Model text renders as React text. Never `dangerouslySetInnerHTML`, never Markdown to HTML.
 - Accessible by default: every control has a label, every map element is focusable, color is never the only signal, and motion respects `prefers-reduced-motion`.
 - zustand stores return stable values from selectors: select the stored value, derive arrays and objects in the component.

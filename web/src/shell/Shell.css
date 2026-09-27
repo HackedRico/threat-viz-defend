@@ -53,6 +53,11 @@
   max-width: 480px;
 }
 
+.welcome-mascot {
+  --mascot-size: 96px;
+  align-self: flex-start;
+}
+
 .welcome-title {
   font-size: var(--hand-xl);
   line-height: 1;

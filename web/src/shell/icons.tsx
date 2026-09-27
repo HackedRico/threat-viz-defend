@@ -69,3 +69,11 @@ export const ArrowUpRightIcon = (p: IconProps) => <Icon {...p}><path d="M7 17L17
 export const ArrowRightIcon = (p: IconProps) => <Icon {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Icon>;
 /** Two boxes joined left to right, for a layout's direction; rotate it a quarter turn for top to bottom. */
 export const FlowDirectionIcon = (p: IconProps) => <Icon {...p}><rect x="2.5" y="8" width="7" height="8" rx="1.5" /><rect x="14.5" y="8" width="7" height="8" rx="1.5" /><path d="M9.5 12h4.5M12 9.8l2.2 2.2-2.2 2.2" /></Icon>;
+/** A monitor, for following the system theme. */
+export const MonitorIcon = (p: IconProps) => <Icon {...p}><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></Icon>;
+/** A sun, for the light theme. */
+export const SunIcon = (p: IconProps) => <Icon {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></Icon>;
+/** A crescent moon, for the dark theme. */
+export const MoonIcon = (p: IconProps) => <Icon {...p}><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" /></Icon>;
+/** A paw print, for the hackUMBC theme; filled, since a stroked paw blurs into a blob at icon size. */
+export const PawIcon = (p: IconProps) => <Icon fill="currentColor" stroke="none" {...p}><ellipse cx="5.2" cy="10.6" rx="2.1" ry="2.6" /><ellipse cx="9.3" cy="5.6" rx="2.1" ry="2.7" /><ellipse cx="14.7" cy="5.6" rx="2.1" ry="2.7" /><ellipse cx="18.8" cy="10.6" rx="2.1" ry="2.6" /><path d="M12 11.6c-3.1 0-6 3.7-6 6.3 0 1.7 1.3 2.6 2.8 2.6 1.3 0 2-.8 3.2-.8s1.9.8 3.2.8c1.5 0 2.8-.9 2.8-2.6 0-2.6-2.9-6.3-6-6.3z" /></Icon>;

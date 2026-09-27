@@ -2,8 +2,9 @@
    Module Overview
    =============================================================================
    Every design token in one place: colors, fonts, radii, spacing, shadows and
-   motion. Light is an enamel whiteboard with marker colors; dark is a glass
-   board with chalk-bright markers. Components read tokens, never raw values. */
+   motion, per theme on `<html data-theme>`: light is an enamel whiteboard,
+   dark a glass board with chalk-bright markers, hackUMBC black and gold.
+   Components read tokens, never raw values. */
 
 :root {
   /* ---------- fonts ---------- */
@@ -111,62 +112,153 @@
   --shadow-3: 0 18px 50px rgba(27, 34, 49, 0.18), 0 4px 10px rgba(27, 34, 49, 0.08);
   --shadow-sticky: 2px 6px 14px rgba(58, 49, 16, 0.18);
 
+  /* Text on a solid accent fill. */
+  --on-accent: #fffdf8;
+  /* The primary button: ink on the boards, gold in hackUMBC. */
+  --primary: var(--ink);
+  --primary-hover: var(--ink-soft);
+  --primary-ink: var(--ink-inverse);
+  --code-wash: rgba(255, 255, 255, 0.6);
+  /* Highlighter marks multiply on a light board and glow on a dark one. */
+  --highlighter-blend: multiply;
+  --highlighter-strength: 1;
+
   color-scheme: light;
 }
 
 /* ---------- dark: glass board ---------- */
+:root[data-theme="dark"] {
+  --board: #15191e;
+  --board-dot: rgba(220, 230, 245, 0.08);
+  --board-edge: #2c333c;
+  --tray: #0f1216;
+  --surface: #1b2027;
+  --surface-2: #222831;
+  --surface-3: #2a313b;
+  --line: #313843;
+  --line-strong: #46505d;
+
+  --ink: #f3f0e8;
+  --ink-soft: #cbc8bf;
+  --ink-faint: #a4a9b2;
+  --ink-inverse: #15191e;
+
+  --marker-blue: #74a9ff;
+  --marker-blue-wash: rgba(116, 169, 255, 0.14);
+  --marker-red: #ff7462;
+  --marker-red-wash: rgba(255, 116, 98, 0.14);
+  --marker-orange: #ffa552;
+  --marker-amber: #f0c94a;
+  --marker-green: #62d08b;
+  --marker-green-wash: rgba(98, 208, 139, 0.14);
+  --marker-teal: #4fd0c8;
+  --marker-teal-wash: rgba(79, 208, 200, 0.14);
+  --crossing: #f08ad8;
+
+  --sev-high-text: var(--marker-orange);
+  --sev-medium-text: var(--marker-amber);
+
+  --highlight: #ffd84a;
+  --highlight-glow: rgba(255, 216, 74, 0.35);
+
+  --sticky: #d8c160;
+  --sticky-edge: #bfa840;
+  --sticky-ink: #221d08;
+
+  --focus: #8fb8ff;
+
+  /* The chalk-bright pins all fail white digits, so every pin takes a dark one. */
+  --pin-digit-critical: #15191e;
+  --pin-digit-high: #15191e;
+  --pin-digit-medium: #15191e;
+  --pin-digit-low: #15191e;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 22px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --shadow-sticky: 2px 8px 18px rgba(0, 0, 0, 0.5);
+
+  --on-accent: #15191e;
+  --code-wash: rgba(0, 0, 0, 0.25);
+  --highlighter-blend: screen;
+  --highlighter-strength: 0.6;
+
+  color-scheme: dark;
+}
+
+/* Before the script sets a theme, a dark system still gets a dark page instead of a white flash. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --board: #15191e;
-    --board-dot: rgba(220, 230, 245, 0.08);
-    --board-edge: #2c333c;
+  :root:not([data-theme]) {
     --tray: #0f1216;
-    --surface: #1b2027;
-    --surface-2: #222831;
-    --surface-3: #2a313b;
-    --line: #313843;
-    --line-strong: #46505d;
-
-    --ink: #f3f0e8;
-    --ink-soft: #cbc8bf;
-    --ink-faint: #a4a9b2;
-    --ink-inverse: #15191e;
-
-    --marker-blue: #74a9ff;
-    --marker-blue-wash: rgba(116, 169, 255, 0.14);
-    --marker-red: #ff7462;
-    --marker-red-wash: rgba(255, 116, 98, 0.14);
-    --marker-orange: #ffa552;
-    --marker-amber: #f0c94a;
-    --marker-green: #62d08b;
-    --marker-green-wash: rgba(98, 208, 139, 0.14);
-    --marker-teal: #4fd0c8;
-    --marker-teal-wash: rgba(79, 208, 200, 0.14);
-    --crossing: #f08ad8;
-
-    --sev-high-text: var(--marker-orange);
-    --sev-medium-text: var(--marker-amber);
-
-    --highlight: #ffd84a;
-    --highlight-glow: rgba(255, 216, 74, 0.35);
-
-    --sticky: #d8c160;
-    --sticky-edge: #bfa840;
-    --sticky-ink: #221d08;
-
-    --focus: #8fb8ff;
-
-    /* The chalk-bright pins all fail white digits, so every pin takes a dark one. */
-    --pin-digit-critical: #15191e;
-    --pin-digit-high: #15191e;
-    --pin-digit-medium: #15191e;
-    --pin-digit-low: #15191e;
-
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 8px 22px rgba(0, 0, 0, 0.45);
-    --shadow-3: 0 20px 60px rgba(0, 0, 0, 0.6);
-    --shadow-sticky: 2px 8px 18px rgba(0, 0, 0, 0.5);
-
+    --board: #15191e;
     color-scheme: dark;
   }
+}
+
+/* ---------- hackUMBC: black and gold terminal ---------- */
+:root[data-theme="umbc"] {
+  --board: #0c0b09;
+  --board-dot: rgba(253, 181, 21, 0.1);
+  --board-edge: #2e2a20;
+  --tray: #070605;
+  --surface: #14130f;
+  --surface-2: #1c1a15;
+  --surface-3: #25221b;
+  --line: #2f2b21;
+  --line-strong: #4a4332;
+
+  --ink: #f7f0de;
+  --ink-soft: #cbc1a6;
+  --ink-faint: #a39880;
+  --ink-inverse: #0c0b09;
+
+  --marker-blue: #62c6ff;
+  --marker-blue-wash: rgba(98, 198, 255, 0.13);
+  --marker-red: #ff5d52;
+  --marker-red-wash: rgba(255, 93, 82, 0.14);
+  --marker-orange: #ff9b45;
+  --marker-amber: #ecd873;
+  --marker-green: #5ed98f;
+  --marker-green-wash: rgba(94, 217, 143, 0.13);
+  --marker-teal: #45dccb;
+  --marker-teal-wash: rgba(69, 220, 203, 0.13);
+  --crossing: #ff7bd5;
+
+  /* The bright fills already read as text on black, unlike the light theme's darker shades. */
+  --sev-high-text: var(--marker-orange);
+  --sev-medium-text: var(--marker-amber);
+
+  --accent: #fdb515;
+  --accent-wash: rgba(253, 181, 21, 0.13);
+  --ai: var(--marker-teal);
+
+  /* Paler than the gold accent, so a highlighter mark never reads as a selection. */
+  --highlight: #ffe66d;
+  --highlight-glow: rgba(255, 230, 109, 0.35);
+
+  --sticky: #e3b84e;
+  --sticky-edge: #c49a32;
+  --sticky-ink: #1c1402;
+
+  --focus: #fdb515;
+
+  --pin-digit-critical: #0c0b09;
+  --pin-digit-high: #0c0b09;
+  --pin-digit-medium: #0c0b09;
+  --pin-digit-low: #0c0b09;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(253, 181, 21, 0.04);
+  --shadow-3: 0 22px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(253, 181, 21, 0.06);
+  --shadow-sticky: 2px 8px 18px rgba(0, 0, 0, 0.55);
+
+  --on-accent: #0c0b09;
+  --primary: #fdb515;
+  --primary-hover: #ffc94d;
+  --primary-ink: #0c0b09;
+  --code-wash: rgba(0, 0, 0, 0.35);
+  --highlighter-blend: screen;
+  --highlighter-strength: 0.55;
+
+  color-scheme: dark;
 }

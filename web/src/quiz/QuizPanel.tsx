@@ -4,6 +4,7 @@ import { errorMessage } from "../api/client.ts";
 import type { AttemptOut, QuestionOut } from "../api/types.ts";
 import { useBoardUi } from "../board/store.ts";
 import { CheckIcon, CloseIcon } from "../shell/icons.tsx";
+import { Mascot } from "../shell/Mascot.tsx";
 import { optionLetter } from "../voice/letters.ts";
 import { RESULT_LABEL, TOPIC_LABEL } from "./topics.ts";
 import type { QuizState } from "./useQuiz.ts";
@@ -12,9 +13,15 @@ import type { QuizState } from "./useQuiz.ts";
 // Module Overview
 // =============================================================================
 // The text quiz, one question at a time. A strip of numbered stops shows every
-// question and how it went; the current card takes letters or words, then
-// shows the grade stamp, feedback, the explanation and the evidence quotes, and
-// lights the answer on the map.
+// question and how it went; the current card takes letters or words, then shows
+// the grade stamp (with Dawg reacting in the hackUMBC theme), feedback, the
+// explanation and evidence quotes, and lights the answer on the map.
+
+const DAWG_SAYS: Record<AttemptOut["result"], string> = {
+  correct: "Good human.",
+  partial: "Sniff again.",
+  wrong: "Check the map.",
+};
 
 /** The text quiz; `active` is the question on screen, shared with the voice coach. */
 export function QuizPanel({
@@ -215,7 +222,14 @@ function Result({
 
   return (
     <div className="result" aria-live="polite">
-      <p className={`stamp stamp-${attempt.result}`}>{RESULT_LABEL[attempt.result]}</p>
+      <div className="result-head">
+        <p className={`stamp stamp-${attempt.result}`}>{RESULT_LABEL[attempt.result]}</p>
+        <Mascot
+          mood={attempt.result === "correct" ? "cool" : "alert"}
+          bubble={DAWG_SAYS[attempt.result]}
+          className="result-mascot"
+        />
+      </div>
 
       {question.kind !== "open" ? (
         <ul className="options options-graded">

@@ -2,7 +2,8 @@
    Module Overview
    =============================================================================
    An account form: the form on the left, and on the right a panel with a big
-   bracket glyph and a motto. The panel drops away on narrow screens. */
+   bracket glyph, or Dawg in the hackUMBC theme, and a motto. The panel drops
+   away on narrow screens. */
 
 .account {
   width: 100%;
@@ -124,6 +125,15 @@
   text-align: center;
   text-shadow: 0 0 80px color-mix(in srgb, var(--accent) 45%, transparent);
   white-space: nowrap;
+}
+
+.account-mascot {
+  --mascot-size: 150px;
+  align-self: center;
+}
+
+.account-side:has(.account-mascot) .account-side-glyph {
+  display: none;
 }
 
 .account-side-motto {

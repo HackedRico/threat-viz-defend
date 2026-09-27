@@ -10,15 +10,18 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 
 import { App } from "./App.tsx";
+import { startTheme } from "./shell/useTheme.ts";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
-// Entry point: loads self-hosted fonts and global styles, then mounts `App`.
+// Entry point: loads self-hosted fonts and global styles, starts the theme
+// store, then mounts `App`.
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("index.html is missing the `#root` element.");
 
+startTheme();
 createRoot(root).render(
   <StrictMode>
     <App />

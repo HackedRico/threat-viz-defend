@@ -2,7 +2,8 @@
    Module Overview
    =============================================================================
    The home page hero: the pitch on the left and the demo board on the right.
-   It stacks on narrow screens. */
+   The headline's marker marks draw themselves in once, in the board's marker
+   colors. It stacks on narrow screens. */
 
 .landing {
   width: 100%;
@@ -23,16 +24,84 @@
 }
 
 .landing-title {
-  margin-bottom: 30px;
+  margin-bottom: 22px;
   font-size: clamp(46px, 5.1vw, 82px);
   font-weight: 700;
-  line-height: 1.07;
+  line-height: 1.12;
   letter-spacing: -0.045em;
 }
 
-.landing-title em {
-  font-style: normal;
-  color: var(--accent);
+/* ---------- marker marks on the headline ---------- */
+
+.landing-mark {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.landing-mark-ink {
+  position: absolute;
+  inset: -18% -12% -22% -10%;
+  width: 122%;
+  height: 140%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Stroke width is in the mark's own units, so the marker thickens and thins with the headline. */
+.landing-mark-ink path {
+  fill: none;
+  stroke-width: 2.8px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: landing-draw 0.7s var(--ease-out) forwards;
+}
+
+.landing-mark.is-blue .landing-mark-ink path {
+  stroke: var(--marker-blue);
+  animation-delay: 0.35s;
+}
+
+.landing-mark.is-red .landing-mark-ink path {
+  stroke: var(--marker-red);
+  animation-delay: 0.9s;
+}
+
+.landing-pin {
+  position: absolute;
+  top: -4px;
+  right: -26px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sev-critical);
+  color: var(--pin-digit-critical);
+  box-shadow:
+    0 0 0 4px var(--board),
+    0 0 0 6px color-mix(in srgb, var(--sev-critical) 40%, transparent);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  animation: landing-pin 0.35s 1.45s var(--ease-out) both;
+}
+
+.landing-note-hand {
+  margin: 0 0 26px;
+  color: var(--marker-red);
+  font-size: var(--hand-lg);
+  line-height: 1.1;
+  transform: rotate(-1.5deg);
+  transform-origin: left;
+  animation: landing-fade 0.5s 1.6s var(--ease-out) both;
+}
+
+.landing-note-hand::before {
+  content: "\2191  ";
 }
 
 .landing-lead {
@@ -65,23 +134,6 @@
   color: var(--accent);
 }
 
-@media (max-width: 850px) {
-  .landing {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    padding-top: 75px;
-  }
-}
-
-@media (max-width: 520px) {
-  .landing-title {
-    font-size: 46px;
-  }
-  .landing-actions .auth-button {
-    width: 100%;
-  }
-}
-
 .landing-more {
   display: inline-flex;
   align-items: center;
@@ -101,4 +153,97 @@
   width: 14px;
   height: 14px;
   transform: rotate(90deg);
+}
+
+/* ---------- demo, with Dawg on top in the hackUMBC theme ---------- */
+
+.landing-demo {
+  position: relative;
+  min-width: 0;
+}
+
+.landing-demo:has(.landing-mascot) {
+  padding-top: 64px;
+}
+
+.landing-mascot {
+  --mascot-size: 88px;
+  position: absolute;
+  top: 12px;
+  right: 24px;
+  z-index: 2;
+}
+
+.landing-mascot .mascot-bubble {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 16px;
+  white-space: nowrap;
+}
+
+.landing-mascot .mascot-bubble::after {
+  left: auto;
+  right: -8px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+@keyframes landing-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes landing-pin {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@keyframes landing-fade {
+  from {
+    opacity: 0;
+    transform: rotate(-1.5deg) translateY(6px);
+  }
+}
+
+/* The global rule shortens durations but not delays, so the delayed pieces opt out here. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-mark-ink path {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .landing-pin,
+  .landing-note-hand {
+    animation: none;
+  }
+}
+
+@media (max-width: 850px) {
+  .landing {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding-top: 75px;
+  }
+}
+
+@media (max-width: 520px) {
+  .landing-title {
+    font-size: 46px;
+  }
+  .landing-note-hand {
+    font-size: var(--hand-md);
+  }
+  .landing-pin {
+    width: 24px;
+    height: 24px;
+    right: -20px;
+    font-size: 12px;
+  }
+  .landing-actions .auth-button {
+    width: 100%;
+  }
 }
