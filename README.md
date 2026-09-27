@@ -314,7 +314,8 @@ threat-viz-defend/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example                  every server setting
-└── AGENTS.md
+├── AGENTS.md
+└── LICENSE                       Apache License 2.0
 ```
 
 </details>
@@ -322,3 +323,7 @@ threat-viz-defend/
 ## Tech stack
 
 FastAPI, Pydantic, SQLAlchemy (SQLite or Postgres), argon2, the OpenAI Python SDK, the MCP Python SDK, React 19, Vite, ELK for layout, Rough.js for the hand-drawn look, zustand, and the ElevenLabs React SDK for voice.
+
+## License
+
+ThreatViz Defend is open source under the [Apache License 2.0](LICENSE). The fonts in `demo/fonts/` keep their own SIL Open Font License, with each license beside its font.
