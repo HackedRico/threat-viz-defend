@@ -7,6 +7,7 @@ from typing import Literal
 from app.domain.models import (
     AttackPath,
     Boundary,
+    CodeRef,
     ElementKind,
     Flow,
     Node,
@@ -35,6 +36,8 @@ MAX_THREATS = 10
 MAX_PATHS = 5
 MAX_TEXT = 600
 MAX_LABEL = 80
+MAX_DETAILS = 4
+MAX_PATH = 200
 
 
 @dataclass(frozen=True)
@@ -259,6 +262,28 @@ def slug_id(raw: str, fallback: str) -> str:
     return cleaned or fallback
 
 
+def code_ref_label(ref: CodeRef) -> str:
+    """A code reference as `path:line (symbol)`, leaving out the parts the model did not give."""
+    where = f"{ref.path}:{ref.line}" if ref.line is not None else ref.path
+    return f"{where} ({ref.symbol})" if ref.symbol else where
+
+
+def _sanitize_code(refs: list[CodeRef]) -> list[CodeRef]:
+    """Fold code references onto one line, drop empty paths and duplicates, and keep only positive line numbers."""
+    kept: list[CodeRef] = []
+    seen: set[tuple[str, int | None, str | None]] = set()
+    for ref in refs:
+        path = "".join(ref.path.split()).strip("`'\"")[:MAX_PATH]
+        line = ref.line if ref.line is not None and ref.line > 0 else None
+        clean = CodeRef(path=path, line=line, symbol=_one_line_optional(ref.symbol, MAX_LABEL))
+        key = (clean.path, clean.line, clean.symbol)
+        if not path or key in seen:
+            continue
+        seen.add(key)
+        kept.append(clean)
+    return kept[:MAX_DETAILS]
+
+
 def sanitize_map(system: SystemMap) -> SystemMap:
     """Normalize ids, drop broken references and duplicates, fold text onto one line, and cap sizes."""
     boundaries: list[Boundary] = []
@@ -289,6 +314,8 @@ def sanitize_map(system: SystemMap) -> SystemMap:
                     "tech": _one_line_optional(node.tech, MAX_LABEL),
                     "boundary": zone,
                     "evidence": _one_line(node.evidence, MAX_TEXT),
+                    "how": [_one_line(b, MAX_TEXT) for b in node.how if b.strip()][:MAX_DETAILS],
+                    "code": _sanitize_code(node.code),
                 }
             )
         )

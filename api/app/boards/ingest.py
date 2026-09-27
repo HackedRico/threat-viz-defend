@@ -16,6 +16,8 @@ from app.domain.masking import MAX_FILES, mask_secrets, skip_reason
 # when a code folder is too big, keeps the files that say the most about
 # architecture: docs, manifests, deploy files, API specs and entry points.
 # Only a record of each source (name, kind, size) is kept after the call.
+# Code files go in with a line number before each line, so the map can point
+# a reader at `path:line` instead of making them search for it.
 
 MATERIAL_CHARS = 150_000
 PER_FILE_CHARS = 24_000
@@ -45,6 +47,10 @@ _PRIORITY: tuple[tuple[int, re.Pattern[str]], ...] = (
     (7, re.compile(r"(^|/)(routes?|routers?|api|controllers?|handlers?|views|services?|agents?|tools?|auth)/")),
     (8, re.compile(r"\.(py|ts|tsx|js|jsx|go|rs|java|kt|rb|php|cs|swift)$")),
 )
+
+
+# Prose reads better without line numbers, and its evidence is quoted, not located.
+_PROSE = re.compile(r"\.(md|markdown|mdx|txt|rst|adoc)$")
 
 
 @dataclass(frozen=True)
@@ -108,11 +114,13 @@ def build_material(items: Sequence[SourceItem], now: datetime) -> Material:
         masked = mask_secrets(item.text)
         masked_total += masked.count
         body = masked.text
+        cut = ""
         if len(body) > PER_FILE_CHARS:
-            body = (
-                body[:PER_FILE_CHARS]
-                + f"\n[... cut: the file continues for {len(masked.text) - PER_FILE_CHARS} characters]"
-            )
+            body = body[:PER_FILE_CHARS]
+            cut = f"\n[... cut: the file continues for {len(masked.text) - PER_FILE_CHARS} characters]"
+        if item.kind != "text" and not _PROSE.search(item.name.lower()):
+            body = number_lines(body)
+        body += cut
         block = f"### {_heading(item)}\n{body}"
         if len(block) > budget:
             omitted.append(item.name)
@@ -136,6 +144,11 @@ def build_material(items: Sequence[SourceItem], now: datetime) -> Material:
     # A folder shows up as one source in the sidebar, not hundreds.
     sources = _collapse_code(sources, now)
     return Material("\n\n".join(chunks), sources, masked_total, skipped, omitted)
+
+
+def number_lines(text: str) -> str:
+    """Prefix each line with its 1-based number as `12| `, the form the map prompt tells the model to cite."""
+    return "\n".join(f"{number}| {line}" for number, line in enumerate(text.split("\n"), start=1))
 
 
 def agent_material(agent: str, summary: str, diff: str, files: Sequence[str], now: datetime) -> Material:

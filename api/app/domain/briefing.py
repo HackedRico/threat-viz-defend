@@ -1,5 +1,14 @@
 from app.domain.models import SystemMap, ThreatAnalysis
-from app.domain.rules import STRIDE, ai_exposure, crosses_boundary, flow_label, label_of, node_index, severity_counts
+from app.domain.rules import (
+    STRIDE,
+    ai_exposure,
+    code_ref_label,
+    crosses_boundary,
+    flow_label,
+    label_of,
+    node_index,
+    severity_counts,
+)
 
 # =============================================================================
 # Module Overview
@@ -67,6 +76,10 @@ def describe_element(system: SystemMap, analysis: ThreatAnalysis | None, item_id
         if node.sensitive:
             traits.append("holds sensitive data")
         text = f"{node.label} ({', '.join(traits)}). Evidence: {node.evidence}"
+        if node.how:
+            text += "\nHow it works: " + "; ".join(node.how)
+        if node.code:
+            text += "\nIn the code: " + ", ".join(code_ref_label(ref) for ref in node.code)
     else:
         flow = next((f for f in system.flows if f.id == item_id), None)
         if flow is None:

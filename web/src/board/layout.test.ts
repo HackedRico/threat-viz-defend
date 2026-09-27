@@ -168,7 +168,7 @@ for (const direction of DIRECTIONS) {
   test(`stays clean when a coding agent adds a cache both sides read and write, ${direction}`, async () => {
     const updated: SystemMap = {
       ...map,
-      nodes: [...map.nodes, { id: "cache", label: "Session cache", kind: "store", tech: "Redis", boundary: "backend", ai: false, sensitive: true, evidence: "inferred: sessions" }],
+      nodes: [...map.nodes, { id: "cache", label: "Session cache", kind: "store", tech: "Redis", boundary: "backend", ai: false, sensitive: true, evidence: "inferred: sessions", how: [], code: [] }],
       flows: [
         ...map.flows,
         { id: "f19", source: "api", target: "cache", label: "save session", data: "Session ids", evidence: null },
