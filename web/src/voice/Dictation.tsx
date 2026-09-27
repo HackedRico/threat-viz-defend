@@ -9,6 +9,7 @@ import {
   DICTATION_BITS_PER_SECOND,
   DICTATION_MAX_SECONDS,
   DICTATION_MIN_BYTES,
+  micProblem,
   preferredRecordingType,
   toBase64,
 } from "./dictation.ts";
@@ -89,13 +90,8 @@ export function DictateButton({ available, onText, onError, disabled = false }: 
     try {
       mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch (caught) {
-      const denied = caught instanceof DOMException && (caught.name === "NotAllowedError" || caught.name === "SecurityError");
       setPhase("idle");
-      onError(
-        denied
-          ? "Microphone access is blocked. Allow it in your browser's site settings, then try again."
-          : "No microphone was found. Plug one in, or type your question.",
-      );
+      onError(micProblem(caught));
       return;
     }
     if (!alive.current) {
