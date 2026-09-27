@@ -96,6 +96,14 @@ export type ExposureOut = Schemas["ExposureOut"];
 /** A board with everything the canvas needs. */
 export type BoardOut = Schemas["BoardOut"];
 
+/** One map a board has held, without the map: for the version chips and the history list. */
+export type MapVersionSummary = Schemas["MapVersionSummary"];
+/** What made a version: an upload, a GitHub import, a coding agent, a hand edit, the example, or an earlier map. */
+export type VersionSource = MapVersionSummary["source"];
+
+/** One version with its map, threats and the rules' findings, ready to draw. */
+export type MapVersionOut = Schemas["MapVersionOut"];
+
 /** One piece of material read as text in the browser. */
 export type SourceIn = Schemas["SourceIn"];
 

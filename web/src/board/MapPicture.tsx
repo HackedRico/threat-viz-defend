@@ -2,6 +2,7 @@ import { useId, type CSSProperties } from "react";
 
 import type { ExposureOut, SystemMap, Threat } from "../api/types.ts";
 import type { MapLayout } from "./layout.ts";
+import type { MapDiff } from "./mapDiff.ts";
 import { ArrowMarkers, MapScene } from "./MapCanvas.tsx";
 import "./MapCanvas.css";
 
@@ -24,6 +25,7 @@ export function MapPicture({
   exposure,
   crossings,
   label,
+  diff = null,
   style,
 }: {
   map: SystemMap;
@@ -33,6 +35,8 @@ export function MapPicture({
   crossings: readonly string[];
   /** What the picture shows, for screen readers and the file's title. */
   label: string;
+  /** Marks what is new or edited against another map, as review does; the version compare dialog uses it. */
+  diff?: MapDiff | null;
   style?: CSSProperties;
 }) {
   const prefix = `picture${useId().replace(/[^\w-]/g, "")}-`;
@@ -55,7 +59,7 @@ export function MapPicture({
         threats={threats}
         exposure={exposure}
         crossings={crossings}
-        diff={null}
+        diff={diff}
         draft={false}
         pinsShown
         markers={prefix}

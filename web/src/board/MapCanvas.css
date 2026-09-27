@@ -466,10 +466,10 @@
 
 /* ---------- draft stamp ---------- */
 
-/* Below the panel toggle, which holds the top right corner. */
+/* Below the panel toggle and the version chips, which hold the top right corner. */
 .canvas-stamp {
   position: absolute;
-  top: 58px;
+  top: 100px;
   right: 20px;
   padding: 0 12px;
   border: 3px solid var(--marker-blue);

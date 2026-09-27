@@ -38,6 +38,8 @@ export const PlugIcon = (p: IconProps) => <Icon {...p}><path d="M9 2v5M15 2v5M6 
 export const LogoutIcon = (p: IconProps) => <Icon {...p}><path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H3" /></Icon>;
 /** Download. */
 export const DownloadIcon = (p: IconProps) => <Icon {...p}><path d="M12 3v12M7 10l5 5 5-5M4 20h16" /></Icon>;
+/** A clock turning back, for a map's history. */
+export const HistoryIcon = (p: IconProps) => <Icon {...p}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></Icon>;
 /** Close. */
 export const CloseIcon = (p: IconProps) => <Icon {...p}><path d="M6 6l12 12M18 6L6 18" /></Icon>;
 /** A chevron pointing left, for going back a level. */
