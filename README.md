@@ -4,8 +4,7 @@ Runtime threat modeling while you vibe code.
 
 Coding agents let anyone ship an app they cannot explain. ThreatViz Defend reads your code and docs, or watches your coding agent as it works, draws the system as a threat model, and coaches you by text or voice until you can defend it at a whiteboard.
 
-<!-- TODO: point Live app at the real URL before submitting -->
-**[Live app](#)** · **[Demo video](https://www.youtube.com/watch?v=0jWPZnt6eMM)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · Built at [hackUMBC 2026](#hackumbc-2026)
+**[Live app](https://threat-viz-defend.vip)** · **[Demo video](https://www.youtube.com/watch?v=0jWPZnt6eMM)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · Built at [hackUMBC 2026](#hackumbc-2026)
 
 ## The problem
 
@@ -72,7 +71,7 @@ Threat modeling means mapping how a system works, where its data flows and what 
 
 **Watch it first.** Open [demo/index.html](demo/index.html) in a browser for a 30 second walkthrough: Claude Code builds an app, the hook posts each git diff, and the threat model draws and updates itself. It is a scripted animation with no setup. The [pitch deck](docs/pitch/threatviz-defend-pitch.pdf) tells the whole story in 13 slides.
 
-**Hosted.** During hackUMBC, open the [live app](#) and create an account with the invite code from the organizers.
+**Hosted.** During hackUMBC, open the live app at [threat-viz-defend.vip](https://threat-viz-defend.vip) and create an account with the invite code from the organizers.
 
 **On your machine.** You need Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 24.
 
@@ -241,7 +240,7 @@ Memory is kept this small on purpose: it lives on a third-party service and last
 | Cybersecurity Application | A defensive tool that teaches developers the threat model of their own code. [Why it fits](#why-it-is-a-cybersecurity-tool) | Built |
 | ElevenLabs | An ElevenLabs Agent as the voice coach, and Speech to Text for dictated questions. [How it is used](#how-elevenlabs-is-used) | Built |
 | DigitalOcean | App Platform, Postgres 16, and Gradient AI serverless inference for the default model. [How it is used](#how-digitalocean-is-used) | Built |
-| GoDaddy Registry | Our domain: `<domain goes here>` | To do |
+| GoDaddy Registry | Our domain, [threat-viz-defend.vip](https://threat-viz-defend.vip), serves the web app and the API on App Platform | Built |
 | Backboard | A memory store of each developer's progress across boards and sessions. [How it is used](#how-backboard-is-used) | Built |
 | Most Engaging Demo | Watch an agent build an app while its threat model draws, updates and gets defended by voice | Built |
 | Best Overall | Runtime threat modeling end to end: from a prompt to a threat model you can defend | At the demo |
