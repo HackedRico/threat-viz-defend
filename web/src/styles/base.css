@@ -260,10 +260,10 @@ pre {
   color: var(--sev-critical);
 }
 .sev-high {
-  color: var(--sev-high);
+  color: var(--sev-high-text);
 }
 .sev-medium {
-  color: var(--sev-medium);
+  color: var(--sev-medium-text);
 }
 .sev-low {
   color: var(--sev-low);

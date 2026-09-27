@@ -76,7 +76,7 @@
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 .sidebar-empty {
@@ -159,7 +159,7 @@
   padding: 0 5px;
   border-radius: 4px;
   background: var(--surface-3);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--ink-soft);
   text-transform: uppercase;

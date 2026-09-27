@@ -12,11 +12,12 @@
   --font-body: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-md: 0.9375rem;
-  --text-lg: 1.0625rem;
-  --text-xl: 1.375rem;
+  /* The smallest step is 13px: secondary text still has to read at a glance. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
   --hand-md: 1.35rem;
   --hand-lg: 1.85rem;
   --hand-xl: 2.6rem;
@@ -58,9 +59,10 @@
   --line: #d8d2c3;
   --line-strong: #b9b2a1;
 
-  --ink: #1b2231;
-  --ink-soft: #485063;
-  --ink-faint: #7d8392;
+  /* Faint text holds 4.5:1 or better on every surface, the tray included. */
+  --ink: #161c29;
+  --ink-soft: #3e4557;
+  --ink-faint: #5c6272;
   --ink-inverse: #fffdf8;
 
   --marker-blue: #1d5bbf;
@@ -69,8 +71,8 @@
   --marker-red-wash: rgba(200, 50, 31, 0.1);
   --marker-orange: #cf6a12;
   --marker-amber: #a87f00;
-  --marker-green: #23804a;
-  --marker-green-wash: rgba(35, 128, 74, 0.12);
+  --marker-green: #1b6e3e;
+  --marker-green-wash: rgba(27, 110, 62, 0.12);
   --marker-teal: #0d7f86;
   --marker-teal-wash: rgba(13, 127, 134, 0.1);
 
@@ -78,6 +80,10 @@
   --sev-high: var(--marker-orange);
   --sev-medium: var(--marker-amber);
   --sev-low: var(--marker-green);
+
+  /* Orange and amber fills are too light for text on the board, so words take a darker shade. */
+  --sev-high-text: #9a4d06;
+  --sev-medium-text: #7a5b00;
 
   --accent: var(--marker-blue);
   --accent-wash: var(--marker-blue-wash);
@@ -132,9 +138,9 @@
   --line: #313843;
   --line-strong: #46505d;
 
-  --ink: #ebe8df;
-  --ink-soft: #b6b3aa;
-  --ink-faint: #858a93;
+  --ink: #f3f0e8;
+  --ink-soft: #cbc8bf;
+  --ink-faint: #a4a9b2;
   --ink-inverse: #15191e;
 
   --marker-blue: #74a9ff;
@@ -148,6 +154,9 @@
   --marker-teal: #4fd0c8;
   --marker-teal-wash: rgba(79, 208, 200, 0.14);
   --crossing: #f08ad8;
+
+  --sev-high-text: var(--marker-orange);
+  --sev-medium-text: var(--marker-amber);
 
   --highlight: #ffd84a;
   --highlight-glow: rgba(255, 216, 74, 0.35);
@@ -200,7 +209,7 @@
 
   --ink: #f7f0de;
   --ink-soft: #cbc1a6;
-  --ink-faint: #928871;
+  --ink-faint: #a39880;
   --ink-inverse: #0c0b09;
 
   --marker-blue: #62c6ff;
@@ -214,6 +223,10 @@
   --marker-teal: #45dccb;
   --marker-teal-wash: rgba(69, 220, 203, 0.13);
   --crossing: #ff7bd5;
+
+  /* The bright fills already read as text on black, unlike the light theme's darker shades. */
+  --sev-high-text: var(--marker-orange);
+  --sev-medium-text: var(--marker-amber);
 
   --accent: #fdb515;
   --accent-wash: rgba(253, 181, 21, 0.13);

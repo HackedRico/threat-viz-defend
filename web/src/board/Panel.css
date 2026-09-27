@@ -31,7 +31,7 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 summary.panel-label {
@@ -54,7 +54,7 @@ summary.panel-label {
 }
 
 .panel-meta {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--ink-faint);
 }
 
@@ -67,8 +67,8 @@ summary.panel-label {
   text-align: left;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  text-underline-offset: 3px;
 }
 
 /* ---------- sticky note ---------- */
@@ -105,9 +105,10 @@ summary.panel-label {
   margin: 0;
   padding-left: 1.2em;
   font-size: var(--text-sm);
+  line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .check-list {
@@ -123,18 +124,20 @@ summary.panel-label {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: var(--text-sm);
 }
 
 .diff-mark {
   display: inline-block;
-  min-width: 52px;
+  min-width: 60px;
   margin-right: var(--space-2);
-  padding: 0 6px;
+  padding: 1px 6px;
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   text-align: center;
 }
@@ -144,11 +147,11 @@ summary.panel-label {
   color: var(--ink-inverse);
 }
 .diff-changed {
-  border: 1px solid var(--accent);
+  border: 1.5px solid var(--accent);
   color: var(--accent);
 }
 .diff-removed {
-  border: 1px dashed var(--ink-faint);
+  border: 1.5px dashed var(--ink-faint);
   color: var(--ink-faint);
 }
 
