@@ -4,9 +4,14 @@
    Every design token in one place: colors, fonts, radii, spacing, shadows and
    motion, per theme on `<html data-theme>`: light is an enamel whiteboard,
    dark a glass board with chalk-bright markers, hackUMBC black and gold.
+   `.theme-light` wears the light board inside any theme, for what prints.
    Components read tokens, never raw values. */
 
-:root {
+/* A printed page is white paper, so `.theme-light` redeclares every light token on
+   its own element and the whole subtree reads light whatever `<html>` wears. Every
+   token another theme sets has to be declared here for that to hold. */
+:root,
+.theme-light {
   /* ---------- fonts ---------- */
   --font-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
   --font-body: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;

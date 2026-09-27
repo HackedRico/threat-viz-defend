@@ -1,0 +1,423 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The printed report. It never shows on screen; while it is mounted, a print
+   shows it alone. The pages are set here: upright with fixed margins, and a
+   page turned on its side for a wide map. Type is sized in points for paper,
+   and the colors are the light theme's, from `.theme-light`. */
+
+.paper {
+  display: none;
+}
+
+/* The report lays out its own pages; the margins are the ones `MAP_ROOM` in exportPlan.ts assumes. */
+@page {
+  size: portrait;
+  margin: 15mm 14mm;
+}
+
+@page map-landscape {
+  size: landscape;
+}
+
+@media print {
+  /* While a report is mounted it prints alone, and the app underneath stays as it was. */
+  body:has(> .paper) > :not(.paper) {
+    display: none !important;
+  }
+
+  /* The app fills one window over a tinted tray; the report runs as many pages as it needs, on white. */
+  html:has(> body > .paper),
+  body:has(> .paper) {
+    height: auto;
+    overflow: visible;
+    background: none;
+  }
+
+  .paper {
+    display: block;
+  }
+}
+
+.paper {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 9.5pt;
+  line-height: 1.45;
+  /* Badges, chips and the board behind the map carry meaning, so they print even when the
+     browser is set to leave backgrounds out. */
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.paper code,
+.paper .mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.paper .chip {
+  padding: 0 1.8mm;
+  font-size: 7.5pt;
+}
+
+.paper .sev {
+  padding: 0 1.8mm 0 1.4mm;
+  font-size: 7.5pt;
+}
+
+.paper .pin-badge {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- cover ---------- */
+
+.paper-kicker {
+  font-family: var(--font-mono);
+  font-size: 7.5pt;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.paper-title {
+  margin: 1mm 0 2mm;
+  font-family: var(--font-hand);
+  font-size: 30pt;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.paper-meta {
+  color: var(--ink-soft);
+}
+
+.paper-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm;
+  margin-top: 2.5mm;
+}
+
+.paper-brief {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3mm 6mm;
+  margin-top: 6mm;
+}
+
+.paper-label {
+  margin: 0 0 1mm;
+  font-family: var(--font-body);
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.paper-fix {
+  grid-column: 1 / -1;
+  padding: 3mm 4mm;
+  background: var(--sticky);
+  color: var(--sticky-ink);
+  border-bottom: 3px solid var(--sticky-edge);
+}
+
+.paper-fix .paper-label {
+  color: inherit;
+}
+
+.paper-verdict {
+  font-family: var(--font-hand);
+  font-size: 15pt;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.paper-caveat {
+  margin-top: 5mm;
+  padding-left: 3mm;
+  border-left: 2px solid var(--line-strong);
+  font-size: 8.5pt;
+  color: var(--ink-faint);
+}
+
+/* ---------- sections ---------- */
+
+.paper-section {
+  margin-top: 7mm;
+}
+
+/* The parts, flows and assumptions are reference tables; they start a page rather than trail off the last threat's. */
+.paper-appendix {
+  break-before: page;
+}
+
+.paper-heading {
+  margin-bottom: 3mm;
+  padding-bottom: 1mm;
+  border-bottom: 1.5px solid var(--line);
+  font-family: var(--font-hand);
+  font-size: 19pt;
+  font-weight: 700;
+  line-height: 1.1;
+  break-after: avoid;
+}
+
+.paper h3 {
+  font-size: 10.5pt;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.paper-muted {
+  color: var(--ink-faint);
+  font-size: 8.5pt;
+}
+
+.paper-list {
+  margin: 1mm 0 0;
+  padding-left: 5mm;
+}
+
+.paper-list li + li {
+  margin-top: 0.8mm;
+}
+
+/* ---------- tables ---------- */
+
+.paper-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+}
+
+.paper-table th {
+  padding: 1mm 2mm;
+  border-bottom: 1.5px solid var(--line-strong);
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.paper-table td {
+  padding: 1.4mm 2mm;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.paper-table tr {
+  break-inside: avoid;
+}
+
+.paper-glance td {
+  vertical-align: middle;
+}
+
+.paper-glance td:first-child {
+  width: 1%;
+}
+
+/* ---------- map ---------- */
+
+.paper-map {
+  break-before: page;
+  break-after: page;
+}
+
+.paper-map.is-landscape {
+  page: map-landscape;
+}
+
+.paper-caption {
+  margin-bottom: 3mm;
+  color: var(--ink-soft);
+  font-size: 8.5pt;
+}
+
+.paper-figure {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 3mm;
+  border: 1px solid var(--board-edge);
+  border-radius: 3mm;
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1px, transparent 1px);
+  background-size: 18px 18px;
+  break-inside: avoid;
+}
+
+.paper-figure .map-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.paper-key ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm 5mm;
+  margin: 3mm 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 8pt;
+  color: var(--ink-soft);
+}
+
+.paper-key li,
+.paper-key .legend-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+
+.paper-key li > svg {
+  width: 26px;
+  height: 16px;
+  flex: none;
+}
+
+.paper-key .legend-pins {
+  gap: 3mm;
+  text-transform: capitalize;
+}
+
+/* ---------- threats and paths ---------- */
+
+.paper-threat-list,
+.paper-path-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paper-threat {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+  padding: 1mm 0 1mm 4mm;
+  border-left: 3.5px solid var(--line-strong);
+  break-inside: avoid;
+}
+
+.paper-threat + .paper-threat,
+.paper-path + .paper-path {
+  margin-top: 5mm;
+}
+
+.paper-edge-critical {
+  border-left-color: var(--sev-critical);
+}
+.paper-edge-high {
+  border-left-color: var(--sev-high);
+}
+.paper-edge-medium {
+  border-left-color: var(--sev-medium);
+}
+.paper-edge-low {
+  border-left-color: var(--sev-low);
+}
+
+.paper-threat-head {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+}
+
+.paper-threat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2mm;
+  font-size: 8pt;
+  color: var(--ink-faint);
+}
+
+.paper-threat-summary {
+  font-weight: 600;
+}
+
+.paper-evidence {
+  margin: 0;
+  padding: 1.5mm 3mm;
+  border-left: 2px solid var(--line-strong);
+  background: var(--surface-2);
+  font-size: 8.5pt;
+  color: var(--ink-soft);
+}
+
+.paper-evidence .paper-label {
+  display: inline;
+  margin-right: 1.5mm;
+}
+
+.paper-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm;
+}
+
+.paper-path {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+  break-inside: avoid;
+}
+
+.paper-path h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2mm;
+}
+
+.paper-steps {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-weight: 600;
+}
+
+.paper-steps li + li::before {
+  content: "\2192";
+  margin: 0 1.5mm;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+/* ---------- parts ---------- */
+
+.paper-parts {
+  columns: 2;
+  column-gap: 7mm;
+}
+
+.paper-part {
+  break-inside: avoid;
+  margin-bottom: 3.5mm;
+}
+
+.paper-part h3 {
+  margin-bottom: 0.5mm;
+}
+
+.paper-part .paper-muted {
+  margin-top: 1mm;
+}
+
+.paper-foot {
+  margin-top: 8mm;
+  padding-top: 2mm;
+  border-top: 1px solid var(--line);
+  font-size: 8pt;
+  color: var(--ink-faint);
+}

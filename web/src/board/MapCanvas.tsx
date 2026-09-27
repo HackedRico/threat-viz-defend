@@ -14,6 +14,7 @@ import {
   trimEnd,
   type Box,
   type Direction,
+  type MapLayout,
   type MapLayouts,
 } from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
@@ -32,6 +33,7 @@ import "./MapCanvas.css";
 // the canvas, with threat pins, lethal trifecta rings, crossing flows and
 // highlights on top. The view pans and zooms by pointer, wheel and keyboard, and
 // every element is focusable and selects on Enter, so the map works without a mouse.
+// `MapScene` draws the map itself, so an export draws the very same shapes.
 
 interface View {
   x: number;
@@ -85,8 +87,11 @@ export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, li
   const selected = useBoardUi((s) => s.selected);
   const select = useBoardUi((s) => s.select);
   const openThreat = useBoardUi((s) => s.openThreat);
+  const showDirection = useBoardUi((s) => s.showDirection);
   const hintId = useId();
   const layout = layouts[direction ?? "DOWN"];
+
+  useEffect(() => showDirection(direction), [direction, showDirection]);
 
   // ---------- fitting and resizing ----------
 
@@ -279,20 +284,6 @@ export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, li
     [size],
   );
 
-  // ---------- derived drawing data ----------
-
-  const crossingSet = useMemo(() => new Set(crossings), [crossings]);
-  const lethal = useMemo(() => new Set(exposure.filter((x) => x.lethal).map((x) => x.node)), [exposure]);
-  const threatsOn = useMemo(() => {
-    const counts = new Map<string, number>();
-    threats.forEach((t) => counts.set(t.element, (counts.get(t.element) ?? 0) + 1));
-    return counts;
-  }, [threats]);
-  const pins = useMemo(() => placePins(threats, layout), [threats, layout]);
-  const added = useMemo(() => new Set(diff?.added ?? []), [diff]);
-  const changed = useMemo(() => new Set(diff?.changed ?? []), [diff]);
-  const nodeLabels = useMemo(() => new Map(map.nodes.map((n) => [n.id, n.label])), [map.nodes]);
-
   const activate = useCallback(
     (id: string) => {
       select(selected === id ? null : id);
@@ -300,7 +291,6 @@ export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, li
     [select, selected],
   );
 
-  const litState = (id: string): "lit" | "dim" | "" => (lit === null ? "" : lit.has(id) ? "lit" : "dim");
   const turnLabel = direction === "RIGHT" ? "Lay out top to bottom" : "Lay out left to right";
 
   return (
@@ -324,84 +314,25 @@ export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, li
         Tab moves between elements; Enter selects one. Arrow keys pan, plus and minus zoom, zero fits the map.
       </p>
       <svg className="canvas-svg" width="100%" height="100%">
-        <defs>
-          {/* Sized in canvas units, not stroke widths: a head scaled by a crossing flow's thick line grows wider than the gap between lanes. */}
-          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
-            <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head" />
-          </marker>
-          <marker id="arrow-cross" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
-            <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-crossing" />
-          </marker>
-          <marker id="arrow-selected" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
-            <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-selected" />
-          </marker>
-        </defs>
+        <ArrowMarkers />
         {/* Nothing is drawn until the first measure picks a direction, so the map never flashes the other way round. */}
         {direction !== null && (
           <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-            {map.boundaries.map((boundary) => {
-              const box = layout.boundaries[boundary.id];
-              return box ? <BoundaryShape key={boundary.id} id={boundary.id} box={box} /> : null;
-            })}
-
-            {map.flows.map((flow) => {
-              const route = layout.edges[flow.id];
-              if (!route || route.points.length < 2) return null;
-              return (
-                <FlowShape
-                  key={flow.id}
-                  flow={flow}
-                  points={route.points}
-                  label={route.label}
-                  sourceLabel={nodeLabels.get(flow.source) ?? flow.source}
-                  targetLabel={nodeLabels.get(flow.target) ?? flow.target}
-                  crossing={crossingSet.has(flow.id)}
-                  inferred={draft && isInferred(flow.evidence)}
-                  selected={selected === flow.id}
-                  state={litState(flow.id)}
-                  diffTag={added.has(flow.id) ? "new" : changed.has(flow.id) ? "edited" : null}
-                  threatCount={threatsOn.get(flow.id) ?? 0}
-                  onActivate={activate}
-                  onReveal={reveal}
-                />
-              );
-            })}
-
-            {/* Boundary names sit over the lines, so a flow that must cross one never strikes through it. */}
-            {map.boundaries.map((boundary) => {
-              const spot = layout.boundaryLabels[boundary.id];
-              return spot ? <BoundaryName key={boundary.id} label={boundary.label} spot={spot} /> : null;
-            })}
-
-            {map.nodes.map((node) => {
-              const box = layout.nodes[node.id];
-              if (!box) return null;
-              return (
-                <NodeShape
-                  key={node.id}
-                  node={node}
-                  box={box}
-                  lethal={lethal.has(node.id)}
-                  inferred={draft && isInferred(node.evidence)}
-                  selected={selected === node.id}
-                  state={litState(node.id)}
-                  diffTag={added.has(node.id) ? "new" : changed.has(node.id) ? "edited" : null}
-                  threatCount={threatsOn.get(node.id) ?? 0}
-                  onActivate={activate}
-                  onReveal={reveal}
-                />
-              );
-            })}
-
-            {pinsShown &&
-              pins.map((pin) => (
-                <PinButton
-                  key={pin.threat.id}
-                  pin={pin}
-                  state={litState(pin.threat.id) || litState(pin.threat.element)}
-                  onOpen={() => openThreat(pin.threat.id)}
-                />
-              ))}
+            <MapScene
+              map={map}
+              layout={layout}
+              threats={threats}
+              exposure={exposure}
+              crossings={crossings}
+              diff={diff}
+              draft={draft}
+              pinsShown={pinsShown}
+              selected={selected}
+              lit={lit}
+              onActivate={activate}
+              onReveal={reveal}
+              onOpenThreat={openThreat}
+            />
           </g>
         )}
       </svg>
@@ -445,6 +376,157 @@ export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, li
     </div>
   );
 }
+
+// =============================================================================
+// Scene
+// =============================================================================
+
+/** Ids for the arrowhead markers under `prefix`, so two drawings on one page never share one. */
+function markerIds(prefix: string) {
+  return { plain: `${prefix}arrow`, crossing: `${prefix}arrow-cross`, selected: `${prefix}arrow-selected` };
+}
+
+/** The arrowheads every flow ends in; a drawing that sits beside the canvas passes its own `prefix`. */
+export function ArrowMarkers({ prefix = "" }: { prefix?: string }) {
+  const ids = markerIds(prefix);
+  return (
+    <defs>
+      {/* Sized in canvas units, not stroke widths: a head scaled by a crossing flow's thick line grows wider than the gap between lanes. */}
+      <marker id={ids.plain} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head" />
+      </marker>
+      <marker id={ids.crossing} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-crossing" />
+      </marker>
+      <marker id={ids.selected} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
+        <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-selected" />
+      </marker>
+    </defs>
+  );
+}
+
+/** What `MapScene` draws, and on the live canvas how a reader points at it; a still picture leaves the pointing out. */
+export interface MapSceneProps {
+  map: SystemMap;
+  layout: MapLayout;
+  threats: readonly Threat[];
+  exposure: readonly ExposureOut[];
+  crossings: readonly string[];
+  diff: MapDiff | null;
+  draft: boolean;
+  pinsShown: boolean;
+  /** The prefix given to `ArrowMarkers` in the same SVG. */
+  markers?: string;
+  selected?: string | null;
+  lit?: ReadonlySet<string> | null;
+  onActivate?: (id: string) => void;
+  onReveal?: (box: Box) => void;
+  onOpenThreat?: (id: string) => void;
+}
+
+const ignore = () => undefined;
+
+/** Every mark on the map in canvas coordinates: boundaries, flows, boundary names, nodes, then pins, so names and pins sit over lines. */
+export const MapScene = memo(function MapScene({
+  map,
+  layout,
+  threats,
+  exposure,
+  crossings,
+  diff,
+  draft,
+  pinsShown,
+  markers = "",
+  selected = null,
+  lit = null,
+  onActivate = ignore,
+  onReveal = ignore,
+  onOpenThreat = ignore,
+}: MapSceneProps) {
+  const crossingSet = useMemo(() => new Set(crossings), [crossings]);
+  const lethal = useMemo(() => new Set(exposure.filter((x) => x.lethal).map((x) => x.node)), [exposure]);
+  const threatsOn = useMemo(() => {
+    const counts = new Map<string, number>();
+    threats.forEach((t) => counts.set(t.element, (counts.get(t.element) ?? 0) + 1));
+    return counts;
+  }, [threats]);
+  const pins = useMemo(() => placePins(threats, layout), [threats, layout]);
+  const added = useMemo(() => new Set(diff?.added ?? []), [diff]);
+  const changed = useMemo(() => new Set(diff?.changed ?? []), [diff]);
+  const nodeLabels = useMemo(() => new Map(map.nodes.map((n) => [n.id, n.label])), [map.nodes]);
+  const ids = markerIds(markers);
+
+  const litState = (id: string): LitState => (lit === null ? "" : lit.has(id) ? "lit" : "dim");
+
+  return (
+    <>
+      {map.boundaries.map((boundary) => {
+        const box = layout.boundaries[boundary.id];
+        return box ? <BoundaryShape key={boundary.id} id={boundary.id} box={box} /> : null;
+      })}
+
+      {map.flows.map((flow) => {
+        const route = layout.edges[flow.id];
+        if (!route || route.points.length < 2) return null;
+        return (
+          <FlowShape
+            key={flow.id}
+            flow={flow}
+            points={route.points}
+            label={route.label}
+            sourceLabel={nodeLabels.get(flow.source) ?? flow.source}
+            targetLabel={nodeLabels.get(flow.target) ?? flow.target}
+            crossing={crossingSet.has(flow.id)}
+            inferred={draft && isInferred(flow.evidence)}
+            selected={selected === flow.id}
+            state={litState(flow.id)}
+            diffTag={added.has(flow.id) ? "new" : changed.has(flow.id) ? "edited" : null}
+            threatCount={threatsOn.get(flow.id) ?? 0}
+            marker={selected === flow.id ? ids.selected : crossingSet.has(flow.id) ? ids.crossing : ids.plain}
+            onActivate={onActivate}
+            onReveal={onReveal}
+          />
+        );
+      })}
+
+      {/* Boundary names sit over the lines, so a flow that must cross one never strikes through it. */}
+      {map.boundaries.map((boundary) => {
+        const spot = layout.boundaryLabels[boundary.id];
+        return spot ? <BoundaryName key={boundary.id} label={boundary.label} spot={spot} /> : null;
+      })}
+
+      {map.nodes.map((node) => {
+        const box = layout.nodes[node.id];
+        if (!box) return null;
+        return (
+          <NodeShape
+            key={node.id}
+            node={node}
+            box={box}
+            lethal={lethal.has(node.id)}
+            inferred={draft && isInferred(node.evidence)}
+            selected={selected === node.id}
+            state={litState(node.id)}
+            diffTag={added.has(node.id) ? "new" : changed.has(node.id) ? "edited" : null}
+            threatCount={threatsOn.get(node.id) ?? 0}
+            onActivate={onActivate}
+            onReveal={onReveal}
+          />
+        );
+      })}
+
+      {pinsShown &&
+        pins.map((pin) => (
+          <PinButton
+            key={pin.threat.id}
+            pin={pin}
+            state={litState(pin.threat.id) || litState(pin.threat.element)}
+            onOpen={() => onOpenThreat(pin.threat.id)}
+          />
+        ))}
+    </>
+  );
+});
 
 // =============================================================================
 // Shapes
@@ -606,6 +688,8 @@ interface FlowShapeProps {
   state: LitState;
   diffTag: "new" | "edited" | null;
   threatCount: number;
+  /** The id of the arrowhead marker to end the line in. */
+  marker: string;
   onActivate: (id: string) => void;
   onReveal: (box: Box) => void;
 }
@@ -622,12 +706,12 @@ const FlowShape = memo(function FlowShape({
   state,
   diffTag,
   threatCount,
+  marker,
   onActivate,
   onReveal,
 }: FlowShapeProps) {
   const d = useMemo(() => roundedPath(points, 12), [points]);
   const inner = useMemo(() => (crossing ? roundedPath(trimEnd(points, ARROW_LENGTH), 12) : null), [crossing, points]);
-  const marker = selected ? "url(#arrow-selected)" : crossing ? "url(#arrow-cross)" : "url(#arrow)";
   const text = clip(flow.label, FLOW_LABEL_MAX);
   const describe = [
     `Flow from ${sourceLabel} to ${targetLabel}: ${flow.label}`,
@@ -661,7 +745,7 @@ const FlowShape = memo(function FlowShape({
       {text !== flow.label && <title>{flow.label}</title>}
       <path d={d} className="flow-hit" />
       {state === "lit" && <path d={d} className="flow-highlighter" />}
-      <path d={d} className="flow-line" markerEnd={marker} />
+      <path d={d} className="flow-line" markerEnd={`url(#${marker})`} />
       {inner && <path d={inner} className="flow-inner" />}
       {label && (
         <g className="flow-chip">

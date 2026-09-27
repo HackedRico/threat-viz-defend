@@ -7,7 +7,8 @@ import { useBoardUi } from "./store.ts";
 // Module Overview
 // =============================================================================
 // Checks how opening a threat and lighting the map treat the selection, which
-// decides whether the side panel shows an element's details or its lists.
+// decides whether the side panel shows an element's details or its lists, and
+// that the way round the canvas draws the map lasts until the board changes.
 
 beforeEach(() => useBoardUi.getState().reset());
 
@@ -46,4 +47,15 @@ test("an answer keeps the selection but a quiz result clears it", () => {
 
   ui.setHighlight(["db"], "quiz");
   assert.equal(useBoardUi.getState().selected, null);
+});
+
+test("the canvas's direction is kept for exports until the board resets", () => {
+  const ui = useBoardUi.getState();
+  assert.equal(ui.direction, null);
+  ui.showDirection("RIGHT");
+  assert.equal(useBoardUi.getState().direction, "RIGHT");
+  ui.select("api");
+  assert.equal(useBoardUi.getState().direction, "RIGHT");
+  ui.reset();
+  assert.equal(useBoardUi.getState().direction, null);
 });

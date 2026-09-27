@@ -3,12 +3,13 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, errorMessage } from "../api/client.ts";
 import type { BoardOut } from "../api/types.ts";
 import { useBoardList } from "../shell/boards.tsx";
-import { CloseIcon, DownloadIcon, PlugIcon, PlusIcon, TrashIcon } from "../shell/icons.tsx";
+import { CloseIcon, PlugIcon, PlusIcon, TrashIcon } from "../shell/icons.tsx";
 import { SeverityBadge } from "../shell/SeverityBadge.tsx";
 import { isBusy, STATUS_LABEL } from "../shell/statusText.ts";
 import { useSession } from "../shell/session.tsx";
 import { navigate } from "../shell/useRoute.ts";
 import { Drawing } from "./Drawing.tsx";
+import { ExportMenu } from "./ExportMenu.tsx";
 import { Intake } from "./Intake.tsx";
 import { SEVERITIES } from "./severity.ts";
 import { useBoardUi } from "./store.ts";
@@ -133,7 +134,6 @@ function BoardHeader({
   const [title, setTitle] = useState(board.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const rename = async (event: FormEvent) => {
@@ -166,26 +166,6 @@ function BoardHeader({
       setConfirmDelete(false);
     } finally {
       setDeleting(false);
-    }
-  };
-
-  // The API may sit on another origin, where a plain download link cannot name the file,
-  // so the report is fetched with the session cookie and saved from a local blob.
-  const exportReport = async () => {
-    setExporting(true);
-    setError(null);
-    try {
-      const blob = await api.report(board.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${board.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "threat-model"}.md`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -253,11 +233,7 @@ function BoardHeader({
             <PlusIcon /> Add material
           </button>
         )}
-        {board.status === "ready" && (
-          <button type="button" className="btn btn-sm" onClick={() => void exportReport()} disabled={exporting}>
-            {exporting ? <span className="spinner" aria-hidden="true" /> : <DownloadIcon />} Export report
-          </button>
-        )}
+        {board.status === "ready" && <ExportMenu board={board} onError={setError} />}
         <button type="button" className="btn btn-sm" onClick={() => navigate({ name: "settings", section: "agents", boardId: board.id })}>
           <PlugIcon /> Connect an agent
         </button>

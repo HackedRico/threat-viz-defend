@@ -196,13 +196,15 @@ The web app in [web/src/](../web/src/) is React 19 with Vite. There is no router
 | `api/` | The typed client (`openapi-fetch`), the generated `schema.d.ts`, aliases in `types.ts`, and error handling |
 | `auth/` | The home page with its replay of the example board, sign in and create account |
 | `shell/` | App layout, sidebar, account menu with usage meters, routing, polling |
-| `board/` | The board screen: intake, the drawing state, the canvas, the ELK layout, the inspector, the ask bar under the canvas, the review panel, the ready panel with threats, paths, defend and activity |
+| `board/` | The board screen: intake, the drawing state, the canvas, the ELK layout, the inspector, the ask bar under the canvas, the review panel, the ready panel with threats, paths, defend and activity, and the export menu |
 | `quiz/` | The Defend tab and the text quiz |
 | `voice/` | The voice coach, loaded only when used |
 | `settings/` | Connect a coding agent and model provider |
 | `styles/` | Design tokens and base styles |
 
-The canvas lays out the map with ELK, loaded on first use, both top to bottom and left to right, and draws whichever shows larger in its space as SVG with Rough.js. The same drawing serves both workflows: a map drafted from material and a map updated from a coding agent's diff. A small zustand store holds what the user is pointing at: the selected element and the ids lit by an answer, a quiz result, the voice coach or an attack path. The voice coach's tools light the map through that store from outside React.
+The canvas lays out the map with ELK, loaded on first use, both top to bottom and left to right, and draws whichever shows larger in its space as SVG with Rough.js. The same drawing serves both workflows: a map drafted from material and a map updated from a coding agent's diff. A small zustand store holds what the user is pointing at: the selected element and the ids lit by an answer, a quiz result, the voice coach or an attack path. The voice coach's tools light the map through that store from outside React. The same store keeps which way round the canvas draws the map, so an export draws it that way too.
+
+Exports draw the map in the browser, since only the browser has its layout. `MapScene` in [MapCanvas.tsx](../web/src/board/MapCanvas.tsx) draws the marks for the canvas and for `MapPicture`, which the PDF report and the image files use, so every export matches the board. The PDF is `PaperReport`, mounted beside the app and printed alone by the browser's print dialog. The PNG and SVG files come from [exportImage.ts](../web/src/board/exportImage.ts), which inlines each element's computed style and embeds the fonts. Only the Markdown report comes from the server.
 
 ## Contract flow
 

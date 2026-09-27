@@ -57,7 +57,7 @@ Across the top of every board:
 - **Severity badges.** On a ready board, the number of threats at each severity.
 - **Analyzed by.** On a ready board, the model that found the threats.
 - **Add material.** Opens intake to add more to a board that already has some.
-- **Export report.** On a ready board, downloads the threat model as a Markdown file named after the board.
+- **Export.** On a ready board, saves the board as a PDF report, the map as a PNG or SVG image, or the report as Markdown. See [Export the board](#export-the-board).
 - **Connect an agent.** Opens the coding agents settings with this board picked.
 - **Delete.** The trash icon asks "Delete this board?". **Delete** removes the board, its activity and its quiz answers for good. **Keep** cancels.
 
@@ -206,9 +206,16 @@ See [Defend what you built](#defend-what-you-built).
 
 The activity log and the list of sources. See [Activity log](#activity-log).
 
-## Export the report
+## Export the board
 
-On a ready board, choose **Export report** in the header. You get a Markdown file with the summary, the verdict, a table of components, how each component works and where its code is, the flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
+On a ready board, choose **Export** in the header, then a format. Each file is named after the board.
+
+- **PDF report.** Opens the print dialog; choose **Save as PDF**. The first page has the short version and every threat at a glance. The second is the map as drawn on the board, with its key, on a page turned on its side when the map is wide. Then come each threat with its fixes and evidence, the attack paths and the lethal trifecta, and from a fresh page the parts, the data flows and the assumptions. The report is always light, whatever your theme, since it is meant for paper.
+- **PNG image.** The map as a picture at twice its size, in your theme, for slides and docs.
+- **SVG image.** The map as a drawing that stays sharp at any size, with its fonts inside, in your theme.
+- **Markdown.** The report as text, for a repo or a ticket: the summary, the verdict, the components and how each works, the flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
+
+The PDF and the images draw the map the way round the canvas shows it. Turn the map with the view controls first to export it the other way.
 
 ## Defend what you built
 
