@@ -20,12 +20,19 @@ type Tab = "threats" | "paths" | "defend" | "activity";
 /** The panel for a board with a threat model. */
 export function ReadyPanel({ board, map }: { board: BoardOut; map: SystemMap }) {
   const [tab, setTab] = useState<Tab>("threats");
+  // Once opened, Defend stays mounted and is only hidden, so a pin that jumps to Threats neither hangs up
+  // a voice call nor loses the quiz's place and a half typed answer.
+  const [defendOpened, setDefendOpened] = useState(false);
   const focusThreat = useBoardUi((s) => s.focusThreat);
   const analysis = board.analysis;
 
   useEffect(() => {
     if (focusThreat) setTab("threats");
   }, [focusThreat]);
+
+  useEffect(() => {
+    if (tab === "defend") setDefendOpened(true);
+  }, [tab]);
 
   if (analysis === null) {
     return (
@@ -71,12 +78,18 @@ export function ReadyPanel({ board, map }: { board: BoardOut; map: SystemMap }) 
           </button>
         ))}
       </div>
-      <div className="tab-panel" role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === "threats" && <ThreatList analysis={analysis} map={map} />}
-        {tab === "paths" && <AttackPaths analysis={analysis} map={map} />}
-        {tab === "defend" && <DefendPanel board={board} map={map} />}
-        {tab === "activity" && <ActivityLog board={board} open />}
-      </div>
+      {tab !== "defend" && (
+        <div className="tab-panel" role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
+          {tab === "threats" && <ThreatList analysis={analysis} map={map} />}
+          {tab === "paths" && <AttackPaths analysis={analysis} map={map} />}
+          {tab === "activity" && <ActivityLog board={board} open />}
+        </div>
+      )}
+      {(tab === "defend" || defendOpened) && (
+        <div className="tab-panel" role="tabpanel" id="tabpanel-defend" aria-labelledby="tab-defend" hidden={tab !== "defend"}>
+          <DefendPanel board={board} map={map} />
+        </div>
+      )}
     </div>
   );
 }

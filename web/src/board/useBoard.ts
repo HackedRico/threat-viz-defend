@@ -40,6 +40,8 @@ export function useBoard(id: string): BoardState {
 
   const adopt = useCallback(
     (next: BoardOut, announce: boolean) => {
+      // The server only ever raises `revision`, so a slow poll that lands after a newer board is older news.
+      if (revision.current !== null && next.revision < revision.current) return;
       const newest = next.events.reduce((max, event) => Math.max(max, event.id), 0);
       if (announce && revision.current !== null && newest > lastEvent.current) {
         const latest = next.events.find((event) => event.id === newest);

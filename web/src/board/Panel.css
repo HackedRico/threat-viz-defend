@@ -228,6 +228,11 @@ summary.panel-label {
   gap: var(--space-4);
 }
 
+/* A hidden Defend panel stays mounted; `display: flex` above would otherwise override the attribute. */
+.tab-panel[hidden] {
+  display: none;
+}
+
 /* ---------- threats ---------- */
 
 .threat-list,

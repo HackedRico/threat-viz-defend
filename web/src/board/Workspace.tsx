@@ -59,7 +59,9 @@ export function Workspace({
   const serverMap = board.map!;
   const [draft, setDraft] = useState<SystemMap>(serverMap);
   const [dirty, setDirty] = useState(false);
-  const [editBase, setEditBase] = useState<number | null>(null);
+  // The server's map as it was when editing began, so only a change to the map itself, not a rename, reads as stale.
+  const [editBase, setEditBase] = useState<string | null>(null);
+  const serverMapJson = useMemo(() => JSON.stringify(serverMap), [serverMap]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [askSignal, setAskSignal] = useState(0);
   const [storedWidth, setPanelWidth] = useStoredWidth(PANEL_WIDTH_KEY, PANEL_DEFAULT, PANEL_BOUNDS);
@@ -99,12 +101,12 @@ export function Workspace({
   }, [activePath, highlight, map, analysis]);
 
   const edit = (next: SystemMap) => {
-    if (!dirty) setEditBase(board.revision);
+    if (!dirty) setEditBase(serverMapJson);
     setDraft(next);
     setDirty(true);
   };
   // Someone else, such as a coding agent, saved the board while these edits were open.
-  const staleEdits = dirty && editBase !== null && board.revision !== editBase;
+  const staleEdits = dirty && editBase !== null && serverMapJson !== editBase;
 
   const busy = isBusy(board.status);
   const asking = analysis !== null;
@@ -123,11 +125,15 @@ export function Workspace({
       <div className="workspace-stage">
         {top}
         <div className="workspace-canvas">
+          {layouts && key && error && (
+            <div className="banner banner-error workspace-layout-error" role="alert">
+              The latest changes could not be laid out, so the map may be out of date: {error}
+            </div>
+          )}
           {layouts && key ? (
             <MapCanvas
               map={map}
               layouts={layouts}
-              layoutKey={key}
               threats={threats}
               exposure={board.exposure}
               crossings={board.crossings}
