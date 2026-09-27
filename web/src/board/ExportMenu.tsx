@@ -10,6 +10,7 @@ import { fileBase } from "./exportPlan.ts";
 import { pickDirection, type MapLayout } from "./layout.ts";
 import { MapPicture } from "./MapPicture.tsx";
 import { PaperReport } from "./PaperReport.tsx";
+import { SnowflakeDialog } from "./SnowflakeDialog.tsx";
 import { useBoardUi } from "./store.ts";
 import { layOutBoth } from "./useMapLayout.ts";
 import "./ExportMenu.css";
@@ -20,16 +21,18 @@ import "./ExportMenu.css";
 // The Export menu on a ready board. "PDF report" mounts `PaperReport` and opens
 // the print dialog, where Save as PDF writes the file. "PNG image" and "SVG
 // image" save the drawn map in the page's theme. "Markdown" downloads the text
-// report from the server. A drawing is laid out afresh the way round the canvas
+// report from the server. "Snowflake" opens a dialog that sends the threats to
+// the user's own Snowflake account. A drawing is laid out afresh the way round the canvas
 // shows it, so every file shows the map as it is on the board.
 
-type Format = "pdf" | "png" | "svg" | "markdown";
+type Format = "pdf" | "png" | "svg" | "markdown" | "snowflake";
 
 const CHOICES: readonly { format: Format; title: string; hint: string }[] = [
   { format: "pdf", title: "PDF report", hint: "The map, every threat and its fixes. Choose Save as PDF in the print dialog." },
   { format: "png", title: "PNG image", hint: "The map as a picture, for slides and docs." },
   { format: "svg", title: "SVG image", hint: "The map as a drawing that stays sharp at any size." },
   { format: "markdown", title: "Markdown", hint: "The report as text, for a repo or a ticket." },
+  { format: "snowflake", title: "Snowflake", hint: "One row per threat in your own account, ready for SQL and charts." },
 ];
 
 // A canvas the size of a laptop's, for the rare export before the canvas has picked a direction.
@@ -47,6 +50,7 @@ export function ExportMenu({ board, onError }: { board: BoardOut; onError: (mess
   const [alignEnd, setAlignEnd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
+  const [snowflake, setSnowflake] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menuId = useId();
@@ -74,6 +78,10 @@ export function ExportMenu({ board, onError }: { board: BoardOut; onError: (mess
     setOpen(false);
     trigger.current?.focus();
     onError(null);
+    if (format === "snowflake") {
+      setSnowflake(true);
+      return;
+    }
     setBusy(true);
     try {
       if (format === "markdown") {
@@ -162,6 +170,15 @@ export function ExportMenu({ board, onError }: { board: BoardOut; onError: (mess
             </button>
           ))}
         </div>
+      )}
+      {snowflake && (
+        <SnowflakeDialog
+          boardId={board.id}
+          onClose={() => {
+            setSnowflake(false);
+            trigger.current?.focus();
+          }}
+        />
       )}
       {job &&
         map &&

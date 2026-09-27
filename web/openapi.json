@@ -754,6 +754,7 @@
               "payload_too_large",
               "model_error",
               "memory_error",
+              "snowflake_error",
               "voice_error",
               "not_configured",
               "internal_error"
@@ -1981,6 +1982,74 @@
           "invite_code"
         ],
         "title": "SignupIn",
+        "type": "object"
+      },
+      "SnowflakeExportIn": {
+        "additionalProperties": false,
+        "description": "Where to send one board's threats. The token is used for this request only and never stored.",
+        "properties": {
+          "account": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+            "title": "Account",
+            "type": "string"
+          },
+          "database": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+            "title": "Database",
+            "type": "string"
+          },
+          "schema_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 4000,
+            "minLength": 8,
+            "title": "Token",
+            "type": "string"
+          },
+          "warehouse": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+            "title": "Warehouse",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account",
+          "token",
+          "warehouse",
+          "database",
+          "schema_name"
+        ],
+        "title": "SnowflakeExportIn",
+        "type": "object"
+      },
+      "SnowflakeExportOut": {
+        "description": "How many threats reached Snowflake, and the table that holds them.",
+        "properties": {
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rows",
+          "table"
+        ],
+        "title": "SnowflakeExportOut",
         "type": "object"
       },
       "SourceIn": {
@@ -5404,6 +5473,159 @@
           }
         },
         "summary": "Report",
+        "tags": [
+          "boards"
+        ]
+      }
+    },
+    "/api/boards/{board_id}/snowflake": {
+      "post": {
+        "description": "Send this board's threats to the user's own Snowflake account.",
+        "operationId": "export_snowflake_api_boards__board_id__snowflake_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnowflakeExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnowflakeExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export Snowflake",
         "tags": [
           "boards"
         ]

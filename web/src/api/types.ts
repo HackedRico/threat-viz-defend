@@ -201,3 +201,11 @@ export type MemoryNoteOut = Schemas["MemoryNoteOut"];
 
 /** What Backboard remembers about the user, newest first. */
 export type MemoryNotesOut = Schemas["MemoryNotesOut"];
+
+// ---------- snowflake export ----------
+
+/** Where to send one board's threats in the user's own Snowflake account; the token is never stored. */
+export type SnowflakeExportIn = Schemas["SnowflakeExportIn"];
+
+/** How many threats reached Snowflake, and the table that holds them. */
+export type SnowflakeExportOut = Schemas["SnowflakeExportOut"];

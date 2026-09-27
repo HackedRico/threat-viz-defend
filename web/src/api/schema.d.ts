@@ -360,6 +360,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/boards/{board_id}/snowflake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Snowflake
+         * @description Send this board's threats to the user's own Snowflake account.
+         */
+        post: operations["export_snowflake_api_boards__board_id__snowflake_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/boards/{board_id}/sources": {
         parameters: {
             query?: never;
@@ -995,7 +1015,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "bad_request" | "invalid_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "budget_exhausted" | "payload_too_large" | "model_error" | "memory_error" | "voice_error" | "not_configured" | "internal_error";
+            code: "bad_request" | "invalid_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "budget_exhausted" | "payload_too_large" | "model_error" | "memory_error" | "snowflake_error" | "voice_error" | "not_configured" | "internal_error";
             /** Message */
             message: string;
         };
@@ -1516,6 +1536,32 @@ export interface components {
              * @default
              */
             website: string;
+        };
+        /**
+         * SnowflakeExportIn
+         * @description Where to send one board's threats. The token is used for this request only and never stored.
+         */
+        SnowflakeExportIn: {
+            /** Account */
+            account: string;
+            /** Database */
+            database: string;
+            /** Schema Name */
+            schema_name: string;
+            /** Token */
+            token: string;
+            /** Warehouse */
+            warehouse: string;
+        };
+        /**
+         * SnowflakeExportOut
+         * @description How many threats reached Snowflake, and the table that holds them.
+         */
+        SnowflakeExportOut: {
+            /** Rows */
+            rows: number;
+            /** Table */
+            table: string;
         };
         /**
          * SourceIn
@@ -4206,6 +4252,131 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_snowflake_api_boards__board_id__snowflake_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnowflakeExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnowflakeExportOut"];
+                };
             };
             /** @description Bad Request */
             400: {
