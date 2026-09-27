@@ -65,7 +65,19 @@ def test_agent_change_updates_the_board_with_a_token(signed_in: TestClient) -> N
     response = signed_in.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers)
     assert response.status_code == 202
     assert response.json()["status"] == "review"
-    assert response.json()["review_url"].endswith(f"/boards/{board['id']}")
+    # With no web origin configured, as in a local run, the link uses the origin the hook called.
+    assert response.json()["review_url"] == f"http://testserver/boards/{board['id']}"
+
+
+def test_agent_review_links_use_the_configured_web_app(make_client: ClientFactory) -> None:
+    client = make_client(cors_origins=("https://app.example.com",))
+    sign_up(client)
+    token = client.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    board = client.post("/api/boards", json={"title": "Agent board"}).json()
+    body = {"agent": "Claude Code", "summary": example_material()["sources"][0]["text"], "diff": "", "files": []}
+    headers = {"Authorization": f"Bearer {token}"}
+    response = client.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers)
+    assert response.json()["review_url"] == f"https://app.example.com/boards/{board['id']}"
 
 
 def test_mcp_needs_a_token(client: TestClient) -> None:

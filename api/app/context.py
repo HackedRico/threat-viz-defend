@@ -77,6 +77,15 @@ def client_ip(request: Request, settings: Settings) -> str:
     return network_key(address)
 
 
+def web_app_origin(request: Request | None, settings: Settings) -> str:
+    """Where the web app lives, for links to boards: the configured origin, else the one `request` came to."""
+    if settings.web_origin or request is None:
+        return settings.web_origin
+    # Only local runs get here, since production requires `PUBLIC_ORIGIN`. `RequestGuard` has already refused
+    # any host outside `ALLOWED_HOSTS`, so the link cannot name someone else's site.
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
 def network_key(address: str) -> str:
     """An IPv4 address as is, an IPv6 address as its /64, since one client holds a whole /64."""
     try:
