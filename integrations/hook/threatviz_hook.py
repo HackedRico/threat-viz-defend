@@ -942,8 +942,11 @@ def settings_snippet(repo: Repo | None, harness: str) -> dict[str, object]:
     command = _hook_command(repo, harness)
     if harness == "cursor":
         return {"version": 1, "hooks": {"beforeSubmitPrompt": [{"command": command}], "stop": [{"command": command}]}}
-    hook = {"type": "command", "command": command, "async": True, "timeout": 60}
-    return {"hooks": {"UserPromptSubmit": [{"hooks": [hook]}], "Stop": [{"hooks": [hook]}]}}
+    prompt = {"type": "command", "command": command, "async": True, "timeout": 60}
+    # Headless `claude -p` exits without finishing async hooks. On stop the hook forks and returns at once anyway,
+    # so a synchronous Stop only waits for Python to start.
+    stop = {"type": "command", "command": command, "timeout": 60}
+    return {"hooks": {"UserPromptSubmit": [{"hooks": [prompt]}], "Stop": [{"hooks": [stop]}]}}
 
 
 def _require_repo() -> Repo:
