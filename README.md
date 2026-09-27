@@ -4,8 +4,8 @@ Runtime threat modeling while you vibe code.
 
 Coding agents let anyone ship an app they cannot explain. ThreatViz Defend reads your code and docs, or watches your coding agent as it works, draws the system as a threat model, and coaches you by text or voice until you can defend it at a whiteboard.
 
-<!-- TODO: point Live app and Demo video at the real URLs before submitting -->
-**[Live app](#)** · **[Demo video](#)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · Built at [hackUMBC 2026](#hackumbc-2026)
+<!-- TODO: point Live app at the real URL before submitting -->
+**[Live app](#)** · **[Demo video](https://www.youtube.com/watch?v=0jWPZnt6eMM)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · Built at [hackUMBC 2026](#hackumbc-2026)
 
 ## The problem
 
@@ -244,7 +244,7 @@ Memory is kept this small on purpose: it lives on a third-party service and last
 | Submission | Status |
 |---|---|
 | Public repo | Done |
-| Demo video, 30 seconds or more | Recorded, link to add |
+| Demo video, 30 seconds or more | [Done](https://www.youtube.com/watch?v=0jWPZnt6eMM) |
 | Pitch deck | [Done](docs/pitch/threatviz-defend-pitch.pdf) |
 | Live demo, 3 to 5 minutes | At the demo |
 | Devpost entry by Sun 11:00 ET, final by 11:45 ET | In progress |
