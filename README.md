@@ -1,9 +1,11 @@
 # ThreatViz Defend
 
-Coding agents let anyone ship an app they cannot explain. ThreatViz Defend reads your code and docs, draws the system as a threat model, and quizzes you until you can defend it at a whiteboard.
+Runtime threat modeling while you vibe code.
 
-<!-- TODO: point Live app and Demo video at the real URLs before submitting -->
-**[Live app](#)** · **[Demo video](#)** · Built at [hackUMBC 2026](#hackumbc-2026)
+Coding agents let anyone ship an app they cannot explain. ThreatViz Defend reads your code and docs, or watches your coding agent as it works, draws the system as a threat model, and coaches you by text or voice until you can defend it at a whiteboard.
+
+<!-- TODO: point Live app at the real URL before submitting -->
+**[Live app](#)** · **[Demo video](https://www.youtube.com/watch?v=0jWPZnt6eMM)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · Built at [hackUMBC 2026](#hackumbc-2026)
 
 ## The problem
 
@@ -35,14 +37,40 @@ It does not tell you a system is secure. It shows you where to look, and checks 
 |:---:|:---:|
 | <img alt="The fix first note: fix the triage agent first, turn off auto-send and fence its tools" src="docs/images/fix-first.png" width="100%"> | <img alt="A quiz question: which of these flows cross a trust boundary, with flows to pick from" src="docs/images/quiz.png" width="100%"> |
 
+### Runtime threat modeling
+
+The map keeps up while your agent codes. Connect Claude Code or Cursor once, and every turn that changes the architecture updates the board.
+
+1. **A turn ends.** Our hook runs when the agent stops.
+2. **Snapshot.** It copies the working tree into a private git ref. Your branch, index, stash and files stay untouched.
+3. **Diff.** It compares the snapshot with the last report, and files that hold secrets never enter the snapshot.
+4. **Architectural or not.** It posts only changes to manifests, Dockerfiles, infrastructure, routes, env vars, databases, queues, model SDKs or auth. UI and refactor work is skipped.
+5. **The map updates.** The board redraws, marks what changed, and waits for you to confirm it.
+
+Over MCP the agent can also list your boards, read the map, ask the board what a change risks, report a change, and run the Defend questions right in the editor. [integrations/README.md](integrations/README.md) sets it up.
+
 ## Why it is a cybersecurity tool
 
-- **Threat modeling for every developer.** Security teams use threat models to find design flaws before attackers do. ThreatViz Defend runs the same method on any codebase in minutes: STRIDE checks on every part, every flow that crosses a trust boundary, and the lethal trifecta on AI agents, which is private data, untrusted input and a way to send data out.
-- **It trains the defender.** A report nobody understands fixes nothing. The quiz makes sure the person who ships the code can explain how it can be attacked and what stops it.
-- **It keeps up with AI-written code.** Agents change a system faster than anyone can review it. Connected over MCP or a hook, every change redraws the map and waits for a person to confirm it.
+Threat modeling means mapping how a system works, where its data flows and what trusts what, then asking what can go wrong at each step and fixing the worst of it before it ships. Security teams do it by hand. Vibe coding skips it entirely.
+
+- **Threat modeling for every developer.** ThreatViz Defend runs the method on any codebase in minutes: STRIDE checks on every part, every flow that crosses a trust boundary, and the lethal trifecta on AI agents, which is private data, untrusted input and a way to send data out.
+- **It trains the defender.** A report nobody understands fixes nothing. The Defend questions make sure the person who ships the code can explain how it can be attacked and what stops it.
+- **It keeps up with AI-written code.** Agents change a system faster than anyone can review it, so every change redraws the map and waits for a person to confirm it.
 - **It is defensive only.** It reads the material you give it. It never scans, probes or attacks a running system.
 
+**Standards we build on:**
+
+| Standard | How ThreatViz Defend uses it |
+|---|---|
+| [Threat Modeling Manifesto](https://www.threatmodelingmanifesto.org/) | Its four questions shape the flow: what are we working on, what can go wrong, what are we going to do about it, did we do a good enough job |
+| STRIDE | The six threat categories, checked by rules on every part of the map |
+| [OWASP](https://owasp.org/) | The Top 10 for LLM Applications 2025: prompt injection, data disclosure and excessive agency checks on every AI part |
+| [CWE](https://cwe.mitre.org/) | Threats link to CWE and OWASP ids, and only when the model is sure of them |
+| [NIST SSDF](https://csrc.nist.gov/projects/ssdf) | Practice PW.1.1 calls for threat modeling during design. ThreatViz Defend puts it in every developer's hands |
+
 ## Try it
+
+**Watch it first.** Open [demo/index.html](demo/index.html) in a browser for a 30 second walkthrough: Claude Code builds an app, the hook posts each git diff, and the threat model draws and updates itself. It is a scripted animation with no setup. The [pitch deck](docs/pitch/threatviz-defend-pitch.pdf) tells the whole story in 13 slides.
 
 **Hosted.** During hackUMBC, open the [live app](#) and create an account with the invite code from the organizers.
 
@@ -124,25 +152,64 @@ After changing `api/app/schemas.py` or a route, run `npm run gen:api` in `web/` 
 
 ## How it is built
 
+Anything you bring becomes a threat model. Every input is untrusted, so it passes through one API that owns every rule, every model call and all storage.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/pipeline-dark.svg">
+  <img alt="Pasted notes, files or a code folder, and a public GitHub URL come from the browser, and a coding agent comes from the editor. The API masks secrets, drafts a map with the model, waits for you to confirm it, then finds threats with STRIDE rules and the model, and returns a threat model diagram with its threats pinned." src="docs/images/pipeline-light.svg" width="100%">
+</picture>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
   <img alt="The browser and coding agents reach the web app and API on DigitalOcean App Platform. The API stores boards in Postgres and calls ElevenLabs, the model, Backboard memory and GitHub." src="docs/images/architecture-light.svg" width="100%">
 </picture>
 
-The API owns every rule, every model call and all storage. The browser draws what the API returns, so editing the page cannot change a threat or a grade.
-
-- **Web app and API.** One DigitalOcean App Platform app on our GoDaddy domain: a static React site and a FastAPI server. Postgres holds accounts, boards and quiz progress.
-- **Model.** Every model call goes through one interface and must return JSON that matches a schema. The default is DigitalOcean serverless inference. Each user can switch to their own OpenAI-compatible endpoint.
+- **Model.** Every model call goes through one interface and must return JSON that matches a schema. The default runs on DigitalOcean. Each user can switch to their own OpenAI-compatible endpoint.
 - **Backboard.** The memory layer around the model calls. It never answers; it remembers each developer's questions and quiz results and feeds them back into the next call.
-- **ElevenLabs.** For each voice session, the API asks ElevenLabs for a one-time token. The browser then talks to the private agent over WebRTC, and the agent's tools call the API for each question and grade. Dictation sends a recorded question through the API, so the ElevenLabs key never leaves the server.
 - **Coding agents.** Claude Code and Cursor connect to `/mcp` with a personal token, or send diffs from a hook.
 - **GitHub.** Importing a public repository downloads one archive from GitHub.
+- **The browser only draws.** It shows what the API returns, so editing the page cannot change a threat or a grade.
 
 [docs/architecture.md](docs/architecture.md) walks through every component, the board lifecycle and each model call.
 
+### How DigitalOcean is used
+
+DigitalOcean is the backbone the product runs on. One App Platform spec, [.do/app.yaml](.do/app.yaml), defines the whole app, and the default model runs on DigitalOcean too.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/digitalocean-dark.svg">
+  <img alt="DigitalOcean App Platform in NYC: GitHub main deploys on push to the web app and the API service, the API reads encrypted secrets and stores boards in Postgres 16, the browser comes in through GoDaddy DNS with HTTPS, and model calls go to Gradient AI serverless inference." src="docs/images/digitalocean-light.svg" width="100%">
+</picture>
+
+- **One spec, two components.** The API as a Docker service and the web app as a static site, in NYC, on our GoDaddy domain.
+- **Deploy on push.** Every merge to main rebuilds both, behind a health check, with alerts when a deploy fails.
+- **Gradient AI serverless inference.** The default model, `openai-gpt-oss-120b`, drafts maps, finds threats and grades answers.
+- **Postgres 16 and encrypted secrets.** The database holds accounts, boards and progress. Keys live in encrypted App Platform secrets, and daily budgets cap what any one account can spend.
+
+### How ElevenLabs is used
+
+ElevenLabs is the voice layer. You can defend your threat model out loud, and ask the board a question by speaking it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/elevenlabs-dark.svg">
+  <img alt="A private ElevenLabs agent hears your answer with speech to text, thinks with gemini-2.5-flash and asks out loud with text to speech over WebRTC. Four client tools reach our API, which mints a one-conversation token and grades every answer. Dictated questions go through our API to ElevenLabs Speech to Text." src="docs/images/elevenlabs-light.svg" width="100%">
+</picture>
+
+- **The voice coach is an ElevenLabs Agent.** It asks the same questions as the text quiz, hears your answer, and replies out loud. [scripts/elevenlabs_agent.py](scripts/elevenlabs_agent.py) creates it with its prompt, model and tools.
+- **It drives the board through four client tools.** It fetches the next question, submits your answer, lights parts of the map as it talks, and reads a spoken brief of the board. Our server grades every answer, never the agent.
+- **The key stays on the server.** For each session the API mints a one-conversation token, and each user gets a daily voice budget.
+- **Speech to Text for dictation.** The mic beside Ask records up to a minute, the API sends it to ElevenLabs Speech to Text (`scribe_v2`), and the text lands in the ask bar for you to check before sending.
+
 ### How Backboard is used
 
-Backboard is the memory layer around the model. DigitalOcean serverless inference, or a user's own endpoint, does every model call; Backboard remembers each developer across boards and sessions and feeds that memory into the calls that teach them. Each developer gets their own Backboard assistant.
+Backboard is the memory layer around the model. DigitalOcean, or a user's own endpoint, makes every model call; Backboard remembers what each developer asked and missed, across every board and session, and feeds it into the calls that teach them. Each developer gets their own Backboard assistant.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/backboard-memory-dark.svg">
+  <img alt="The Backboard memory store: one private assistant per developer holds notes of each question asked and each quiz verdict. Before the API answers or grades, it searches the store for the top five notes and fences them into the model call, then keeps a new note, so the next session's coach can notice progress. Uploads, maps, evidence quotes and answers are never stored." src="docs/images/backboard-memory-light.svg" width="100%">
+</picture>
+
+With `BACKBOARD_API_KEY` set on the server, memory is on for every account; each developer can turn it off, or use their own Backboard key, under **Memory**.
 
 | When | What Backboard does | What you see |
 |---|---|---|
@@ -151,7 +218,7 @@ Backboard is the memory layer around the model. DigitalOcean serverless inferenc
 | When a quiz opens | The API reads the notes back into the topics the developer got wrong or partly right, and asks those questions first, on the web, over MCP and with the voice coach | "From Backboard memory: you found these hard in earlier sessions, so they come first" |
 | Any time | Settings, **Memory** lists every note Backboard holds, turns memory off, forgets everything, or takes the developer's own Backboard key | The **Memory** page, and "Backboard memory: on" in the sidebar |
 
-Notes never hold uploads, maps or the words of an answer. With `BACKBOARD_API_KEY` set on the server, memory is on for every account; without it, a developer can paste their own key. When Backboard fails, the answer or grade goes on without memory. Boards live in our Postgres, and answer keys always come from code.
+Memory is kept this small on purpose: it lives on a third-party service and lasts across sessions, so it holds progress, never your code. Notes never hold uploads, maps or the words of an answer. When Backboard fails, the answer or grade goes on without memory. Boards live in our Postgres, answer keys always come from code, and a developer's own Backboard key is sealed on the server.
 
 ## Security by design
 
@@ -172,19 +239,20 @@ Notes never hold uploads, maps or the words of an answer. With `BACKBOARD_API_KE
 | Track | What we built for it | Status |
 |---|---|---|
 | Cybersecurity Application | A defensive tool that teaches developers the threat model of their own code. [Why it fits](#why-it-is-a-cybersecurity-tool) | Built |
-| ElevenLabs | A voice coach that runs the quiz out loud, and dictation for questions | Built |
-| DigitalOcean | App Platform, a Postgres database, and serverless inference for the default model | Built |
+| ElevenLabs | An ElevenLabs Agent as the voice coach, and Speech to Text for dictated questions. [How it is used](#how-elevenlabs-is-used) | Built |
+| DigitalOcean | App Platform, Postgres 16, and Gradient AI serverless inference for the default model. [How it is used](#how-digitalocean-is-used) | Built |
 | GoDaddy Registry | Our domain: `<domain goes here>` | To do |
-| Backboard | Memory of each developer's progress across boards and sessions. [How it is used](#how-backboard-is-used) | Built |
-| Most Engaging Demo | A judge talks with the voice coach about how this app can be attacked | At the demo |
-| Best Overall | The whole path, end to end | At the demo |
+| Backboard | A memory store of each developer's progress across boards and sessions. [How it is used](#how-backboard-is-used) | Built |
+| Most Engaging Demo | Watch an agent build an app while its threat model draws, updates and gets defended by voice | Built |
+| Best Overall | Runtime threat modeling end to end: from a prompt to a threat model you can defend | At the demo |
 
 | Submission | Status |
 |---|---|
-| Public repo | To do |
-| Demo video, 30 seconds or more | To do |
+| Public repo | Done |
+| Demo video, 30 seconds or more | [Done](https://www.youtube.com/watch?v=0jWPZnt6eMM) |
+| Pitch deck | [Done](docs/pitch/threatviz-defend-pitch.pdf) |
 | Live demo, 3 to 5 minutes | At the demo |
-| Devpost entry by Sun 11:00 ET, final by 11:45 ET | To do |
+| Devpost entry by Sun 11:00 ET, final by 11:45 ET | In progress |
 
 **Team:** Ricky (core engine), MD (diagrams), Eman (voice), Jonathan (hosting). [Who owns what](docs/team.md)
 
@@ -201,6 +269,8 @@ We wrote all of the code during the event. After judging we delete the deploymen
 | [docs/deploy.md](docs/deploy.md) | Deploying to DigitalOcean App Platform |
 | [integrations/README.md](integrations/README.md) | Connecting Claude Code and Cursor: MCP server and hook |
 | [AGENTS.md](AGENTS.md) | Commands, contracts and rules for anyone changing the code |
+| [demo/README.md](demo/README.md) | The click to play pitch demo: controls, recording and how to change the story |
+| [docs/pitch/](docs/pitch/README.md) | The 13 slide pitch deck and its talk track |
 | [docs/team.md](docs/team.md) | Who owns each area, how the areas attach to the core engine, and how to work in parallel |
 | [docs/conventions.md](docs/conventions.md) | Code style, tests, docs, commits and pull requests |
 
@@ -244,12 +314,14 @@ threat-viz-defend/
 │   ├── openapi.json              the API schema the types come from
 │   └── package.json
 ├── integrations/                 hook and config examples for coding agents
-├── docs/                         the docs listed above
+├── demo/                         the click to play pitch demo
+├── docs/                         the docs listed above, and the pitch deck in docs/pitch/
 ├── .do/app.yaml                  App Platform spec
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example                  every server setting
-└── AGENTS.md
+├── AGENTS.md
+└── LICENSE                       Apache License 2.0
 ```
 
 </details>
@@ -257,3 +329,7 @@ threat-viz-defend/
 ## Tech stack
 
 FastAPI, Pydantic, SQLAlchemy (SQLite or Postgres), argon2, the OpenAI Python SDK, the MCP Python SDK, React 19, Vite, ELK for layout, Rough.js for the hand-drawn look, zustand, and the ElevenLabs React SDK for voice.
+
+## License
+
+ThreatViz Defend is open source under the [Apache License 2.0](LICENSE). The fonts in `demo/fonts/` keep their own SIL Open Font License, with each license beside its font.
