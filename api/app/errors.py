@@ -22,6 +22,7 @@ ErrorCode = Literal[
     "payload_too_large",
     "model_error",
     "memory_error",
+    "snowflake_error",
     "voice_error",
     "not_configured",
     "internal_error",

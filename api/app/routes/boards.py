@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Response, status
 
 from app.boards.github import fetch_repo, parse_repo_url
@@ -7,8 +8,9 @@ from app.boards.views import board_out, board_summary, version_out
 from app.context import CurrentUser, Db, Svc
 from app.db import utcnow
 from app.domain.briefing import brief
+from app.domain.findings import findings
 from app.domain.report import render_report
-from app.errors import conflict
+from app.errors import AppError, conflict
 from app.schemas import (
     AskIn,
     AskOut,
@@ -20,8 +22,11 @@ from app.schemas import (
     GithubIn,
     MapIn,
     MapVersionOut,
+    SnowflakeExportIn,
+    SnowflakeExportOut,
     SourcesIn,
 )
+from app.snowflake import TABLE, SnowflakeError, SnowflakeTarget, push_board
 
 # =============================================================================
 # Module Overview
@@ -31,6 +36,11 @@ from app.schemas import (
 # its busy status; the browser polls the board until the status settles.
 
 router = APIRouter(prefix="/api/boards", tags=["boards"])
+
+
+def snowflake_client() -> httpx.Client:
+    """The HTTP client for Snowflake; tests replace it with a scripted transport."""
+    return httpx.Client(timeout=60, follow_redirects=False)
 
 
 @router.get("")
@@ -141,3 +151,24 @@ def report(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Response:
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="threat-model.md"'},
     )
+
+
+@router.post("/{board_id}/snowflake")
+def export_snowflake(
+    board_id: str, body: SnowflakeExportIn, user: CurrentUser, svc: Svc, session: Db
+) -> SnowflakeExportOut:
+    """Send this board's threats to the user's own Snowflake account."""
+    row = svc.boards.get(session, user.id, board_id)
+    system = read_map(row)
+    analysis = current_analysis(row)
+    if system is None or analysis is None:
+        raise conflict("Confirm the map and find threats first, so there is something to send.")
+    svc.limiter.hit(f"snowflake:{user.id}", 20, 600, "Too many exports in a few minutes. Wait, then try again.")
+    target = SnowflakeTarget(body.account, body.token, body.warehouse, body.database, body.schema_name)
+    rows = findings(row.id, system, analysis, row.updated_at)
+    try:
+        with snowflake_client() as client:
+            push_board(target, row.id, rows, client)
+    except SnowflakeError as exc:
+        raise AppError(502, "snowflake_error", str(exc)) from exc
+    return SnowflakeExportOut(rows=len(rows), table=f"{body.database}.{body.schema_name}.{TABLE}")

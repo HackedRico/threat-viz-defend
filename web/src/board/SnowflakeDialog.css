@@ -1,0 +1,76 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The Send to Snowflake dialog: a small form over a dimmed board, in the same
+   frame as the compare dialog. */
+
+.snowflake-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-3);
+}
+
+.snowflake-dialog::backdrop {
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+.snowflake-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.sf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sf-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.sf-lead {
+  margin: 0;
+}
+
+.sf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 520px) {
+  .sf-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sf-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid currentColor;
+}
+
+.sf-note.is-error {
+  color: var(--danger);
+}
+
+.sf-note.is-ok {
+  color: var(--ok);
+}
+
+.sf-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

@@ -459,6 +459,30 @@ class ProviderTestOut(BaseModel):
 
 
 # =============================================================================
+# Snowflake export
+# =============================================================================
+
+_SNOWFLAKE_NAME = r"^[A-Za-z_][A-Za-z0-9_$]*$"
+
+
+class SnowflakeExportIn(RequestBody):
+    """Where to send one board's threats. The token is used for this request only and never stored."""
+
+    account: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$")
+    token: str = Field(min_length=8, max_length=4000)
+    warehouse: str = Field(min_length=1, max_length=255, pattern=_SNOWFLAKE_NAME)
+    database: str = Field(min_length=1, max_length=255, pattern=_SNOWFLAKE_NAME)
+    schema_name: str = Field(min_length=1, max_length=255, pattern=_SNOWFLAKE_NAME)
+
+
+class SnowflakeExportOut(BaseModel):
+    """How many threats reached Snowflake, and the table that holds them."""
+
+    rows: int
+    table: str
+
+
+# =============================================================================
 # Memory
 # =============================================================================
 

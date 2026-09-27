@@ -3,7 +3,17 @@ import createClient, { type Middleware } from "openapi-fetch";
 import { API_BASE, apiUrl } from "./base.ts";
 import { ApiError, networkError, toApiError } from "./errors.ts";
 import type { paths } from "./schema";
-import type { AnswerIn, DictationIn, LoginIn, MemoryIn, ProviderIn, SignupIn, SourceIn, SystemMap } from "./types.ts";
+import type {
+  AnswerIn,
+  DictationIn,
+  LoginIn,
+  MemoryIn,
+  ProviderIn,
+  SignupIn,
+  SnowflakeExportIn,
+  SourceIn,
+  SystemMap,
+} from "./types.ts";
 
 // =============================================================================
 // Module Overview
@@ -89,6 +99,8 @@ export const api = {
     unwrap(http.GET("/api/boards/{board_id}/versions/{number}", { params: { path: { board_id: id, number } } })),
   ask: (id: string, question: string, focus: string | null) =>
     unwrap(http.POST("/api/boards/{board_id}/ask", { ...path(id), body: { question, focus } })),
+  snowflake: (id: string, body: SnowflakeExportIn) =>
+    unwrap(http.POST("/api/boards/{board_id}/snowflake", { ...path(id), body })),
   report: (id: string) => downloadText(apiUrl(`/api/boards/${encodeURIComponent(id)}/report.md`)),
 
   quiz: (id: string) => unwrap(http.GET("/api/boards/{board_id}/quiz", path(id))),
