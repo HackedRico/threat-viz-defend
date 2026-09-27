@@ -104,6 +104,9 @@ export const api = {
   resetProvider: () => unwrap(http.DELETE("/api/provider")),
 
   memory: () => unwrap(http.GET("/api/memory")),
+  switchMemory: (enabled: boolean) => unwrap(http.PUT("/api/memory/enabled", { body: { enabled } })),
+  memoryNotes: () => unwrap(http.GET("/api/memory/notes")),
+  forgetMemory: () => unwrap(http.DELETE("/api/memory/notes")),
   saveMemory: (body: MemoryIn) => unwrap(http.PUT("/api/memory", { body })),
   testMemory: (body: MemoryIn) => unwrap(http.POST("/api/memory/test", { body })),
   resetMemory: () => unwrap(http.DELETE("/api/memory")),

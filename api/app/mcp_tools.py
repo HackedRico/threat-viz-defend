@@ -23,9 +23,10 @@ from app.db import utcnow
 from app.domain.briefing import brief
 from app.domain.briefing import describe_element as describe_one
 from app.domain.models import SystemMap, ThreatAnalysis
+from app.domain.notes import TOPIC_NAMES
 from app.domain.rules import flow_label
 from app.errors import AppError
-from app.schemas import AnswerIn
+from app.schemas import AnswerIn, MemoryUse
 
 # =============================================================================
 # Module Overview
@@ -33,17 +34,22 @@ from app.schemas import AnswerIn
 # The remote MCP server a coding agent connects to at `/mcp` with a personal
 # token. Its tools let the agent read a board, ask about it, report a change it
 # just made, and quiz the developer inside the editor. Each tool runs the same
-# services the web app uses, as the token's owner, on a worker thread.
+# services the web app uses, as the token's owner, on a worker thread, so
+# Backboard memory takes part here as it does in the web app.
 
-# An option letter standing alone in a choice answer, as in `A, C` or `A and C`.
-_LETTER = re.compile(r"\b([A-Z])\b")
+# Separators in a list of option letters, as in `A, C`, `a/c` or `A and C`.
+_LETTER_SEPARATORS = re.compile(r"[\s,;/&+]+|\band\b|\bor\b", re.IGNORECASE)
+# A capital letter standing alone inside a sentence; a lowercase one is more likely the article "a".
+_CAPITAL = re.compile(r"\b([A-Z])\b")
 
 INSTRUCTIONS = (
     "Tools for the developer's threat model boards. Call list_boards to find a board id. After you change how "
     "the system is built (new services, routes, data stores, third party APIs, AI tools), call report_change with "
-    "a summary and the diff so the board's map stays current. Use get_board or ask_board before designing a change "
-    "that touches sensitive data or untrusted input. When the developer asks to be quizzed, use next_quiz_question "
-    "and answer_quiz_question, and never reveal an answer before they try."
+    "a summary and the diff so the board's map stays current, unless the repository has a .threatviz.json: its "
+    "hook already reports every turn's changes, so there call report_change only when the developer asks. Use "
+    "get_board or ask_board before designing a change that touches sensitive data or untrusted input. When the "
+    "developer asks to be quizzed, use next_quiz_question and answer_quiz_question, and never reveal an answer "
+    "before they try."
 )
 
 
@@ -83,7 +89,9 @@ def build_mcp(services: Services) -> tuple[MCPServer, Starlette]:
     app = mcp.streamable_http_app(
         streamable_http_path="/mcp",
         stateless_http=True,
-        json_response=True,
+        # An event stream sends its headers at once. A JSON reply sends nothing until the tool returns, and
+        # Claude Code gives up on a response with no headers after 60 seconds, which a model-backed tool can take.
+        json_response=False,
         transport_security=TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=[]),
     )
     return mcp, app
@@ -151,7 +159,7 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
             # A line break in the model's answer could forge the `Related ids` line, so the agent gets it on one
             # line. The web app gets the answer with its breaks, since it shows them as plain text paragraphs.
             ids = f"\nRelated ids: {', '.join(answer.highlight)}" if answer.highlight else ""
-            return " ".join(answer.answer.split()) + ids
+            return " ".join(answer.answer.split()) + ids + _memory_line(answer.memory)
 
         return await _as_user(work)
 
@@ -163,7 +171,11 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
         diff: Annotated[str, Field(description="The unified diff of the change, if you have it.")] = "",
         files: Annotated[list[str], Field(description="Paths of the files you changed.")] = [],  # noqa: B006
     ) -> str:
-        """Update the board's map from a change you just made; the developer reviews it in the app."""
+        """Update the board's map from a change you just made; the developer reviews it in the app.
+
+        Skip this when the repository has a .threatviz.json: its hook reports each turn's changes on its own, and a
+        second report of the same change redraws the map twice. Call it there only when the developer asks.
+        """
         origin = web_app_origin(ctx.request_context.request, services.settings)
 
         def work(user_id: str) -> str:
@@ -185,7 +197,9 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
             with services.db.session() as session:
                 # `Quiz.state` gives a board without a map no questions, which would read as a finished quiz.
                 _board_parts(services, session, user_id, board_id)
-                state = services.quiz.state(session, user_id, board_id)
+            focus = services.quiz.focus(user_id, board_id)
+            with services.db.session() as session:
+                state = services.quiz.state(session, user_id, board_id, focus)
             if not state.questions:
                 raise ToolError(
                     "This board has no quiz questions yet. They follow once the developer confirms the map "
@@ -203,8 +217,14 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
                 "open": "Answer in your own words.",
             }
             number = len(state.questions) - len(pending) + 1
+            why = (
+                f" Backboard memory: they found {TOPIC_NAMES[q.topic]} hard before, so this comes first."
+                if focus is not None and q.topic in focus.topics
+                else ""
+            )
             return (
                 f"Question {number} of {len(state.questions)} (id {q.id}). {q.prompt} {options} {how[q.kind]}".strip()
+                + why
             )
 
         return await _as_user(work)
@@ -230,17 +250,18 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
             if question.kind == "open":
                 body = AnswerIn(question_id=question_id, text=answer)
             else:
-                # Only standalone letters count, so "A and C" is A and C, not the A and D inside "and".
-                letters = list(dict.fromkeys(_LETTER.findall(answer.upper())))
-                if not letters or any(ord(ch) - 65 >= len(question.options) for ch in letters):
+                letters = _option_letters(answer, len(question.options))
+                if not letters:
                     last = chr(64 + len(question.options))
                     raise ToolError(f"Answer with the option letters from A to {last}, such as `A, C`.")
                 body = AnswerIn(
                     question_id=question_id, choice_ids=[question.options[ord(ch) - 65].id for ch in letters]
                 )
-            graded = services.quiz.answer(user_id, board_id, body).attempt
+            answered = services.quiz.answer(user_id, board_id, body)
+            graded = answered.attempt
             # Folded to one line, so a line break in model feedback cannot pose as another `Result:` line.
-            return " ".join(f"Result: {graded.result}. {graded.feedback} {graded.explanation}".split())
+            text = " ".join(f"Result: {graded.result}. {graded.feedback} {graded.explanation}".split())
+            return text + _memory_line(answered.memory)
 
         return await _as_user(work)
 
@@ -257,6 +278,31 @@ def _board_parts(
             "Try again after the developer adds material and confirms the map in the web app."
         )
     return system, current_analysis(row)
+
+
+def _option_letters(answer: str, count: int) -> list[str]:
+    """The option letters in a choice answer, or none when it names a letter out of range or no letter at all."""
+    tokens = [token for token in _LETTER_SEPARATORS.split(answer.strip()) if token]
+    if tokens and all(len(token) == 1 and token.isalpha() for token in tokens):
+        # Letters alone, in either case: `a, c` or `B`.
+        letters = [token.upper() for token in tokens]
+    else:
+        # A sentence such as "B, because it is a boundary": only capitals count, and "I" is the pronoun
+        # unless the question has that many options.
+        letters = [ch for ch in _CAPITAL.findall(answer) if ch != "I" or count >= 9]
+    picked = list(dict.fromkeys(letters))
+    if any(ord(ch) - 65 >= count for ch in picked):
+        return []
+    return picked
+
+
+def _memory_line(memory: MemoryUse | None) -> str:
+    """A closing line on what Backboard memory did, so the agent can say memory took part; empty when it is off."""
+    if memory is None:
+        return ""
+    count = len(memory.recalled)
+    recalled = f"recalled {count} note{'' if count == 1 else 's'} from earlier sessions and " if count else ""
+    return f"\nBackboard memory {recalled}kept a note of this for next time."
 
 
 async def _as_user[T](work: Callable[[str], T]) -> T:

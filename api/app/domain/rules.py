@@ -1,6 +1,6 @@
 import re
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -284,20 +284,52 @@ def _sanitize_code(refs: list[CodeRef]) -> list[CodeRef]:
     return kept[:MAX_DETAILS]
 
 
+def _resolver(ids: dict[str, str], labels: Iterable[tuple[str, str]]) -> Callable[[str | None], str | None]:
+    """Find what a model's reference names: the exact id, the id in another case or spacing, else a label."""
+    # Without this, a map whose flows name nodes by label, or ids in title case, loses every flow.
+    aliases: dict[str, str] = {}
+    for raw, new in ids.items():
+        aliases.setdefault(slug_id(raw, ""), new)
+    for label, new in labels:
+        aliases.setdefault(slug_id(label, ""), new)
+    aliases.pop("", None)
+
+    def resolve(ref: str | None) -> str | None:
+        if ref is None:
+            return None
+        return ids.get(ref) or aliases.get(slug_id(ref, ""))
+
+    return resolve
+
+
+def _free_id(wanted: str, taken: set[str], prefix: str) -> str:
+    """`wanted` when free, else the next `<prefix>N` nobody holds, so a repeated id renames rather than drops."""
+    if wanted not in taken:
+        return wanted
+    number = len(taken) + 1
+    while f"{prefix}{number}" in taken:
+        number += 1
+    return f"{prefix}{number}"
+
+
 def sanitize_map(system: SystemMap) -> SystemMap:
-    """Normalize ids, drop broken references and duplicates, fold text onto one line, and cap sizes."""
+    """Normalize ids, resolve loose references, drop broken ones and duplicates, fold text and cap sizes."""
     boundaries: list[Boundary] = []
     boundary_ids: dict[str, str] = {}
+    boundary_labels: list[tuple[str, str]] = []
     for index, boundary in enumerate(system.boundaries[:MAX_BOUNDARIES]):
         new_id = slug_id(boundary.id, f"zone-{index + 1}")
         if new_id in boundary_ids.values():
             continue
         boundary_ids[boundary.id] = new_id
+        boundary_labels.append((boundary.label, new_id))
         boundaries.append(Boundary(id=new_id, label=_one_line(boundary.label, MAX_LABEL)))
+    zone_of = _resolver(boundary_ids, boundary_labels)
 
     # Nodes and flows share one id space, because threats and highlights point at either kind.
     taken: set[str] = set()
     node_ids: dict[str, str] = {}
+    node_labels: list[tuple[str, str]] = []
     nodes: list[Node] = []
     for index, node in enumerate(system.nodes[:MAX_NODES]):
         new_id = slug_id(node.id, f"n{index + 1}")
@@ -305,7 +337,8 @@ def sanitize_map(system: SystemMap) -> SystemMap:
             continue
         taken.add(new_id)
         node_ids[node.id] = new_id
-        zone = boundary_ids.get(node.boundary) if node.boundary is not None else None
+        node_labels.append((node.label, new_id))
+        zone = zone_of(node.boundary)
         nodes.append(
             node.model_copy(
                 update={
@@ -320,15 +353,16 @@ def sanitize_map(system: SystemMap) -> SystemMap:
             )
         )
 
+    node_of = _resolver(node_ids, node_labels)
     flows: list[Flow] = []
     for index, flow in enumerate(system.flows):
         if len(flows) >= MAX_FLOWS:
             break
-        source = node_ids.get(flow.source)
-        target = node_ids.get(flow.target)
-        new_id = slug_id(flow.id, f"f{index + 1}")
-        if source is None or target is None or source == target or new_id in taken:
+        source = node_of(flow.source)
+        target = node_of(flow.target)
+        if source is None or target is None or source == target:
             continue
+        new_id = _free_id(slug_id(flow.id, f"f{index + 1}"), taken, "f")
         taken.add(new_id)
         flows.append(
             flow.model_copy(
@@ -356,24 +390,33 @@ def sanitize_map(system: SystemMap) -> SystemMap:
 
 
 def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnalysis:
-    """Drop threats and path steps the map does not contain, sort by severity, renumber and fold text onto one line."""
-    places = element_ids(system)
-    seen: set[str] = set()
+    """Resolve loose references, drop threats and path steps the map lacks, sort, renumber and fold text."""
+    place_of = _resolver(
+        {place: place for place in element_ids(system)},
+        [(node.label, node.id) for node in system.nodes],
+    )
+    seen: set[tuple[str, str, str]] = set()
     kept: list[Threat] = []
     for threat in analysis.threats:
-        if threat.element not in places or threat.id in seen:
+        element = place_of(threat.element)
+        # The same threat twice is dropped; two threats that only share an id are both kept and renumbered.
+        key = (threat.id, element or "", threat.title)
+        if element is None or key in seen:
             continue
-        seen.add(threat.id)
-        kept.append(threat)
+        seen.add(key)
+        kept.append(threat.model_copy(update={"element": element}))
     # A stable sort keeps the model's own order among threats of equal severity.
     kept.sort(key=lambda t: severity_rank(t.severity))
     kept = kept[:MAX_THREATS]
 
-    renumbered = {threat.id: f"T{index + 1}" for index, threat in enumerate(kept)}
+    # Path threat lists name the model's ids; with a repeated id they follow its first threat.
+    renumbered: dict[str, str] = {}
+    for index, threat in enumerate(kept):
+        renumbered.setdefault(threat.id, f"T{index + 1}")
     threats = [
         threat.model_copy(
             update={
-                "id": renumbered[threat.id],
+                "id": f"T{index + 1}",
                 "title": _one_line(threat.title, MAX_LABEL),
                 "summary": _one_line(threat.summary, MAX_TEXT),
                 "statement": _one_line(threat.statement, MAX_TEXT),
@@ -383,17 +426,18 @@ def sanitize_analysis(system: SystemMap, analysis: ThreatAnalysis) -> ThreatAnal
                 "evidence": _one_line(threat.evidence, MAX_TEXT),
             }
         )
-        for threat in kept
+        for index, threat in enumerate(kept)
     ]
 
-    node_ids = {node.id for node in system.nodes}
+    step_of = _resolver({node.id: node.id for node in system.nodes}, [(node.label, node.id) for node in system.nodes])
     paths: list[AttackPath] = []
-    path_ids: set[str] = set()
+    path_keys: set[tuple[str, ...]] = set()
     for path in sorted(analysis.paths, key=lambda p: severity_rank(p.severity)):
-        steps = [step for step in path.steps if step in node_ids]
-        if len(steps) < 2 or path.id in path_ids:
+        steps = [found for found in (step_of(step) for step in path.steps) if found is not None]
+        path_key = (path.id, *steps)
+        if len(steps) < 2 or path_key in path_keys:
             continue
-        path_ids.add(path.id)
+        path_keys.add(path_key)
         along = only_known((renumbered.get(t, "") for t in path.threats), set(renumbered.values()))
         paths.append(
             path.model_copy(

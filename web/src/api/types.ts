@@ -42,8 +42,11 @@ export type AttackPath = Schemas["AttackPath"];
 /** The threats and attack paths found on a confirmed map. */
 export type ThreatAnalysis = Schemas["ThreatAnalysis"];
 
-/** A reply to a question about a finished board. */
-export type Answer = Schemas["Answer"];
+/** A reply to a question about a finished board, with how Backboard memory took part. */
+export type Answer = Schemas["AskOut"];
+
+/** What Backboard memory did around one model call: the notes it fed in, and whether it keeps a new one. */
+export type MemoryUse = Schemas["MemoryUse"];
 
 // ---------- accounts and config ----------
 
@@ -123,6 +126,9 @@ export type Mastery = Schemas["Mastery"];
 /** The quiz for a board's current analysis and the latest result per question. */
 export type QuizOut = Schemas["QuizOut"];
 
+/** Topics memory says the developer found hard, which the quiz asks first. */
+export type QuizFocus = Schemas["QuizFocus"];
+
 /** An answer: option ids for choice questions, words for open ones. */
 export type AnswerIn = Schemas["AnswerIn"];
 
@@ -170,11 +176,20 @@ export type ProviderTestOut = Schemas["ProviderTestOut"];
 
 // ---------- memory ----------
 
-/** Whether Backboard memory is saved and applies to the user's analyses now. */
+/** The user's Backboard memory: on or off, working or not, and whose account holds it. */
 export type MemoryOut = Schemas["MemoryOut"];
 
-/** A Backboard key to save or test for memory; `api_key` null keeps the saved key. */
+/** Whose Backboard account holds the user's memory: their own key, the server's, or none. */
+export type MemorySource = MemoryOut["source"];
+
+/** A Backboard key of the user's own to save or test; `api_key` null keeps the saved key. */
 export type MemoryIn = Schemas["MemoryIn"];
 
 /** Whether Backboard accepted a memory key. */
 export type MemoryTestOut = Schemas["MemoryTestOut"];
+
+/** One note Backboard holds about the user. */
+export type MemoryNoteOut = Schemas["MemoryNoteOut"];
+
+/** What Backboard remembers about the user, newest first. */
+export type MemoryNotesOut = Schemas["MemoryNotesOut"];

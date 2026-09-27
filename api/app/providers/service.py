@@ -9,11 +9,9 @@ from app.analysis.analyst import Analyst, LlmAnalyst
 from app.config import Settings
 from app.db import Database, utcnow
 from app.errors import bad_request
-from app.llm.backboard import BackboardLlm
-from app.llm.base import JsonMode, Llm, LlmError
+from app.llm.base import JsonMode, LlmError
 from app.llm.openai_compat import OpenAICompatibleLlm
 from app.providers.gate import GatedLlm, provider_slot
-from app.providers.memory import MemorySettings
 from app.providers.netguard import Resolver, check_base_url, resolve
 from app.providers.secrets_box import SecretBox
 from app.schemas import ProviderIn, ProviderOut, ProviderTestOut
@@ -22,12 +20,13 @@ from app.tables import ProviderRow
 # =============================================================================
 # Module Overview
 # =============================================================================
-# Which model analyzes a user's boards. A user may save their own provider:
-# an OpenAI-compatible endpoint or Backboard, with a base URL, a model and a
-# key. `Providers.for_user` returns that user's analyst, or the server's default
-# when they saved none, with their Backboard memory from `MemorySettings` when
-# they saved one. `AnalystSource` is the seam boards and the quiz use,
-# so tests and other deployments can pick analysts any other way.
+# Which model analyzes a user's boards. A user may save their own provider,
+# any OpenAI-compatible endpoint, with a base URL, a model and a key.
+# `Providers.for_user` returns that user's analyst, or the server's default
+# when they saved none. Memory is not chosen here: Backboard sits around
+# whichever model serves the user (`app.memory`). `AnalystSource` is the seam
+# boards and the quiz use, so tests and other deployments can pick analysts
+# any other way.
 
 log = logging.getLogger(__name__)
 
@@ -69,11 +68,9 @@ class Providers:
         server: Analyst,
         *,
         demo: bool,
-        memory: MemorySettings | None = None,
         resolver: Resolver = resolve,
     ) -> None:
         self._db = db
-        self._memory = memory
         self._settings = settings
         self._server = server
         self._demo = demo
@@ -83,17 +80,10 @@ class Providers:
     def for_user(self, user_id: str) -> Chosen:
         """The user's own analyst when they saved a provider, otherwise the server's."""
         with self._db.session() as session:
-            row = session.get(ProviderRow, user_id)
+            row = _usable(session.get(ProviderRow, user_id))
             if row is None:
                 return Chosen(self._server, own_key=False)
-            kind, base_url, model, sealed, memory, assistant = (
-                row.kind,
-                row.base_url,
-                row.model,
-                row.key_sealed,
-                row.memory,
-                row.assistant_id,
-            )
+            base_url, model, sealed = row.base_url, row.model, row.key_sealed
         # Checked again at use, because DNS for a saved host can change after it was saved.
         url = check_base_url(
             base_url, allow_private=self._settings.allow_private_provider_urls, resolver=self._resolver
@@ -102,23 +92,19 @@ class Providers:
             key = self._box.open(sealed, user_id)
         except ValueError as exc:
             raise bad_request(str(exc)) from exc
-        llm = self._build(kind, url, model, key, memory, assistant, user_id)
-        # A Backboard provider brings its own memory, so the separate memory would only double it.
-        notes = self._memory.for_user(user_id) if self._memory is not None and kind != "backboard" else None
-        return Chosen(LlmAnalyst(GatedLlm(llm, user_id), notes), own_key=True)
+        return Chosen(LlmAnalyst(GatedLlm(self._build(url, model, key), user_id)), own_key=True)
 
     def view(self, session: Session, user_id: str) -> ProviderOut:
         """What analyzes this user's boards, without the key."""
-        row = session.get(ProviderRow, user_id)
+        row = _usable(session.get(ProviderRow, user_id))
         if row is not None:
             return ProviderOut(
                 source="custom",
-                kind=row.kind,
+                kind="openai_compatible",
                 base_url=row.base_url,
                 model=row.model,
                 key_preview=f"...{row.key_last4}" if row.key_last4 else None,
-                memory=row.memory,
-                label=_label(row.kind, row.model, row.memory),
+                label=_label(row.model),
                 updated_at=row.updated_at,
             )
         return ProviderOut(
@@ -127,7 +113,6 @@ class Providers:
             base_url=None,
             model=None,
             key_preview=None,
-            memory=False,
             label=self._server.label,
             updated_at=None,
         )
@@ -137,13 +122,10 @@ class Providers:
         url = check_base_url(
             body.base_url, allow_private=self._settings.allow_private_provider_urls, resolver=self._resolver
         )
-        _check_model(body)
         row = session.get(ProviderRow, user_id)
-        _key_stays_home(row, body, url)
+        _key_stays_home(_usable(row), body, url)
         new_key = body.api_key
-        if new_key is None and row is None:
-            if body.kind == "backboard":
-                raise bad_request("Enter your Backboard API key.")
+        if new_key is None and _usable(row) is None:
             # Local servers such as Ollama take no key; an empty one is stored so the row stays complete.
             new_key = ""
         if row is None:
@@ -153,10 +135,8 @@ class Providers:
             key = new_key.strip()
             row.key_sealed = self._box.seal(key, user_id)
             row.key_last4 = key[-4:]
-        # A different Backboard account or kind would not know the old assistant.
-        if row.kind != body.kind or row.base_url != url:
-            row.assistant_id = None
-        row.kind, row.base_url, row.model, row.memory = body.kind, url, body.model.strip(), body.memory
+        row.kind, row.base_url, row.model = body.kind, url, body.model.strip()
+        row.memory, row.assistant_id = False, None
         row.updated_at = utcnow()
         session.flush()
         return self.view(session, user_id)
@@ -172,19 +152,16 @@ class Providers:
         url = check_base_url(
             body.base_url, allow_private=self._settings.allow_private_provider_urls, resolver=self._resolver
         )
-        _check_model(body)
         key = body.api_key
         if key is None:
             with self._db.session() as session:
-                row = session.get(ProviderRow, user_id)
+                row = _usable(session.get(ProviderRow, user_id))
                 _key_stays_home(row, body, url)
-                if row is None and body.kind == "backboard":
-                    raise bad_request("Enter your Backboard API key to test.")
                 try:
                     key = self._box.open(row.key_sealed, user_id) if row is not None else ""
                 except ValueError as exc:
                     raise bad_request(str(exc)) from exc
-        label = _label(body.kind, body.model, body.memory)
+        label = _label(body.model)
         try:
             with provider_slot(user_id):
                 return self._probe(body, url, key, label)
@@ -192,11 +169,8 @@ class Providers:
             return ProviderTestOut(ok=False, label=label, message=exc.message, models=[])
 
     def _probe(self, body: ProviderIn, url: str, key: str, label: str) -> ProviderTestOut:
-        """Try the provider once: Backboard by listing assistants, others by listing models."""
+        """Try the provider once by listing its models."""
         try:
-            if body.kind == "backboard":
-                llm = BackboardLlm(api_key=key, model=body.model, base_url=url, memory=body.memory, timeout_s=15)
-                return ProviderTestOut(ok=True, label=label, message=llm.check(), models=[])
             models = _list_models(url, key)
         except LlmError as exc:
             return ProviderTestOut(ok=False, label=label, message=exc.message, models=[])
@@ -206,27 +180,8 @@ class Providers:
         )
         return ProviderTestOut(ok=found, label=label, message=message, models=models[:200])
 
-    def _build(
-        self, kind: str, url: str, model: str, key: str, memory: bool, assistant: str | None, user_id: str
-    ) -> Llm:
+    def _build(self, url: str, model: str, key: str) -> OpenAICompatibleLlm:
         """The adapter for a saved provider."""
-        if kind == "backboard":
-
-            def remember(assistant_id: str) -> None:
-                with self._db.session() as session:
-                    row = session.get(ProviderRow, user_id)
-                    if row is not None:
-                        row.assistant_id = assistant_id
-
-            return BackboardLlm(
-                api_key=key,
-                model=model,
-                base_url=url,
-                memory=memory,
-                assistant_id=assistant,
-                on_assistant=remember,
-                timeout_s=self._settings.llm_timeout_s,
-            )
         # Most user endpoints are not OpenAI itself, so ask for JSON in the prompt unless it is.
         mode: JsonMode = "json_schema" if "api.openai.com" in url else "prompt"
         # The SDK insists on some key; servers that need none ignore it.
@@ -242,22 +197,19 @@ class Providers:
         )
 
 
+def _usable(row: ProviderRow | None) -> ProviderRow | None:
+    """A saved provider this server can call, or `None`; a row saved when Backboard could be the model is ignored."""
+    return row if row is not None and row.kind == "openai_compatible" else None
+
+
 def _key_stays_home(row: ProviderRow | None, body: ProviderIn, url: str) -> None:
     """Refuse to reuse a saved key for another host: whoever holds the session could otherwise send it anywhere."""
-    if body.api_key is None and row is not None and (row.base_url != url or row.kind != body.kind):
+    if body.api_key is None and row is not None and row.base_url != url:
         raise bad_request("Enter the API key again when you change the provider or its base URL.")
 
 
-def _check_model(body: ProviderIn) -> None:
-    """Reject a Backboard model that is not written as `provider/model`."""
-    if body.kind == "backboard" and "/" not in body.model.strip("/"):
-        raise bad_request("Write the Backboard model as provider/model, such as openai/gpt-4o.")
-
-
-def _label(kind: str, model: str, memory: bool) -> str:
+def _label(model: str) -> str:
     """How a saved provider is named in the app."""
-    if kind == "backboard":
-        return f"{model} via Backboard" + (" with memory" if memory else "")
     return f"{model} (your provider)"
 
 

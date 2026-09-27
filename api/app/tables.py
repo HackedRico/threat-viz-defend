@@ -132,14 +132,14 @@ class ProviderRow(Base):
     model: Mapped[str] = mapped_column(String(120))
     key_sealed: Mapped[str] = mapped_column(Text)
     key_last4: Mapped[str] = mapped_column(String(4))
+    # Unused since Backboard became memory only; kept so databases made before still load.
     memory: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Backboard creates one assistant per user on first use; reusing it is what makes memory persist.
     assistant_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
 class MemoryRow(Base):
-    """A user's Backboard memory, apart from their model provider. The key is sealed like a provider key."""
+    """A user's own Backboard key for memory, in place of the server's. The key is sealed like a provider key."""
 
     __tablename__ = "memories"
 
@@ -147,5 +147,17 @@ class MemoryRow(Base):
     key_sealed: Mapped[str] = mapped_column(Text)
     key_last4: Mapped[str] = mapped_column(String(4))
     # Created on the first note and reused after, which is what makes memory persist.
+    assistant_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class MemoryPrefsRow(Base):
+    """A user's memory switch, and their assistant in the server's Backboard account. No row means memory is on."""
+
+    __tablename__ = "memory_prefs"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete=_CASCADE), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Created on the first note kept with `BACKBOARD_API_KEY`; a user's own key has its own in `memories`.
     assistant_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)

@@ -10,9 +10,12 @@ export function mcpUrl(origin: string): string {
   return `${origin.replace(/\/+$/, "")}/mcp`;
 }
 
-/** The `claude mcp add` command, reading the token from `THREATVIZ_TOKEN` so it stays out of shell history. */
+/**
+ * The `claude mcp add` command, reading the token from `THREATVIZ_TOKEN` so it stays out of shell history. The
+ * `:?` form stops the shell with a message when the token was never exported, instead of saving an empty one.
+ */
 export function claudeCommand(origin: string): string {
-  return `claude mcp add --transport http threatviz ${mcpUrl(origin)} --header "Authorization: Bearer $THREATVIZ_TOKEN"`;
+  return `claude mcp add --transport http threatviz ${mcpUrl(origin)} --header "Authorization: Bearer \${THREATVIZ_TOKEN:?run the export line first}"`;
 }
 
 /** The `.cursor/mcp.json` file, reading the token from the `THREATVIZ_TOKEN` environment variable. */

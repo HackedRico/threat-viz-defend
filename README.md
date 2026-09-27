@@ -107,7 +107,9 @@ In demo mode every new account gets the example board ("Example: Inbox Helper") 
 To use a real model, pick one:
 
 - **Server default.** Set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` in `.env`, then restart the API.
-- **Your own provider.** Account menu > **Model provider**: save an OpenAI-compatible base URL, model and key, or a Backboard key. Under **Memory**, a Backboard key lets any of them remember your progress. This works in demo mode too, and only for your account.
+- **Your own provider.** Account menu > **Model provider**: save an OpenAI-compatible base URL, model and key. This works in demo mode too, and only for your account.
+
+For memory, set `BACKBOARD_API_KEY` in `.env` and every account remembers its progress, or paste your own Backboard key under **Memory**. [How Backboard is used](#how-backboard-is-used) explains what it does.
 
 </details>
 
@@ -162,7 +164,8 @@ Anything you bring becomes a threat model. Every input is untrusted, so it passe
   <img alt="The browser and coding agents reach the web app and API on DigitalOcean App Platform. The API stores boards in Postgres and calls ElevenLabs, the model, Backboard memory and GitHub." src="docs/images/architecture-light.svg" width="100%">
 </picture>
 
-- **Model.** Every model call goes through one interface and must return JSON that matches a schema. The default runs on DigitalOcean. Each user can switch to their own OpenAI-compatible endpoint or to Backboard.
+- **Model.** Every model call goes through one interface and must return JSON that matches a schema. The default runs on DigitalOcean. Each user can switch to their own OpenAI-compatible endpoint.
+- **Backboard.** The memory layer around the model calls. It never answers; it remembers each developer's questions and quiz results and feeds them back into the next call.
 - **Coding agents.** Claude Code and Cursor connect to `/mcp` with a personal token, or send diffs from a hook.
 - **GitHub.** Importing a public repository downloads one archive from GitHub.
 - **The browser only draws.** It shows what the API returns, so editing the page cannot change a threat or a grade.
@@ -199,21 +202,23 @@ ElevenLabs is the voice layer. You can defend your threat model out loud, and as
 
 ### How Backboard is used
 
-Backboard is a memory store. It remembers what each developer missed, so later answers and grades build on earlier sessions, across every board.
+Backboard is the memory layer around the model. DigitalOcean, or a user's own endpoint, makes every model call; Backboard remembers what each developer asked and missed, across every board and session, and feeds it into the calls that teach them. Each developer gets their own Backboard assistant.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/backboard-memory-dark.svg">
   <img alt="The Backboard memory store: one private assistant per developer holds notes of each question asked and each quiz verdict. Before the API answers or grades, it searches the store for the top five notes and fences them into the model call, then keeps a new note, so the next session's coach can notice progress. Uploads, maps, evidence quotes and answers are never stored." src="docs/images/backboard-memory-light.svg" width="100%">
 </picture>
 
-Memory stays off until you add a Backboard key under **Model provider**, and it runs in one of two ways:
+With `BACKBOARD_API_KEY` set on the server, memory is on for every account; each developer can turn it off, or use their own Backboard key, under **Memory**.
 
-| Setup | What Backboard does | What stays out of memory |
+| When | What Backboard does | What you see |
 |---|---|---|
-| Backboard memory with any model | Before the API answers a question or grades an open answer, from the web app, the voice coach or a coding agent, it searches your assistant for up to five notes and fences them into the prompt. Afterwards it keeps a note of the question, and the verdict for a grade. When memory fails, the call goes on without it. | Your uploads, your maps, evidence quotes and the words of your answers |
-| Backboard as your model | Runs every model call on a thread of your own Backboard assistant, with any model written as `provider/model`. Answers and grades read and write memory. | Your uploads. Mapping and threat finding, the calls that read them, only read memory |
+| Before an answer or a grade | The API searches the developer's notes for ones related to the question and fences up to five into the model's prompt as untrusted context | Under the answer or grade: "Backboard fed 2 earlier notes into this answer", with the notes |
+| After a question or any quiz answer | The API keeps a note in the background: the board's title, the question, and for the quiz the topic and how it went | "Saved to memory" |
+| When a quiz opens | The API reads the notes back into the topics the developer got wrong or partly right, and asks those questions first, on the web, over MCP and with the voice coach | "From Backboard memory: you found these hard in earlier sessions, so they come first" |
+| Any time | Settings, **Memory** lists every note Backboard holds, turns memory off, forgets everything, or takes the developer's own Backboard key | The **Memory** page, and "Backboard memory: on" in the sidebar |
 
-Memory is kept this small on purpose: it lives on a third-party service and lasts across sessions, so it holds progress, never your code. Boards live in our Postgres, answer keys always come from code, and your Backboard key is sealed on the server.
+Memory is kept this small on purpose: it lives on a third-party service and lasts across sessions, so it holds progress, never your code. Notes never hold uploads, maps or the words of an answer. When Backboard fails, the answer or grade goes on without memory. Boards live in our Postgres, answer keys always come from code, and a developer's own Backboard key is sealed on the server.
 
 ## Security by design
 
@@ -288,8 +293,9 @@ threat-viz-defend/
 │   │   ├── routes/               one module per area of the API
 │   │   ├── domain/               pure logic: models, rules, quiz, masking, report
 │   │   ├── analysis/             prompts and the Analyst
-│   │   ├── llm/                  model adapters: OpenAI-compatible, Backboard
-│   │   ├── providers/            per-user providers, key encryption, URL guard
+│   │   ├── memory.py             Backboard memory: recall and keep notes
+│   │   ├── llm/                  the OpenAI-compatible model adapter
+│   │   ├── providers/            per-user providers and memory, key encryption, URL guard
 │   │   ├── boards/               board lifecycle, ingest, GitHub importer
 │   │   ├── auth/                 accounts, sessions, personal tokens
 │   │   └── examples/             the built-in example board
@@ -303,7 +309,7 @@ threat-viz-defend/
 │   │   ├── board/                canvas, layout, inspector, intake, panels
 │   │   ├── quiz/                 Defend tab and text quiz
 │   │   ├── voice/                voice coach
-│   │   ├── settings/             coding agents and model provider
+│   │   ├── settings/             coding agents, model provider and memory
 │   │   └── styles/               design tokens
 │   ├── openapi.json              the API schema the types come from
 │   └── package.json

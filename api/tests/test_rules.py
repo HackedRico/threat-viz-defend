@@ -193,3 +193,44 @@ def test_sanitize_map_cleans_how_and_code() -> None:
 def test_code_ref_label_leaves_out_what_is_missing() -> None:
     assert code_ref_label(CodeRef(path="a.py", line=7, symbol="main")) == "a.py:7 (main)"
     assert code_ref_label(CodeRef(path="a.py", line=None, symbol=None)) == "a.py"
+
+
+def test_sanitize_map_resolves_nodes_and_zones_named_by_label_or_case() -> None:
+    loose = system(
+        [node("api", label="Web API", boundary="Cloud zone"), node("db", "store", boundary="CLOUD", label="Main DB")],
+        [flow("f1", "Web API", "Main DB"), flow("f2", "API", "db"), flow("f2", "db", "api")],
+    ).model_copy(update={"boundaries": [Boundary(id="cloud", label="Cloud zone")]})
+    clean = sanitize_map(loose)
+    assert [n.boundary for n in clean.nodes] == ["cloud", "cloud"]
+    # The repeated flow id is renamed, not dropped with its flow.
+    assert [(f.id, f.source, f.target) for f in clean.flows] == [
+        ("f1", "api", "db"),
+        ("f2", "api", "db"),
+        ("f5", "db", "api"),
+    ]
+
+
+def test_sanitize_analysis_resolves_elements_and_steps_named_by_label_and_keeps_repeated_ids() -> None:
+    small = trifecta_map()
+    labels = {n.id: n.label for n in small.nodes}
+    raw = analysis(
+        [
+            threat("T1", labels["agent"], "critical"),
+            threat("T1", "F3", "high"),
+            threat("T1", "F3", "high"),
+        ],
+        [
+            AttackPath(
+                id="P1",
+                title="t",
+                severity="high",
+                steps=[labels["attacker"], "AGENT", labels["mail"]],
+                threats=["T1"],
+                story="s",
+            )
+        ],
+    )
+    clean = sanitize_analysis(small, raw)
+    assert [(t.id, t.element) for t in clean.threats] == [("T1", "agent"), ("T2", "f3")]
+    assert clean.paths[0].steps == ["attacker", "agent", "mail"]
+    assert clean.paths[0].threats == ["T1"]

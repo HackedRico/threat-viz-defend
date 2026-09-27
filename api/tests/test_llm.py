@@ -1,14 +1,19 @@
+import json
+import threading
+import time
 from types import SimpleNamespace
 from typing import Any
 
 import httpx
 import openai
 import pytest
+from pydantic import ValidationError
 
 from app.analysis.analyst import LlmAnalyst
 from app.analysis.prompts import fence, find_threats_content, neutralize
 from app.config import load_settings
 from app.domain.models import Answer, SystemMap, ThreatAnalysis
+from app.llm import openai_compat
 from app.llm.base import LlmError, LlmRequest, parse_json, strict_schema
 from app.llm.openai_compat import OpenAICompatibleLlm
 from tests.factories import inbox
@@ -240,3 +245,106 @@ def test_a_400_about_the_prompt_keeps_structured_output_for_later_calls() -> Non
         llm.generate(REQUEST)
     assert llm.generate(REQUEST) == inbox().analysis
     assert "response_format" in calls.calls[1]
+
+
+# -----------------------------------------------------------------
+# What prompt-mode replies look like, and a queue for one-at-a-time providers
+# -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        f"{GOOD}\n\nNote: I assumed the {{sync}} worker runs hourly.",
+        f"Using the {{map}} and {{threats}} blocks: {GOOD}",
+        f"<think>The {{agent}} node is the risk.</think>\n{GOOD}",
+        f'```json\n{GOOD}\n```\nFor comparison, a shorter reply:\n```json\n{{"verdict": "x"}}\n```',
+        f'{{"verdict": "x"}} was my first thought, but here is the full reply: {GOOD}',
+    ],
+)
+def test_parse_json_finds_the_reply_among_other_text(reply: str) -> None:
+    assert parse_json(reply, ThreatAnalysis) == inbox().analysis
+
+
+def test_parse_json_forgives_case_spelled_out_stride_and_left_out_nulls() -> None:
+    raw = inbox().analysis.model_dump(mode="json")
+    raw["threats"][0].update({"severity": "Critical", "stride": "Tampering", "extra": "ignored"})
+    del raw["threats"][0]["refs"]
+    parsed = parse_json(json.dumps(raw), ThreatAnalysis)
+    assert (parsed.threats[0].severity, parsed.threats[0].stride, parsed.threats[0].refs) == ("critical", "T", [])
+    system = inbox().map.model_dump(mode="json")
+    for node in system["nodes"]:
+        node.pop("tech")
+        node["kind"] = node["kind"].title()
+    assert parse_json(json.dumps(system), SystemMap).nodes[0].tech is None
+
+
+def test_parse_json_still_rejects_a_reply_missing_what_it_carries() -> None:
+    with pytest.raises(ValidationError):
+        parse_json('{"verdict": "Fix it."}', ThreatAnalysis)
+
+
+def test_a_timeout_is_reported_at_once_rather_than_resent() -> None:
+    timeout = openai.APITimeoutError(request=httpx.Request("POST", "https://x/v1/chat/completions"))  # type: ignore[arg-type]
+    llm, calls = scripted(timeout, GOOD)
+    with pytest.raises(LlmError) as info:
+        llm.generate(REQUEST)
+    assert info.value.code == "timeout"
+    assert len(calls.calls) == 1
+
+
+class _Held:
+    """A client whose first call holds until released, as a provider serving one call at a time does."""
+
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.calls = 0
+
+    def create(self, **kwargs: Any) -> Any:
+        self.calls += 1
+        if self.calls == 1:
+            self.started.set()
+            self.release.wait(5)
+        message = SimpleNamespace(content=ANSWERED, refusal=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+
+
+def queued(concurrency: int | None) -> tuple[OpenAICompatibleLlm, _Held]:
+    held = _Held()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=held))
+    llm = OpenAICompatibleLlm(model="m", api_key="k", concurrency=concurrency, client=client)  # type: ignore[arg-type]
+    return llm, held
+
+
+def test_queued_calls_wait_their_turn_instead_of_racing() -> None:
+    llm, held = queued(1)
+    first = threading.Thread(target=llm.generate, args=(ANSWER,))
+    first.start()
+    assert held.started.wait(5)
+    second: list[str] = []
+    waiter = threading.Thread(target=lambda: second.append(llm.generate(ANSWER).answer))
+    waiter.start()
+    time.sleep(0.2)
+    assert held.calls == 1
+    held.release.set()
+    first.join(5)
+    waiter.join(5)
+    assert (held.calls, second) == (2, ["Fix T1 first."])
+
+
+def test_a_question_stops_waiting_for_a_busy_model_after_its_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(openai_compat, "INTERACTIVE_BUDGET_S", 0.1)
+    llm, held = queued(1)
+    # A background job holding the only slot, as a map draft does for a minute or more.
+    first = threading.Thread(target=llm.generate, args=(LlmRequest("draft_map", "system", "user", Answer),))
+    first.start()
+    assert held.started.wait(5)
+    try:
+        with pytest.raises(LlmError) as info:
+            llm.generate(ANSWER)
+        assert info.value.code == "rate_limited"
+        assert "busy with another board" in info.value.message
+    finally:
+        held.release.set()
+        first.join(5)

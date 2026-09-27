@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -38,9 +39,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 # Module Overview
 # =============================================================================
 # Builds the application. `create_app` wires settings, the database, the
-# analyst, jobs and the voice clients into `Services`, mounts the JSON routes,
-# the MCP server at `/mcp` and the built web app, and renders every error in
-# one shape. Tests call it with fakes; `app` is what uvicorn serves.
+# analyst, Backboard memory, jobs and the voice clients into `Services`, mounts
+# the JSON routes, the MCP server at `/mcp` and the built web app, and renders
+# every error in one shape. Tests call it with fakes; `app` is what uvicorn
+# serves.
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +68,7 @@ def create_app(
     voice: VoiceClient | None = None,
     transcriber: Transcriber | None = None,
     resolver: Resolver = resolve,
+    backboard: httpx.BaseTransport | None = None,
 ) -> FastAPI:
     """Build the API, the MCP server and the web app for `settings`; fakes may replace any service."""
     load_examples()  # fail at startup, not on first use, if an example is broken
@@ -74,16 +77,15 @@ def create_app(
     budget = Budget(settings, limiter)
     chosen_analyst = analyst or _analyst_for(settings)
     job_runner = jobs or ThreadJobs()
-    memories = MemorySettings(db, settings)
+    memories = MemorySettings(db, settings, transport=backboard)
     providers = Providers(
         db,
         settings,
         chosen_analyst,
         demo=isinstance(chosen_analyst, DemoAnalyst),
-        memory=memories,
         resolver=resolver,
     )
-    board_service = Boards(db, providers, budget, job_runner)
+    board_service = Boards(db, providers, budget, job_runner, memories)
     services = Services(
         settings=settings,
         db=db,
@@ -94,7 +96,7 @@ def create_app(
         accounts=Accounts(settings, limiter),
         tokens=Tokens(limiter),
         boards=board_service,
-        quiz=Quiz(db, board_service, providers, budget),
+        quiz=Quiz(db, board_service, providers, budget, memories),
         providers=providers,
         memory=memories,
         voice=voice if voice is not None else _voice_for(settings),
@@ -110,9 +112,10 @@ def create_app(
         if recovered:
             log.warning("[startup] Reset %d boards left busy by a restart.", recovered)
         log.info(
-            "[startup] %s ready; analyst: %s; voice: %s; dictation: %s.",
+            "[startup] %s ready; analyst: %s; memory: %s; voice: %s; dictation: %s.",
             settings.app_name,
             chosen_analyst.label,
+            "Backboard" if memories.server_key_set else "only for users who add a Backboard key",
             services.voice is not None,
             services.transcriber is not None,
         )
@@ -191,6 +194,7 @@ def _analyst_for(settings: Settings) -> Analyst:
         json_mode=settings.llm_json_mode,
         timeout_s=settings.llm_timeout_s,
         max_tokens=settings.llm_max_tokens,
+        concurrency=settings.llm_concurrency,
     )
     return LlmAnalyst(llm)
 

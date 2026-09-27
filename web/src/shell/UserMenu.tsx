@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import type { UsageOut } from "../api/types.ts";
 import { navigate } from "./useRoute.ts";
-import { LogoutIcon, PlugIcon, SparkIcon } from "./icons.tsx";
+import { LogoutIcon, MemoryIcon, PlugIcon, SparkIcon } from "./icons.tsx";
 import { useSession } from "./session.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import "./UserMenu.css";
@@ -11,8 +11,9 @@ import "./UserMenu.css";
 // Module Overview
 // =============================================================================
 // The account menu at the foot of the sidebar: who is signed in, what they have
-// spent today against their limits, the theme picker, a way to connect a
-// coding agent, and sign out. Usage refreshes each time the menu opens.
+// spent today against their limits, the theme picker, ways to connect a coding
+// agent, pick the model and set up memory, and sign out. Usage refreshes each
+// time the menu opens.
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
@@ -99,6 +100,16 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
             }}
           >
             <SparkIcon /> Model provider
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost user-pop-item"
+            onClick={() => {
+              setOpen(false);
+              navigate({ name: "settings", section: "memory", boardId });
+            }}
+          >
+            <MemoryIcon /> Memory
           </button>
           <button type="button" className="btn btn-ghost user-pop-item" onClick={() => void signOut()}>
             <LogoutIcon /> Sign out

@@ -24,9 +24,29 @@ export interface Collected {
 // A dropped home directory could hold millions of entries; stop walking long before the tab stalls.
 const MAX_WALK = 20_000;
 
-/** Files from an `<input type="file">`, keeping folder paths when a folder was picked. */
-export function fromFileList(list: FileList): Picked[] {
-  return Array.from(list, (file) => ({ file, size: file.size, path: file.webkitRelativePath || file.name }));
+/**
+ * Files from an `<input type="file">`, keeping folder paths when a folder was picked. A picked folder brings
+ * every file under it, `node_modules` included, so each folder the policy ignores becomes one skipped entry.
+ */
+export function fromFileList(list: ArrayLike<File>, policy: FilePolicy): { files: Picked[]; skipped: Skipped[] } {
+  const files: Picked[] = [];
+  const ignored = new Map<string, number>();
+  for (const file of Array.from(list)) {
+    const path = file.webkitRelativePath || file.name;
+    const parts = path.split("/");
+    const at = parts.slice(0, -1).findIndex((part) => policy.ignoredDirs.includes(part));
+    if (at === -1) {
+      files.push({ file, size: file.size, path });
+    } else {
+      const folder = `${parts.slice(0, at + 1).join("/")}/`;
+      ignored.set(folder, (ignored.get(folder) ?? 0) + 1);
+    }
+  }
+  const skipped = Array.from(ignored, ([path, count]) => ({
+    path,
+    reason: `vendored or generated folder, ${count.toLocaleString()} file${count === 1 ? "" : "s"}`,
+  }));
+  return { files, skipped };
 }
 
 /** Files from a drop, walking dropped folders but never into ones the policy ignores. */
@@ -37,7 +57,7 @@ export async function fromDrop(transfer: DataTransfer, policy: FilePolicy): Prom
     .map((item) => item.webkitGetAsEntry())
     .filter((entry): entry is FileSystemEntry => entry !== null);
   // Some browsers give no entries for plain file drops; fall back to the file list.
-  if (entries.length === 0) return { files: fromFileList(transfer.files), skipped };
+  if (entries.length === 0) return fromFileList(transfer.files, policy);
 
   let walked = 0;
   const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
@@ -45,8 +65,13 @@ export async function fromDrop(transfer: DataTransfer, policy: FilePolicy): Prom
     walked += 1;
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isFile) {
-      const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
-      files.push({ file, size: file.size, path });
+      // One broken link or unreadable file must not throw away the whole drop.
+      try {
+        const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
+        files.push({ file, size: file.size, path });
+      } catch {
+        skipped.push({ path, reason: "could not be read" });
+      }
       return;
     }
     if (policy.ignoredDirs.includes(entry.name)) {

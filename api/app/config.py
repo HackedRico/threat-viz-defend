@@ -44,6 +44,8 @@ class Settings:
     app_secret: str = _DEV_SECRET
     allow_private_provider_urls: bool = True
     backboard_base_url: str = "https://app.backboard.io/api"
+    # The server's Backboard key: memory for every user who has not turned it off or brought their own key.
+    backboard_api_key: str | None = None
     session_days: int = 7
     invite_codes: tuple[str, ...] = (_DEV_INVITE,)
     max_users: int = 300
@@ -53,6 +55,8 @@ class Settings:
     llm_json_mode: JsonMode = "json_schema"
     llm_timeout_s: float = 120.0
     llm_max_tokens: int | None = 16_384
+    # Calls to the server's model at once; `None` sends every call straight away.
+    llm_concurrency: int | None = None
     daily_model_calls: int = 60
     model_calls_per_minute: int = 6
     global_daily_model_calls: int = 3000
@@ -180,6 +184,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         app_secret=app_secret,
         allow_private_provider_urls=_flag(env, "ALLOW_PRIVATE_PROVIDER_URLS", default=not production),
         backboard_base_url=(_text(env, "BACKBOARD_BASE_URL") or Settings.backboard_base_url).rstrip("/"),
+        backboard_api_key=_text(env, "BACKBOARD_API_KEY"),
         session_days=_int(env, "SESSION_DAYS", 7, low=1, high=30),
         invite_codes=invites,
         max_users=_int(env, "MAX_USERS", 300, low=1, high=100_000),
@@ -190,6 +195,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         llm_timeout_s=float(_int(env, "LLM_TIMEOUT_S", 120, low=5, high=600)),
         # Some providers stop at 4096 unless asked, which a reasoning model can spend before it finishes a threat list.
         llm_max_tokens=_int(env, "LLM_MAX_TOKENS", 16_384, low=0, high=200_000) or None,
+        # A provider that serves one call at a time answers a second with 429, so calls queue instead.
+        llm_concurrency=_int(env, "LLM_CONCURRENCY", 0, low=0, high=64) or None,
         daily_model_calls=_int(env, "DAILY_MODEL_CALLS", 60, low=0, high=100_000),
         model_calls_per_minute=_int(env, "MODEL_CALLS_PER_MINUTE", 6, low=1, high=1000),
         global_daily_model_calls=_int(env, "GLOBAL_DAILY_MODEL_CALLS", 3000, low=0, high=10_000_000),

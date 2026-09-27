@@ -23,7 +23,8 @@ Both end in the same place: a confirmed map with threats and a quiz. A board's `
 | Seam | Where | Rule |
 |---|---|---|
 | HTTP contract | `app/schemas.py`, `app/domain/models.py` | Change a shape here, then `npm run gen:api` in `web/`. Keep stored boards valid: they are revalidated on read. |
-| Model calls | `Llm` in `app/llm/base.py`; `Analyst` in `app/analysis/analyst.py` | Every call goes through an `Analyst`. A new provider kind is an `Llm` adapter plus a branch in `Providers._build`. An adapter that keeps calls as memory says which in `remembers`, so quotes from the material stay out of them. |
+| Model calls | `Llm` in `app/llm/base.py`; `Analyst` in `app/analysis/analyst.py` | Every call goes through an `Analyst`. A new provider kind is an `Llm` adapter plus a branch in `Providers._build`. Backboard is never a provider: it is memory. |
+| Memory | `Memory` and `MemorySource` in `app/memory.py`; `MemorySettings` in `app/providers/memory.py` | Services recall notes before `answer` and `grade` and pass them to the analyst, then keep a note with `Boards.remember`, on a job. Notes come from `app/domain/notes.py` and never hold uploads, maps or answer text. |
 | Which model serves a user | `Providers.for_user` in `app/providers/service.py` | A user's saved provider, else the server's; own-key calls pass through `GatedLlm`. |
 | Slow work | `Jobs` in `app/jobs.py` | Queue only after the transaction commits, as `Boards._begin` does. |
 | Budgets and pace | `Budget` and `RateLimiter` in `app/limits.py` | Every route that calls a model or voice spends first. |

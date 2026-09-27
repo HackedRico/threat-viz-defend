@@ -1,8 +1,10 @@
 import time
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 
@@ -11,8 +13,9 @@ from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
+from app.errors import AppError
 from app.llm.base import LlmError
-from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow
+from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow, UsageRow
 from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
@@ -139,11 +142,23 @@ def test_a_failed_model_call_restores_the_board_and_reports_why(make_client: Cli
         def find_threats(self, system: SystemMap) -> ThreatAnalysis:
             raise AssertionError("not called")
 
-        def answer(self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None) -> Answer:
+        def answer(
+            self,
+            system: SystemMap,
+            analysis: ThreatAnalysis,
+            question: str,
+            focus: str | None,
+            notes: Sequence[str] = (),
+        ) -> Answer:
             raise AssertionError("not called")
 
         def grade(
-            self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str
+            self,
+            system: SystemMap,
+            analysis: ThreatAnalysis | None,
+            question: QuizQuestion,
+            text: str,
+            notes: Sequence[str] = (),
         ) -> OpenGrade:
             raise AssertionError("not called")
 
@@ -275,12 +290,17 @@ def test_an_answer_graded_while_the_board_changed_is_not_saved(make_client: Clie
 
     class Interrupted(DemoAnalyst):
         def grade(
-            self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str
+            self,
+            system: SystemMap,
+            analysis: ThreatAnalysis | None,
+            question: QuizQuestion,
+            text: str,
+            notes: Sequence[str] = (),
         ) -> OpenGrade:
             # A coding agent's change lands while the model grades.
             with holder["client"].app.state.services.db.session() as session:  # type: ignore[attr-defined]
                 session.execute(update(BoardRow).values(status="mapping"))
-            return super().grade(system, analysis, question, text)
+            return super().grade(system, analysis, question, text, notes)
 
     client = holder["client"] = make_client(analyst=Interrupted())
     sign_up(client)
@@ -290,3 +310,25 @@ def test_an_answer_graded_while_the_board_changed_is_not_saved(make_client: Clie
     db = client.app.state.services.db  # type: ignore[attr-defined]
     with db.session() as session:
         assert session.scalar(select(func.count()).select_from(QuizAttemptRow)) == 0
+
+
+def test_two_requests_that_both_saw_an_idle_board_start_one_job(make_client: ClientFactory) -> None:
+    client = make_client()
+    sign_up(client)
+    services = client.app.state.services  # type: ignore[attr-defined]
+    user_id = client.get("/api/auth/me").json()["user"]["id"]
+    board_id = client.get("/api/boards").json()[0]["id"]
+
+    def another_request_claims_it_first(row: BoardRow) -> None:
+        # Between this request's read and its claim, a coding agent's change starts drawing the board.
+        with services.db.session() as session:
+            session.execute(update(BoardRow).where(BoardRow.id == board_id).values(status="mapping"))
+
+    with pytest.raises(AppError) as info:
+        services.boards._begin(
+            user_id, board_id, "find_threats", "analyzing", lambda row, session: None, another_request_claims_it_first
+        )
+    assert info.value.status == 409
+    with services.db.session() as session:
+        assert session.scalar(select(func.count()).select_from(UsageRow)) == 0
+        assert session.get(BoardRow, board_id).status == "mapping"

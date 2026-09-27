@@ -19,11 +19,11 @@ The core engine is the hub. Every other area is a spoke that touches it at one s
            ┌─────────────┤ static, dynamic ├──────────────┐
            │             │ rules, quiz, API│              │
            │             └─────────────────┘              │
-  config.py settings                                Llm protocol
+  config.py settings                          Llm and Memory protocols
            │                                              │
-  Hosting (Jonathan)                               Model providers
+  Hosting (Jonathan)                             Model and memory
 DigitalOcean, GoDaddy,                           OpenAI compatible,
-        credits                                 Backboard
+        credits                                 Backboard memory
 ```
 
 ## The engine and its seams
@@ -42,6 +42,7 @@ The engine turns material into a map, a confirmed map into threats, and threats 
 | Hosting | Jonathan | `api/app/config.py` settings and `/api/health` | Environment variables in, a health check out |
 | Coding agents | Ricky | `/mcp` tools and `POST /api/agent/boards/{id}/changes` | Diffs and summaries in, board facts out |
 | Model providers | Ricky | The `Llm` protocol in `api/app/llm/base.py` | One structured request in, one validated object out |
+| Memory | Ricky | The `Memory` protocol in `api/app/memory.py` | A query in and earlier notes out, or one new note in |
 
 When a spoke needs something the seam does not carry, change the seam, not the other side of it: the engine owner adds the field, route or setting, and the spoke reads it.
 

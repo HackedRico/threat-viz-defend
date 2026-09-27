@@ -21,6 +21,10 @@ from app.domain.masking import MAX_FILES, mask_secrets, skip_reason
 
 MATERIAL_CHARS = 150_000
 PER_FILE_CHARS = 24_000
+# READMEs and docs together, so a well documented project still sends its code.
+PROSE_CHARS = 40_000
+# Room kept for the list of files left out, so the material stays inside `MATERIAL_CHARS`.
+LEFT_OUT_CHARS = 6_000
 # The changed file list of one agent change, so a long list cannot crowd out the diff or the budget.
 FILE_LIST_CHARS = 20_000
 TREE_LINES = 300
@@ -50,6 +54,12 @@ _PRIORITY: tuple[tuple[int, re.Pattern[str]], ...] = (
     (8, re.compile(r"\.(py|ts|tsx|js|jsx|go|rs|java|kt|rb|php|cs|swift)$")),
 )
 
+
+# Tests, fixtures, examples and generated types say little about the running system, so they go last.
+_LOW_VALUE = re.compile(
+    r"(^|/)(tests?|__tests__|spec|e2e|fixtures?|testdata|examples?|samples?|mocks?|__mocks__|migrations|docs_src)/"
+    r"|(^|/)test_[^/]*\.py$|_test\.(py|go)$|\.(test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$"
+)
 
 # Prose reads better without line numbers, and its evidence is quoted, not located.
 _PROSE = re.compile(r"\.(md|markdown|mdx|txt|rst|adoc)$")
@@ -102,7 +112,7 @@ def build_material(items: Sequence[SourceItem], now: datetime) -> Material:
     masked_total = 0
     chunks: list[str] = []
     omitted: list[str] = []
-    budget = MATERIAL_CHARS
+    budget = MATERIAL_CHARS - LEFT_OUT_CHARS
 
     code_paths = [i.name for i in readable if i.kind == "code"]
     if code_paths:
@@ -112,7 +122,9 @@ def build_material(items: Sequence[SourceItem], now: datetime) -> Material:
         chunks.append(listing)
         budget -= len(listing)
 
-    for item in sorted(readable, key=_rank):
+    root = _upload_root(readable)
+    prose = 0
+    for item in sorted(readable, key=lambda i: _rank(i, root)):
         masked = mask_secrets(item.text)
         masked_total += masked.count
         body = masked.text
@@ -124,14 +136,17 @@ def build_material(items: Sequence[SourceItem], now: datetime) -> Material:
             body = number_lines(body)
         body += cut
         block = f"### {_heading(item)}\n{body}"
-        if len(block) > budget:
+        is_prose = _rank(item, root)[0] in (0, 1)
+        if len(block) > budget or (is_prose and prose + len(block) > PROSE_CHARS):
             omitted.append(item.name)
             continue
+        prose += len(block) if is_prose else 0
         chunks.append(block)
         budget -= len(block)
 
     if omitted:
-        chunks.append("### Files left out to fit the size budget\n" + "\n".join(omitted[:TREE_LINES]))
+        listing = "### Files left out to fit the size budget\n" + "\n".join(omitted[:TREE_LINES])
+        chunks.append(listing[:LEFT_OUT_CHARS])
     sources = [
         {
             "id": str(uuid.uuid4()),
@@ -178,13 +193,28 @@ def agent_material(agent: str, summary: str, diff: str, files: Sequence[str], no
     return Material(text, [source], safe_diff.count)
 
 
-def _rank(item: SourceItem) -> tuple[int, int, str]:
+def _upload_root(items: Sequence[SourceItem]) -> str:
+    """The folder every uploaded file sits in, such as `api/`, or `''`; ranking ignores it."""
+    names = [i.name for i in items if i.kind != "text"]
+    if not names or any("/" not in name for name in names):
+        return ""
+    roots = {name.split("/", 1)[0].lower() for name in names}
+    return f"{roots.pop()}/" if len(roots) == 1 else ""
+
+
+def _rank(item: SourceItem, root: str = "") -> tuple[int, int, str]:
     """Sort key: pasted text first, then by architectural value, then smaller files first."""
     if item.kind == "text":
         return (-1, 0, item.name)
-    path = item.name.lower()
-    rank = next((r for r, pattern in _PRIORITY if pattern.search(path)), 9)
-    return (rank, len(item.text), path)
+    # A picked folder named `api` must not rank every file inside it as a route.
+    return path_rank(item.name[len(root) :] if item.name.lower().startswith(root) else item.name, len(item.text))
+
+
+def path_rank(path: str, size: int) -> tuple[int, int, str]:
+    """Sort key for a file known only by path and size: architectural value first, then smaller first."""
+    lowered = path.lower()
+    rank = 10 if _LOW_VALUE.search(lowered) else next((r for r, pattern in _PRIORITY if pattern.search(lowered)), 9)
+    return (rank, size, lowered)
 
 
 def _heading(item: SourceItem) -> str:

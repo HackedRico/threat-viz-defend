@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type F
 
 import { api, errorMessage } from "../api/client.ts";
 import type { Answer, BoardOut, SystemMap } from "../api/types.ts";
+import { MemoryTrace } from "../settings/MemoryTrace.tsx";
 import { useProvider } from "../settings/provider.ts";
 import { CloseIcon, SparkIcon } from "../shell/icons.tsx";
 import { ResizeHandle } from "../shell/ResizeHandle.tsx";
@@ -21,7 +22,8 @@ import "./AskDock.css";
 // any, goes along as the focus; the answer comes back as plain text plus ids
 // that light up on the map. The bar fits its content until the user drags its
 // top edge. The starter questions name this board's own parts and go away
-// once the first question is sent. A mic beside Ask writes a spoken question
+// once the first question is sent. With Backboard memory on, the answer says
+// which earlier notes were fed into it and that this question was kept. A mic beside Ask writes a spoken question
 // into the box, where the user reads it before sending; on a server without
 // dictation it stays, and pressing it says dictation is off.
 
@@ -88,6 +90,14 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   const [asked, setAsked] = useState(false);
   const { dock, shown, size, bounds, setHeight } = useDockHeight();
   const input = useRef<HTMLTextAreaElement>(null);
+  // An answer can land after the reader moved to another board; it must not light that board's map.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const id = useId();
   const analysis = board.analysis;
   const starters = useMemo(
@@ -107,6 +117,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
     setError(null);
     try {
       const reply = await api.ask(board.id, text, selected);
+      if (!alive.current) return;
       setAnswer({ question: text, reply });
       setAsked(true);
       setHighlight(reply.highlight, "ask");
@@ -175,6 +186,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
               </button>
             </div>
           )}
+          {answer.reply.memory && <MemoryTrace memory={answer.reply.memory} what="answer" />}
         </div>
       )}
 

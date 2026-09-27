@@ -1,6 +1,8 @@
 import logging
+import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 from urllib.parse import urlparse
 
@@ -15,6 +17,10 @@ INTERACTIVE_TASKS = frozenset({"answer", "grade"})
 INTERACTIVE_BUDGET_S = 30.0
 # A provider asking for a longer pause than this is treated as down, since a job would sit on it.
 MAX_RETRY_WAIT_S = 60.0
+# The longest a background job waits for its turn when calls are queued; a draft ahead of it takes a few minutes.
+QUEUE_WAIT_S = 600.0
+# A background job is not watched, so it rides out a busy provider longer than a person would wait.
+BACKGROUND_RETRIES = 4
 
 # =============================================================================
 # Module Overview
@@ -25,6 +31,9 @@ MAX_RETRY_WAIT_S = 60.0
 # schema, and gives the model one chance to repair output that fails validation.
 # It retries busy or failing providers itself, logging each retry, and holds an
 # interactive task to `INTERACTIVE_BUDGET_S` so a stalled provider shows an error.
+# With `concurrency` set, calls queue for a slot instead of racing: a provider
+# that serves one call at a time, as Featherless does for large models on most
+# plans, answers a second concurrent call with 429.
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +51,7 @@ class OpenAICompatibleLlm:
         timeout_s: float = 120.0,
         max_tokens: int | None = None,
         max_retries: int = 2,
+        concurrency: int | None = None,
         client: openai.OpenAI | None = None,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
@@ -55,6 +65,7 @@ class OpenAICompatibleLlm:
         self._max_retries = max_retries
         self._sleep = sleep
         self._clock = clock
+        self._turns = threading.BoundedSemaphore(concurrency) if concurrency else None
         self._client = client or openai.OpenAI(
             api_key=api_key,
             base_url=base_url,
@@ -76,6 +87,12 @@ class OpenAICompatibleLlm:
 
     def generate[T: BaseModel](self, request: LlmRequest[T]) -> T:
         """Call the model, validate its JSON against `request.schema`, and repair once on failure."""
+        # One turn covers the repair too, so a queued call cannot slip in between a reply and its repair.
+        with self._turn(request.task):
+            return self._generate(request)
+
+    def _generate[T: BaseModel](self, request: LlmRequest[T]) -> T:
+        """The call and its one repair round."""
         messages: list[dict[str, str]] = [
             {"role": "system", "content": self._system_prompt(request)},
             {"role": "user", "content": request.user},
@@ -98,9 +115,19 @@ class OpenAICompatibleLlm:
                 "bad_output", f"{self._label} returned data in the wrong shape twice. Try again, or use another model."
             ) from second
 
-    def remembers(self, task: str) -> bool:
-        """Never: each Chat Completions call stands alone."""
-        return False
+    @contextmanager
+    def _turn(self, task: str) -> Iterator[None]:
+        """Hold one call slot for a whole `generate`, waiting as long as the task's person, or job, can."""
+        if self._turns is None:
+            yield
+            return
+        wait = INTERACTIVE_BUDGET_S if task in INTERACTIVE_TASKS else QUEUE_WAIT_S
+        if not self._turns.acquire(timeout=wait):
+            raise LlmError("rate_limited", f"{self._label} is still busy with another board. Try again in a minute.")
+        try:
+            yield
+        finally:
+            self._turns.release()
 
     def _system_prompt(self, request: LlmRequest[Any]) -> str:
         """The system prompt, plus the schema in words when the provider will not enforce it."""
@@ -161,6 +188,9 @@ class OpenAICompatibleLlm:
         if self._max_tokens is not None:
             kwargs[self._cap_field] = self._max_tokens
         attempt = 0
+        background = deadline is None
+        # A saved provider gets no retries at all, and keeps none here; the server's model gets more for jobs.
+        retries = max(self._max_retries, BACKGROUND_RETRIES) if background and self._max_retries else self._max_retries
         while True:
             left = None if deadline is None else deadline - self._clock()
             if left is not None and left <= 0:
@@ -175,10 +205,13 @@ class OpenAICompatibleLlm:
                 raise LlmError("auth", f"{self._label} rejected the API key. Check `LLM_API_KEY`.") from exc
             except openai.NotFoundError as exc:
                 raise LlmError("not_configured", f"{self._label} does not know that model. Check `LLM_MODEL`.") from exc
+            except openai.APITimeoutError as exc:
+                # Sending the same prompt again only doubles the wait; the person hears about it now instead.
+                raise _transient_error(self._label, exc, deadline) from exc
             except (openai.RateLimitError, openai.InternalServerError, openai.APIConnectionError) as exc:
-                wait = _retry_wait(exc, attempt)
+                wait = _retry_wait(exc, attempt, background=background)
                 fits = deadline is None or self._clock() + wait < deadline
-                if attempt >= self._max_retries or wait > MAX_RETRY_WAIT_S or not fits:
+                if attempt >= retries or wait > MAX_RETRY_WAIT_S or not fits:
                     raise _transient_error(self._label, exc, deadline) from exc
                 log.warning(
                     "[llm] %s %s attempt %d failed (%s); retrying in %.1fs.",
@@ -190,9 +223,11 @@ class OpenAICompatibleLlm:
                 raise LlmError("unavailable", f"{self._label} is unavailable right now: {_brief(exc)}") from exc
 
 
-def _retry_wait(exc: Exception, attempt: int) -> float:
-    """Seconds to wait before retrying: the provider's `Retry-After` when it sent one, else a short backoff."""
-    backoff = min(0.5 * 2.0**attempt, 8.0)
+def _retry_wait(exc: Exception, attempt: int, *, background: bool = False) -> float:
+    """Seconds to wait before retrying: the provider's `Retry-After` when it sent one, else a backoff."""
+    # A job can wait out another process's call on the same key; a person waiting on a question cannot.
+    base, cap = (2.0, 20.0) if background else (0.5, 8.0)
+    backoff = min(base * 2.0**attempt, cap)
     # Only status errors carry a response; a dropped connection or a timeout has none.
     header = exc.response.headers.get("retry-after") if isinstance(exc, openai.APIStatusError) else None
     try:

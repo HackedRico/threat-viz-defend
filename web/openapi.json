@@ -68,31 +68,6 @@
         "title": "AgentChangeOut",
         "type": "object"
       },
-      "Answer": {
-        "additionalProperties": false,
-        "description": "A reply to a question about one threat model.",
-        "properties": {
-          "answer": {
-            "description": "1 to 3 sentences naming components, flows and threat ids",
-            "title": "Answer",
-            "type": "string"
-          },
-          "highlight": {
-            "description": "Node, flow and threat ids the reader should look at",
-            "items": {
-              "type": "string"
-            },
-            "title": "Highlight",
-            "type": "array"
-          }
-        },
-        "required": [
-          "answer",
-          "highlight"
-        ],
-        "title": "Answer",
-        "type": "object"
-      },
       "AnswerIn": {
         "additionalProperties": false,
         "description": "An answer: option ids for choice questions, words for open ones.",
@@ -131,18 +106,29 @@
         "type": "object"
       },
       "AnsweredOut": {
-        "description": "The graded attempt, and the mastery that follows from it.",
+        "description": "The graded attempt, the mastery that follows from it, and how memory took part. `memory` is null when off.",
         "properties": {
           "attempt": {
             "$ref": "#/components/schemas/AttemptOut"
           },
           "mastery": {
             "$ref": "#/components/schemas/Mastery"
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryUse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "attempt",
-          "mastery"
+          "mastery",
+          "memory"
         ],
         "title": "AnsweredOut",
         "type": "object"
@@ -174,6 +160,39 @@
           "question"
         ],
         "title": "AskIn",
+        "type": "object"
+      },
+      "AskOut": {
+        "description": "The answer to a question, the ids to highlight, and how memory took part. `memory` is null when it is off.",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "highlight": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Highlight",
+            "type": "array"
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryUse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "answer",
+          "highlight",
+          "memory"
+        ],
+        "title": "AskOut",
         "type": "object"
       },
       "AttackPath": {
@@ -726,6 +745,7 @@
               "budget_exhausted",
               "payload_too_large",
               "model_error",
+              "memory_error",
               "voice_error",
               "not_configured",
               "internal_error"
@@ -1114,7 +1134,7 @@
       },
       "MemoryIn": {
         "additionalProperties": false,
-        "description": "A user's Backboard key for memory. `api_key` null keeps the saved key.",
+        "description": "A user's own Backboard key for memory, used in place of the server's. `api_key` null keeps the saved key.",
         "properties": {
           "api_key": {
             "anyOf": [
@@ -1133,11 +1153,73 @@
         "title": "MemoryIn",
         "type": "object"
       },
+      "MemoryNoteOut": {
+        "description": "One note Backboard holds about the user.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "created_at"
+        ],
+        "title": "MemoryNoteOut",
+        "type": "object"
+      },
+      "MemoryNotesOut": {
+        "description": "What Backboard remembers about the user, newest first.",
+        "properties": {
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryNoteOut"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "own",
+              "server",
+              "none"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "notes"
+        ],
+        "title": "MemoryNotesOut",
+        "type": "object"
+      },
       "MemoryOut": {
-        "description": "Whether memory is saved and whether it applies to the user's analyses now. Never the key.",
+        "description": "The user's memory: switched on or not, whether it works now, and whose Backboard account holds it. No key.",
         "properties": {
           "active": {
             "title": "Active",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
             "type": "boolean"
           },
           "key_preview": {
@@ -1159,6 +1241,15 @@
             "title": "Saved",
             "type": "boolean"
           },
+          "source": {
+            "enum": [
+              "own",
+              "server",
+              "none"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -1173,13 +1264,30 @@
           }
         },
         "required": [
-          "saved",
+          "enabled",
           "active",
+          "source",
+          "saved",
           "key_preview",
           "message",
           "updated_at"
         ],
         "title": "MemoryOut",
+        "type": "object"
+      },
+      "MemorySwitchIn": {
+        "additionalProperties": false,
+        "description": "Turn memory on or off for this user.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "MemorySwitchIn",
         "type": "object"
       },
       "MemoryTestOut": {
@@ -1199,6 +1307,28 @@
           "message"
         ],
         "title": "MemoryTestOut",
+        "type": "object"
+      },
+      "MemoryUse": {
+        "description": "What Backboard memory did around one model call: the notes it fed in, and whether it keeps a new one.",
+        "properties": {
+          "kept": {
+            "title": "Kept",
+            "type": "boolean"
+          },
+          "recalled": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recalled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recalled",
+          "kept"
+        ],
+        "title": "MemoryUse",
         "type": "object"
       },
       "Node": {
@@ -1320,17 +1450,10 @@
             "type": "string"
           },
           "kind": {
-            "enum": [
-              "openai_compatible",
-              "backboard"
-            ],
+            "const": "openai_compatible",
+            "default": "openai_compatible",
             "title": "Kind",
             "type": "string"
-          },
-          "memory": {
-            "default": false,
-            "title": "Memory",
-            "type": "boolean"
           },
           "model": {
             "maxLength": 120,
@@ -1340,7 +1463,6 @@
           }
         },
         "required": [
-          "kind",
           "base_url",
           "model"
         ],
@@ -1375,10 +1497,7 @@
           "kind": {
             "anyOf": [
               {
-                "enum": [
-                  "openai_compatible",
-                  "backboard"
-                ],
+                "const": "openai_compatible",
                 "type": "string"
               },
               {
@@ -1390,10 +1509,6 @@
           "label": {
             "title": "Label",
             "type": "string"
-          },
-          "memory": {
-            "title": "Memory",
-            "type": "boolean"
           },
           "model": {
             "anyOf": [
@@ -1434,7 +1549,6 @@
           "base_url",
           "model",
           "key_preview",
-          "memory",
           "label",
           "updated_at"
         ],
@@ -1548,6 +1662,40 @@
         "title": "QuizEvidence",
         "type": "object"
       },
+      "QuizFocus": {
+        "description": "Topics Backboard memory says the developer found hard before, which the quiz asks first, and why.",
+        "properties": {
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "topics": {
+            "items": {
+              "enum": [
+                "boundary",
+                "data",
+                "threat",
+                "stride",
+                "trifecta",
+                "attack",
+                "fix"
+              ],
+              "type": "string"
+            },
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "topics",
+          "notes"
+        ],
+        "title": "QuizFocus",
+        "type": "object"
+      },
       "QuizOption": {
         "description": "One choice, keyed by the element id or STRIDE letter it stands for.",
         "properties": {
@@ -1574,6 +1722,16 @@
             "title": "Analysis Version",
             "type": "integer"
           },
+          "focus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuizFocus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "mastery": {
             "$ref": "#/components/schemas/Mastery"
           },
@@ -1596,7 +1754,8 @@
           "analysis_version",
           "questions",
           "results",
-          "mastery"
+          "mastery",
+          "focus"
         ],
         "title": "QuizOut",
         "type": "object"
@@ -3784,7 +3943,7 @@
     },
     "/api/boards/{board_id}/ask": {
       "post": {
-        "description": "Answer a question about a finished board, with the ids to highlight.",
+        "description": "Answer a question about a finished board, with the ids to highlight and what memory recalled.",
         "operationId": "ask_api_boards__board_id__ask_post",
         "parameters": [
           {
@@ -3812,7 +3971,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Answer"
+                  "$ref": "#/components/schemas/AskOut"
                 }
               }
             },
@@ -4663,7 +4822,7 @@
         ]
       },
       "get": {
-        "description": "The questions for the board as it stands, and the latest result for each.",
+        "description": "The questions for the board as it stands, weak topics from memory first, and the latest result for each.",
         "operationId": "get_quiz_api_boards__board_id__quiz_get",
         "parameters": [
           {
@@ -5797,7 +5956,7 @@
     },
     "/api/memory": {
       "delete": {
-        "description": "Turn memory off and forget the key.",
+        "description": "Forget the user's own key; the server's Backboard account holds their memory from then on, if it has one.",
         "operationId": "delete_memory_api_memory_delete",
         "responses": {
           "204": {
@@ -5920,7 +6079,7 @@
         ]
       },
       "get": {
-        "description": "Whether memory is saved and applies to this user's analyses.",
+        "description": "Whether memory is on for this user, and whose Backboard account holds it.",
         "operationId": "get_memory_api_memory_get",
         "responses": {
           "200": {
@@ -6050,7 +6209,7 @@
         ]
       },
       "put": {
-        "description": "Save the user's Backboard key for memory; a null `api_key` keeps the saved one.",
+        "description": "Save the user's own Backboard key for memory; a null `api_key` keeps the saved one.",
         "operationId": "save_memory_api_memory_put",
         "requestBody": {
           "content": {
@@ -6185,6 +6344,403 @@
           }
         },
         "summary": "Save Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/enabled": {
+      "put": {
+        "description": "Turn memory on or off; notes already kept stay until forgotten.",
+        "operationId": "switch_memory_api_memory_enabled_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySwitchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Switch Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/notes": {
+      "delete": {
+        "description": "Delete every note Backboard holds about this user.",
+        "operationId": "forget_notes_api_memory_notes_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Forget Notes",
+        "tags": [
+          "memory"
+        ]
+      },
+      "get": {
+        "description": "What Backboard remembers about this user, newest first.",
+        "operationId": "get_notes_api_memory_notes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryNotesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Notes",
         "tags": [
           "memory"
         ]

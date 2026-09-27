@@ -60,7 +60,8 @@ export interface LayoutEngine {
   layout(graph: ElkNode): Promise<ElkNode>;
 }
 
-const ROOT = "root";
+// Server ids are slugs without "#", so no node on the map can take the root's id.
+const ROOT = "#root";
 const BOUNDARY_PREFIX = "boundary:";
 
 // Text widths are estimates for the canvas fonts: Caveat at 20px for node labels, IBM Plex

@@ -96,13 +96,13 @@ The server makes outbound requests to three kinds of address. Two are fixed; one
 
 **The GitHub importer** ([boards/github.py](../api/app/boards/github.py)).
 
-- `parse_repo_url` accepts only `https://github.com/<owner>/<repo>` with an optional `/tree/<ref>`, checked by a strict pattern, and refuses `..`.
+- `parse_repo_url` accepts only `https://github.com/<owner>/<repo>` with an optional `/tree/<ref>[/<folder>]` or `/blob/<ref>/...`, checked by a strict pattern after it drops a query or fragment and a `www.` host, and refuses `..`. The ref goes only into a `codeload.github.com` path; the folder only filters the archive's paths.
 - The server fetches only `https://codeload.github.com/...`, with redirects off and a 30 second timeout. The user never picks the host.
-- The download stops at 30 MB. The archive is read in memory and never written to disk. Only regular files are read, so links in the archive are ignored. Each file is capped at 200 KB, the total at 4 MB and 400 files, and only UTF-8 text is kept. The file policy applies to every path.
+- The download stops at 30 MB. The archive is read in memory and never written to disk. Only regular files are read, so links in the archive are ignored. Each file is capped at 200 KB, the total at 4 MB and 400 files, and only UTF-8 text is kept. The file policy applies to every path, and folders named `worktrees` or `site-packages` are skipped like `node_modules`.
 
 **Fixed hosts.** Backboard (`BACKBOARD_BASE_URL`) and ElevenLabs are called with redirects off.
 
-**Saved keys stay with their host.** A saved key is reused only for the same provider kind and base URL. Changing either needs the key typed again, so someone holding a session cannot redirect a user's key to their own server. Model clients never follow redirects, so a public base URL cannot bounce a request to a private address.
+**Saved keys stay with their host.** A saved key is reused only for the same base URL. Changing either needs the key typed again, so someone holding a session cannot redirect a user's key to their own server. Model clients never follow redirects, so a public base URL cannot bounce a request to a private address.
 
 ## Prompt injection
 
@@ -134,8 +134,7 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 |---|---|---|
 | The server's model provider (`LLM_BASE_URL`) | Masked material, maps, threats, questions to the analyst and open quiz answers | For users without their own provider |
 | The user's own provider | The same | For that user |
-| Backboard | The same. With memory on, Backboard may keep anything in answer and grade calls as memory of the user's assistant: the question or open answer, the reply, and the map and threats, sent without the map's evidence quotes, how-it-works notes or code references. Map and threat calls, which carry the material and its quotes, only read memory | For users who pick Backboard as their provider |
-| Backboard memory | The user's questions to the analyst and the open quiz questions as search queries, and notes of those questions with each quiz verdict. Never uploads, maps or the user's answer text | For users who save a memory key with their own model |
+| Backboard memory | Search queries: the user's questions to the analyst, the open quiz questions they answer, and a fixed query about missed quiz topics. Notes: the board's title with each question, and with each quiz answer the question, its topic and whether it was right. Never uploads, maps, threats, model replies or the user's answer text. Backboard never makes a model call for the app | While memory is on: for every user when `BACKBOARD_API_KEY` is set, in an assistant of their own, or in the user's own account when they save a key |
 | ElevenLabs | The user's voice, the transcript, the username, the system name, a short brief of the board, and the quiz questions and feedback the tools return | During a voice session |
 | ElevenLabs | A recording of the question the user dictates, up to a minute, through the API with the server's key | When the user presses the mic beside **Ask** |
 | GitHub | A request for the named public repository, from the server's IP | During an import |

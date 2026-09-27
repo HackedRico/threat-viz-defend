@@ -6,7 +6,14 @@
 // the `/boards/<id>` review links coding agents print open the right board.
 
 /** A part of the settings screen. */
-export type SettingsSection = "agents" | "provider";
+export type SettingsSection = "agents" | "provider" | "memory";
+
+// The path under `/settings` for each section; coding agents sit at the bare path.
+const SECTION_PATH: Record<SettingsSection, string> = {
+  agents: "/settings",
+  provider: "/settings/provider",
+  memory: "/settings/memory",
+};
 
 /** A screen in the app. */
 export type Route =
@@ -19,7 +26,7 @@ export function parseRoute(pathname: string, search = ""): Route {
   const parts = pathname.split("/").filter(Boolean).map(safeDecode);
   if (parts[0] === "boards" && parts[1]) return { name: "board", boardId: parts[1] };
   if (parts[0] === "settings") {
-    const section: SettingsSection = parts[1] === "provider" ? "provider" : "agents";
+    const section: SettingsSection = parts[1] === "provider" || parts[1] === "memory" ? parts[1] : "agents";
     return { name: "settings", section, boardId: new URLSearchParams(search).get("board") };
   }
   return { name: "home" };
@@ -33,7 +40,7 @@ export function routePath(route: Route): string {
     case "board":
       return `/boards/${encodeURIComponent(route.boardId)}`;
     case "settings": {
-      const base = route.section === "provider" ? "/settings/provider" : "/settings";
+      const base = SECTION_PATH[route.section];
       return route.boardId ? `${base}?board=${encodeURIComponent(route.boardId)}` : base;
     }
   }

@@ -4,6 +4,7 @@ import { errorMessage } from "../api/client.ts";
 import type { BoardOut, SystemMap } from "../api/types.ts";
 import { labelOf } from "../board/elements.ts";
 import { useBoardUi } from "../board/store.ts";
+import { MemoryFocus } from "../settings/MemoryTrace.tsx";
 import { MicIcon } from "../shell/icons.tsx";
 import { useSession } from "../shell/session.tsx";
 import { voiceEnabled, VoicePanel } from "../voice/index.tsx";
@@ -16,8 +17,9 @@ import "./Quiz.css";
 // Module Overview
 // =============================================================================
 // Where the developer proves they can defend the board: a mastery score with
-// weak spots, and the same quiz answered by typing or by talking to the voice
-// coach. Both modes share one quiz state, so switching mid-way loses nothing.
+// weak spots, the topics Backboard memory says to start with, and the same quiz
+// answered by typing or by talking to the voice coach. Both modes share one
+// quiz state, so switching mid-way loses nothing.
 
 type Mode = "text" | "voice";
 
@@ -115,6 +117,8 @@ export function DefendPanel({
           </div>
         )}
       </section>
+
+      {quiz.focus && <MemoryFocus focus={quiz.focus} />}
 
       <div className="defend-modes" role="radiogroup" aria-label="How to answer">
         <button type="button" role="radio" aria-checked={mode === "text"} className="defend-mode" onClick={() => setMode("text")}>

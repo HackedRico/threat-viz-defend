@@ -1,4 +1,5 @@
 import re
+from collections.abc import Sequence
 from typing import Protocol
 
 from app.analysis import prompts
@@ -7,15 +8,15 @@ from app.domain.quiz import QuizQuestion
 from app.domain.rules import known_ids, label_of, only_known, sanitize_analysis, sanitize_map
 from app.examples import find_example, load_examples
 from app.llm.base import Llm, LlmError, LlmRequest
-from app.memory import Memory
 
 # =============================================================================
 # Module Overview
 # =============================================================================
 # An `Analyst` performs the four model-backed steps: `draft_map`, `find_threats`,
 # `answer` and `grade`. `LlmAnalyst` does them with a language model and runs
-# every result through the rules' sanitizers, and with a `Memory` it recalls
-# and keeps notes around `answer` and `grade`. `DemoAnalyst` needs no model: it
+# every result through the rules' sanitizers. `answer` and `grade` take the
+# notes Backboard memory recalled (`app.memory`), which the services fetch
+# before the call and fence into the prompt. `DemoAnalyst` needs no model: it
 # replays the built-in examples and grades open answers by keyword, so the app
 # runs, and tests pass, without an API key.
 
@@ -36,12 +37,21 @@ class Analyst(Protocol):
         """Find threats and attack paths on a confirmed map."""
         ...
 
-    def answer(self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None) -> Answer:
-        """Answer a question about a finished board."""
+    def answer(
+        self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None, notes: Sequence[str] = ()
+    ) -> Answer:
+        """Answer a question about a finished board, pitched by `notes` from earlier sessions."""
         ...
 
-    def grade(self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str) -> OpenGrade:
-        """Grade a developer's own-words answer to an open quiz question."""
+    def grade(
+        self,
+        system: SystemMap,
+        analysis: ThreatAnalysis | None,
+        question: QuizQuestion,
+        text: str,
+        notes: Sequence[str] = (),
+    ) -> OpenGrade:
+        """Grade a developer's own-words answer to an open quiz question; `notes` may shape the feedback."""
         ...
 
 
@@ -53,9 +63,8 @@ class Analyst(Protocol):
 class LlmAnalyst:
     """An `Analyst` that asks a language model and sanitizes every reply."""
 
-    def __init__(self, llm: Llm, memory: Memory | None = None) -> None:
+    def __init__(self, llm: Llm) -> None:
         self._llm = llm
-        self._memory = memory
 
     @property
     def label(self) -> str:
@@ -78,38 +87,37 @@ class LlmAnalyst:
         )
         return sanitize_analysis(system, analysis)
 
-    def answer(self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None) -> Answer:
+    def answer(
+        self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None, notes: Sequence[str] = ()
+    ) -> Answer:
         """Answer a question, keeping only highlights that exist on the board."""
-        notes = self._memory.recall(question) if self._memory else []
-        # Evidence quotes the uploads, so it stays out of any call the provider may keep as memory.
-        evidence = not self._llm.remembers("answer")
         reply = self._llm.generate(
             LlmRequest(
                 "answer",
                 prompts.ANSWER_SYSTEM,
-                prompts.answer_content(system, analysis, question, focus, notes, evidence=evidence),
+                prompts.answer_content(system, analysis, question, focus, notes),
                 Answer,
             )
         )
-        if self._memory:
-            self._memory.keep(f"Asked about their threat model: {question}")
         return Answer(answer=reply.answer, highlight=only_known(reply.highlight, known_ids(system, analysis)))
 
-    def grade(self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str) -> OpenGrade:
+    def grade(
+        self,
+        system: SystemMap,
+        analysis: ThreatAnalysis | None,
+        question: QuizQuestion,
+        text: str,
+        notes: Sequence[str] = (),
+    ) -> OpenGrade:
         """Grade an open answer, keeping only highlights that exist on the board."""
-        notes = self._memory.recall(question.prompt) if self._memory else []
-        evidence = not self._llm.remembers("grade")
         grade = self._llm.generate(
             LlmRequest(
                 "grade",
                 prompts.GRADE_SYSTEM,
-                prompts.grade_content(system, analysis, question, text, notes, evidence=evidence),
+                prompts.grade_content(system, analysis, question, text, notes),
                 OpenGrade,
             )
         )
-        if self._memory:
-            # The question and verdict only: the developer's own words stay out of memory.
-            self._memory.keep(f"Quiz question: {question.prompt} Their answer was graded {grade.verdict}.")
         return grade.model_copy(update={"highlight": only_known(grade.highlight, known_ids(system, analysis))})
 
 
@@ -157,7 +165,9 @@ class DemoAnalyst:
             )
         return sanitize_analysis(system, example.analysis)
 
-    def answer(self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None) -> Answer:
+    def answer(
+        self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None, notes: Sequence[str] = ()
+    ) -> Answer:
         """Return a recorded answer when the question matches one, or point at the questions demo mode knows."""
         wanted = _words(question)
         for example in load_examples():
@@ -170,7 +180,14 @@ class DemoAnalyst:
         hint = f' Try: "{known[0]}"' if known else ""
         return Answer(answer=f"Demo mode only knows recorded questions.{hint}", highlight=[])
 
-    def grade(self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str) -> OpenGrade:
+    def grade(
+        self,
+        system: SystemMap,
+        analysis: ThreatAnalysis | None,
+        question: QuizQuestion,
+        text: str,
+        notes: Sequence[str] = (),
+    ) -> OpenGrade:
         """Grade by how many expected elements the answer names, which is crude but needs no model."""
         said = _words(text)
         named = [item for item in question.expected if _words(label_of(system, analysis, item)) & said]

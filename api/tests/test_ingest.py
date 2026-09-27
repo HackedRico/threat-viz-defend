@@ -136,3 +136,14 @@ def test_real_git_diffs_keep_their_ordinary_sections(tmp_path: Path) -> None:
         text = material_text(git("diff", "--cached", *extra))
         assert "could not be read" not in text or extra == ["--no-prefix"]
         assert "+import requests" in text
+
+
+def test_code_gets_in_ahead_of_long_docs_and_tests() -> None:
+    items = [SourceItem(name=f"shop/docs/guide{i}.md", kind="file", text="Prose. " * 3000) for i in range(10)]
+    items += [SourceItem(name=f"shop/tests/test_{i}.py", kind="code", text="assert True\n" * 800) for i in range(30)]
+    items.append(SourceItem(name="shop/api/routes.py", kind="code", text="@app.post('/pay')\ndef pay(): ..."))
+    material = build_material(items, utcnow())
+    # The folder picked, `shop/`, is not what ranks its files; the route inside it is read, not crowded out.
+    assert "### File shop/api/routes.py" in material.text
+    assert material.text.count("### File shop/docs/") <= 2
+    assert material.text.index("### File shop/api/routes.py") < material.text.index("### File shop/tests/")

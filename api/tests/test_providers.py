@@ -5,21 +5,16 @@ from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.analysis.analyst import LlmAnalyst
-from app.domain.models import Answer, OpenGrade, ThreatAnalysis
-from app.domain.quiz import build_quiz
 from app.errors import AppError
-from app.llm.backboard import BackboardLlm
-from app.llm.base import LlmError, LlmRequest
+from app.llm.base import LlmError
 from app.providers import netguard, service
 from app.providers.netguard import check_base_url
 from app.providers.secrets_box import SecretBox
+from app.tables import ProviderRow
 from tests.conftest import ClientFactory, sign_up
-from tests.factories import inbox
 
 PUBLIC = "93.184.216.34"
 
@@ -69,7 +64,6 @@ def provider_body(**changes: Any) -> dict[str, Any]:
         "base_url": "https://api.example.com/v1",
         "model": "gpt-test",
         "api_key": "sk-user-key-1234",
-        "memory": False,
     }
     return {**body, **changes}
 
@@ -89,12 +83,12 @@ def test_provider_settings_round_trip_without_exposing_the_key(make_client: Clie
     assert client.get("/api/provider").json()["source"] == "demo"
 
 
-def test_backboard_needs_a_key_and_every_url_must_be_safe(make_client: ClientFactory) -> None:
+def test_every_url_must_be_safe_and_backboard_is_never_the_model(make_client: ClientFactory) -> None:
     client = make_client(allow_private_provider_urls=False, resolver=lambda host, port: ["127.0.0.1"])
     sign_up(client)
     assert client.put("/api/provider", json=provider_body()).status_code == 400
-    backboard_body = provider_body(kind="backboard", model="openai/gpt-4o", api_key=None)
-    assert client.put("/api/provider", json=backboard_body).status_code == 400
+    backboard_body = provider_body(kind="backboard", model="openai/gpt-4o")
+    assert client.put("/api/provider", json=backboard_body).status_code == 422
 
 
 def test_local_servers_can_be_saved_without_a_key(make_client: ClientFactory) -> None:
@@ -106,13 +100,6 @@ def test_local_servers_can_be_saved_without_a_key(make_client: ClientFactory) ->
     assert saved["key_preview"] is None
 
 
-def test_backboard_models_need_a_provider_prefix(make_client: ClientFactory) -> None:
-    client = make_client(resolver=public_dns)
-    sign_up(client)
-    body = provider_body(kind="backboard", base_url="https://app.backboard.io/api", model="gpt-4o")
-    assert client.put("/api/provider", json=body).status_code == 400
-
-
 def test_a_saved_provider_analyzes_the_users_boards(make_client: ClientFactory) -> None:
     client = make_client(resolver=public_dns)
     sign_up(client)
@@ -120,21 +107,6 @@ def test_a_saved_provider_analyzes_the_users_boards(make_client: ClientFactory) 
     chosen = client.app.state.services.providers.for_user(client.get("/api/auth/me").json()["user"]["id"])  # type: ignore[attr-defined]
     assert chosen.own_key
     assert chosen.analyst.label == "gpt-test via api.example.com"
-
-
-@pytest.mark.parametrize("memory", [True, False])
-def test_a_saved_backboard_provider_remembers_answers_and_grades_only_with_memory(
-    make_client: ClientFactory, memory: bool
-) -> None:
-    client = make_client(resolver=public_dns)
-    sign_up(client)
-    body = provider_body(
-        kind="backboard", base_url="https://app.backboard.io/api", model="openai/gpt-4o", memory=memory
-    )
-    client.put("/api/provider", json=body)
-    chosen = client.app.state.services.providers.for_user(client.get("/api/auth/me").json()["user"]["id"])  # type: ignore[attr-defined]
-    tasks = ["draft_map", "find_threats", "answer", "grade"]
-    assert [chosen.analyst._llm.remembers(task) for task in tasks] == [False, False, memory, memory]
 
 
 def test_a_saved_provider_gets_the_servers_output_cap(
@@ -154,99 +126,31 @@ def test_a_saved_provider_gets_the_servers_output_cap(
     assert built[0]["max_tokens"] == 16_384
 
 
-# -----------------------------------------------------------------
-# Backboard adapter against a recorded fake
-# -----------------------------------------------------------------
-
-
-def backboard(replies: list[dict[str, Any]], seen: list[dict[str, Any]], **options: Any) -> BackboardLlm:
-    def handle(request: httpx.Request) -> httpx.Response:
-        seen.append(
-            {
-                "path": request.url.path,
-                "body": json.loads(request.content or b"{}"),
-                "key": request.headers.get("x-api-key"),
-            }
-        )
-        return httpx.Response(200, json=replies.pop(0))
-
-    client = httpx.Client(base_url="https://bb.test/api", transport=httpx.MockTransport(handle))
-    return BackboardLlm(
-        api_key="bb-key", model="openai/gpt-4o", base_url="https://bb.test/api", client=client, **options
-    )
-
-
-REQUEST = LlmRequest("grade", "system rules", "user text", ThreatAnalysis)
-GOOD = inbox().analysis.model_dump_json()
-
-
-def test_backboard_sends_the_model_and_remembers_the_assistant() -> None:
-    seen: list[dict[str, Any]] = []
-    stored: list[str] = []
-    llm = backboard(
-        [{"content": GOOD, "thread_id": "t1", "assistant_id": "a1"}], seen, memory=True, on_assistant=stored.append
-    )
-    assert llm.generate(REQUEST).threats[0].id == "T1"
-    body = seen[0]["body"]
-    assert (body["llm_provider"], body["model_name"], body["memory"], body["json_output"]) == (
-        "openai",
-        "gpt-4o",
-        "Auto",
-        True,
-    )
-    assert seen[0]["key"] == "bb-key"
-    assert stored == ["a1"]
-
-
-def test_backboard_never_writes_uploaded_material_into_memory() -> None:
-    example = inbox()
-    # Marked evidence, so a quote from the uploads is easy to spot in any call that may write memory.
-    system = example.map.model_copy(
-        update={
-            "nodes": [n.model_copy(update={"evidence": f"upload-quote-{n.id}"}) for n in example.map.nodes],
-            "flows": [f.model_copy(update={"evidence": f"upload-quote-{f.id}"}) for f in example.map.flows],
-        }
-    )
-    question = next(q for q in build_quiz(system, example.analysis) if q.kind == "open")
-    replies = [
-        {"content": system.model_dump_json()},
-        {"content": example.analysis.model_dump_json()},
-        {"content": Answer(answer="Look at T1.", highlight=["T1"]).model_dump_json()},
-        {"content": OpenGrade(verdict="partial", feedback="Close.", highlight=[]).model_dump_json()},
-    ]
-    seen: list[dict[str, Any]] = []
-    analyst = LlmAnalyst(backboard(replies, seen, memory=True, assistant_id="a1"))
-    analyst.draft_map("upload-code", None)
-    analyst.find_threats(system)
-    analyst.answer(system, example.analysis, "Where can mail leak?", "agent")
-    analyst.grade(system, example.analysis, question, "Turn off auto-send.")
-    bodies = [s["body"] for s in seen]
-    assert [b["memory"] for b in bodies] == ["Readonly", "Readonly", "Auto", "Auto"]
-    assert all(b["assistant_id"] == "a1" for b in bodies)
-    assert "upload-quote-agent" in bodies[1]["content"]
-    for body in bodies[2:]:
-        assert "upload-" not in body["content"]
-        assert "Triage agent" in body["content"]
-
-
-def test_backboard_repairs_in_the_same_thread() -> None:
-    seen: list[dict[str, Any]] = []
-    llm = backboard([{"content": "not json", "thread_id": "t9"}, {"content": GOOD}], seen, memory=False)
-    llm.generate(REQUEST)
-    assert seen[1]["body"]["thread_id"] == "t9"
-    assert seen[0]["body"]["memory"] == "off"
-
-
-def test_backboard_auth_errors_are_explained() -> None:
-    client = httpx.Client(base_url="https://bb.test/api", transport=httpx.MockTransport(lambda r: httpx.Response(401)))
-    llm = BackboardLlm(api_key="x", model="openai/gpt-4o", base_url="https://bb.test/api", memory=False, client=client)
-    with pytest.raises(LlmError) as info:
-        llm.generate(REQUEST)
-    assert info.value.code == "auth"
-
-
 def test_provider_routes_need_a_session(client: TestClient) -> None:
     assert client.get("/api/provider").status_code == 401
+
+
+def test_a_provider_saved_when_backboard_could_be_the_model_is_ignored(make_client: ClientFactory) -> None:
+    client = make_client(resolver=public_dns)
+    sign_up(client)
+    user_id = client.get("/api/auth/me").json()["user"]["id"]
+    services = client.app.state.services  # type: ignore[attr-defined]
+    with services.db.session() as session:
+        session.add(
+            ProviderRow(
+                user_id=user_id,
+                kind="backboard",
+                base_url="https://app.backboard.io/api",
+                model="openai/gpt-4o",
+                key_sealed=SecretBox(services.settings.app_secret).seal("bb-old-key", user_id),
+                key_last4="-key",
+                memory=True,
+            )
+        )
+    assert client.get("/api/provider").json()["source"] == "demo"
+    assert services.providers.for_user(user_id).own_key is False
+    saved = client.put("/api/provider", json=provider_body(api_key=None)).json()
+    assert (saved["source"], saved["key_preview"]) == ("custom", None)
 
 
 def test_a_saved_key_is_not_reused_for_another_host(make_client: ClientFactory) -> None:

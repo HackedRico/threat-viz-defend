@@ -207,7 +207,7 @@ export interface paths {
         put?: never;
         /**
          * Ask
-         * @description Answer a question about a finished board, with the ids to highlight.
+         * @description Answer a question about a finished board, with the ids to highlight and what memory recalled.
          */
         post: operations["ask_api_boards__board_id__ask_post"];
         delete?: never;
@@ -305,7 +305,7 @@ export interface paths {
         };
         /**
          * Get Quiz
-         * @description The questions for the board as it stands, and the latest result for each.
+         * @description The questions for the board as it stands, weak topics from memory first, and the latest result for each.
          */
         get: operations["get_quiz_api_boards__board_id__quiz_get"];
         put?: never;
@@ -469,20 +469,64 @@ export interface paths {
         };
         /**
          * Get Memory
-         * @description Whether memory is saved and applies to this user's analyses.
+         * @description Whether memory is on for this user, and whose Backboard account holds it.
          */
         get: operations["get_memory_api_memory_get"];
         /**
          * Save Memory
-         * @description Save the user's Backboard key for memory; a null `api_key` keeps the saved one.
+         * @description Save the user's own Backboard key for memory; a null `api_key` keeps the saved one.
          */
         put: operations["save_memory_api_memory_put"];
         post?: never;
         /**
          * Delete Memory
-         * @description Turn memory off and forget the key.
+         * @description Forget the user's own key; the server's Backboard account holds their memory from then on, if it has one.
          */
         delete: operations["delete_memory_api_memory_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memory/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch Memory
+         * @description Turn memory on or off; notes already kept stay until forgotten.
+         */
+        put: operations["switch_memory_api_memory_enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memory/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notes
+         * @description What Backboard remembers about this user, newest first.
+         */
+        get: operations["get_notes_api_memory_notes_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Forget Notes
+         * @description Delete every note Backboard holds about this user.
+         */
+        delete: operations["forget_notes_api_memory_notes_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -643,22 +687,6 @@ export interface components {
             status: "empty" | "mapping" | "review" | "analyzing" | "ready";
         };
         /**
-         * Answer
-         * @description A reply to a question about one threat model.
-         */
-        Answer: {
-            /**
-             * Answer
-             * @description 1 to 3 sentences naming components, flows and threat ids
-             */
-            answer: string;
-            /**
-             * Highlight
-             * @description Node, flow and threat ids the reader should look at
-             */
-            highlight: string[];
-        };
-        /**
          * AnswerIn
          * @description An answer: option ids for choice questions, words for open ones.
          */
@@ -672,11 +700,12 @@ export interface components {
         };
         /**
          * AnsweredOut
-         * @description The graded attempt, and the mastery that follows from it.
+         * @description The graded attempt, the mastery that follows from it, and how memory took part. `memory` is null when off.
          */
         AnsweredOut: {
             attempt: components["schemas"]["AttemptOut"];
             mastery: components["schemas"]["Mastery"];
+            memory: components["schemas"]["MemoryUse"] | null;
         };
         /**
          * AskIn
@@ -687,6 +716,17 @@ export interface components {
             focus?: string | null;
             /** Question */
             question: string;
+        };
+        /**
+         * AskOut
+         * @description The answer to a question, the ids to highlight, and how memory took part. `memory` is null when it is off.
+         */
+        AskOut: {
+            /** Answer */
+            answer: string;
+            /** Highlight */
+            highlight: string[];
+            memory: components["schemas"]["MemoryUse"] | null;
         };
         /**
          * AttackPath
@@ -933,7 +973,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "bad_request" | "invalid_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "budget_exhausted" | "payload_too_large" | "model_error" | "voice_error" | "not_configured" | "internal_error";
+            code: "bad_request" | "invalid_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "budget_exhausted" | "payload_too_large" | "model_error" | "memory_error" | "voice_error" | "not_configured" | "internal_error";
             /** Message */
             message: string;
         };
@@ -1104,27 +1144,67 @@ export interface components {
         };
         /**
          * MemoryIn
-         * @description A user's Backboard key for memory. `api_key` null keeps the saved key.
+         * @description A user's own Backboard key for memory, used in place of the server's. `api_key` null keeps the saved key.
          */
         MemoryIn: {
             /** Api Key */
             api_key?: string | null;
         };
         /**
+         * MemoryNoteOut
+         * @description One note Backboard holds about the user.
+         */
+        MemoryNoteOut: {
+            /** Content */
+            content: string;
+            /** Created At */
+            created_at: string | null;
+            /** Id */
+            id: string;
+        };
+        /**
+         * MemoryNotesOut
+         * @description What Backboard remembers about the user, newest first.
+         */
+        MemoryNotesOut: {
+            /** Notes */
+            notes: components["schemas"]["MemoryNoteOut"][];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "own" | "server" | "none";
+        };
+        /**
          * MemoryOut
-         * @description Whether memory is saved and whether it applies to the user's analyses now. Never the key.
+         * @description The user's memory: switched on or not, whether it works now, and whose Backboard account holds it. No key.
          */
         MemoryOut: {
             /** Active */
             active: boolean;
+            /** Enabled */
+            enabled: boolean;
             /** Key Preview */
             key_preview: string | null;
             /** Message */
             message: string;
             /** Saved */
             saved: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "own" | "server" | "none";
             /** Updated At */
             updated_at: string | null;
+        };
+        /**
+         * MemorySwitchIn
+         * @description Turn memory on or off for this user.
+         */
+        MemorySwitchIn: {
+            /** Enabled */
+            enabled: boolean;
         };
         /**
          * MemoryTestOut
@@ -1135,6 +1215,16 @@ export interface components {
             message: string;
             /** Ok */
             ok: boolean;
+        };
+        /**
+         * MemoryUse
+         * @description What Backboard memory did around one model call: the notes it fed in, and whether it keeps a new one.
+         */
+        MemoryUse: {
+            /** Kept */
+            kept: boolean;
+            /** Recalled */
+            recalled: string[];
         };
         /**
          * Node
@@ -1204,14 +1294,10 @@ export interface components {
             base_url: string;
             /**
              * Kind
-             * @enum {string}
+             * @default openai_compatible
+             * @constant
              */
-            kind: "openai_compatible" | "backboard";
-            /**
-             * Memory
-             * @default false
-             */
-            memory: boolean;
+            kind: "openai_compatible";
             /** Model */
             model: string;
         };
@@ -1225,11 +1311,9 @@ export interface components {
             /** Key Preview */
             key_preview: string | null;
             /** Kind */
-            kind: ("openai_compatible" | "backboard") | null;
+            kind: "openai_compatible" | null;
             /** Label */
             label: string;
-            /** Memory */
-            memory: boolean;
             /** Model */
             model: string | null;
             /**
@@ -1289,6 +1373,16 @@ export interface components {
             label: string;
         };
         /**
+         * QuizFocus
+         * @description Topics Backboard memory says the developer found hard before, which the quiz asks first, and why.
+         */
+        QuizFocus: {
+            /** Notes */
+            notes: string[];
+            /** Topics */
+            topics: ("boundary" | "data" | "threat" | "stride" | "trifecta" | "attack" | "fix")[];
+        };
+        /**
          * QuizOption
          * @description One choice, keyed by the element id or STRIDE letter it stands for.
          */
@@ -1305,6 +1399,7 @@ export interface components {
         QuizOut: {
             /** Analysis Version */
             analysis_version: number;
+            focus: components["schemas"]["QuizFocus"] | null;
             mastery: components["schemas"]["Mastery"];
             /** Questions */
             questions: components["schemas"]["QuestionOut"][];
@@ -3055,7 +3150,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Answer"];
+                    "application/json": components["schemas"]["AskOut"];
                 };
             };
             /** @description Bad Request */
@@ -4985,6 +5080,365 @@ export interface operations {
         };
     };
     delete_memory_api_memory_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    switch_memory_api_memory_enabled_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemorySwitchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_notes_api_memory_notes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryNotesOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    forget_notes_api_memory_notes_delete: {
         parameters: {
             query?: never;
             header?: never;

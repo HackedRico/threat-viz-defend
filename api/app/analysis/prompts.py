@@ -186,8 +186,8 @@ experts. Use only the map and threats provided. Answer in 1 to 3 plain sentences
 threat ids. In `highlight`, list the node, flow and threat ids the reader should look at on the board. If the map \
 cannot answer the question, say what is missing from it. When a <focus> is given, the reader selected that element \
 before asking, so start from it. A <memory> block, when present, holds notes from this developer's earlier \
-sessions: use it only to pitch the answer, such as revisiting a topic they found hard, never as a fact about this \
-system.
+sessions: use it only to pitch the answer, never as a fact about this system. When a note shows they asked about \
+or missed something related before, connect to it in one short clause, such as noting a quiz topic they found hard.
 
 Answer only the question in the <question> block. {untrusted("map", "threats", "focus", "question", "memory")}"""
 
@@ -198,8 +198,6 @@ def answer_content(
     question: str,
     focus: str | None,
     notes: Sequence[str] = (),
-    *,
-    evidence: bool = True,
 ) -> str:
     """User content for a question: the map, the threats, the focused element, remembered notes and the question."""
     threats = {
@@ -210,7 +208,7 @@ def answer_content(
         ],
         "paths": [p.model_dump(include={"id", "title", "steps", "threats"}) for p in analysis.paths],
     }
-    blocks = [fence("map", _map_json(system, evidence=evidence)), fence("threats", json.dumps(threats))]
+    blocks = [fence("map", system.model_dump_json()), fence("threats", json.dumps(threats))]
     if focus is not None:
         blocks.append(fence("focus", f"{label_of(system, analysis, focus)} (id: {focus})"))
     if notes:
@@ -247,8 +245,6 @@ def grade_content(
     question: QuizQuestion,
     answer: str,
     notes: Sequence[str] = (),
-    *,
-    evidence: bool = True,
 ) -> str:
     """User content for grading: the map, the threats, the question, what a full answer covers, notes, the answer."""
     threats = [
@@ -258,7 +254,7 @@ def grade_content(
     expected = "\n".join(f"{item}: {label_of(system, analysis, item)}" for item in question.expected)
     return "\n\n".join(
         [
-            fence("map", _map_json(system, evidence=evidence)),
+            fence("map", system.model_dump_json()),
             fence("threats", json.dumps(threats)),
             fence("question", question.prompt),
             fence("expected", expected or "No specific elements."),
@@ -267,15 +263,6 @@ def grade_content(
             fence("answer", answer),
             "Grade the answer.",
         ]
-    )
-
-
-def _map_json(system: SystemMap, *, evidence: bool) -> str:
-    """The map as JSON, leaving out the fields drawn closely from the material, unless `evidence`."""
-    if evidence:
-        return system.model_dump_json()
-    return system.model_dump_json(
-        exclude={"nodes": {"__all__": {"evidence", "how", "code"}}, "flows": {"__all__": {"evidence"}}}
     )
 
 

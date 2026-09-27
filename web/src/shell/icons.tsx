@@ -59,6 +59,8 @@ export const CopyIcon = (p: IconProps) => <Icon {...p}><rect x="9" y="9" width="
 /** A key, for the legend toggle and tokens. */
 /** A file stack, for the example board. */
 export const BookIcon = (p: IconProps) => <Icon {...p}><path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" /><path d="M5 16a4 4 0 0 1 4-4h10" /></Icon>;
+/** Two lobes of a brain, for Backboard memory. */
+export const MemoryIcon = (p: IconProps) => <Icon {...p}><path d="M12 5.5A3 3 0 0 0 6.6 4.8 3 3 0 0 0 4.3 9a3.2 3.2 0 0 0 .6 5.3A3.2 3.2 0 0 0 9 18.9 3 3 0 0 0 12 20z" /><path d="M12 5.5a3 3 0 0 1 5.4-.7A3 3 0 0 1 19.7 9a3.2 3.2 0 0 1-.6 5.3 3.2 3.2 0 0 1-4.1 4.6A3 3 0 0 1 12 20V5.5z" /><path d="M8.5 9.5c1 .2 1.8.9 2 2M15.5 9.5c-1 .2-1.8.9-2 2" /></Icon>;
 /** A spark, for the model provider. */
 export const SparkIcon = (p: IconProps) => <Icon {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" /></Icon>;
 /** A map pin, for showing and hiding threat pins. */

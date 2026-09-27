@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { BoardOut, SourceIn } from "../api/types.ts";
@@ -19,6 +19,8 @@ import "./Intake.css";
 type Staged = SourceIn & { bytes: number };
 
 const MAX_TEXT_CHARS = 200_000;
+// Enough to see why files were left out; thousands of rows would slow every keystroke on the page.
+const SKIPPED_SHOWN = 300;
 
 /** The intake screen; `onCancel` is null when the board has nothing else to show. */
 export function Intake({
@@ -44,6 +46,19 @@ export function Intake({
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
 
+  // A folder dropped just outside the drop zone would make the browser open it and leave the app.
+  useEffect(() => {
+    const keep = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    window.addEventListener("dragover", keep);
+    window.addEventListener("drop", keep);
+    return () => {
+      window.removeEventListener("dragover", keep);
+      window.removeEventListener("drop", keep);
+    };
+  }, []);
+
   const stagedBytes = staged.reduce((sum, source) => sum + source.bytes, 0);
   const noteBytes = new TextEncoder().encode(note).length;
   const updating = board.status !== "empty";
@@ -54,7 +69,8 @@ export function Intake({
     try {
       const known = new Set(staged.map((source) => source.name));
       const fresh = picked.filter((file) => !known.has(file.path));
-      const plan = collect(fresh, policy, stagedBytes + noteBytes, staged.length);
+      // One slot stays free for pasted notes, which travel as one more source.
+      const plan = collect(fresh, policy, stagedBytes + noteBytes, staged.length + 1);
       const read = await readAccepted(plan.accepted);
       setStaged((before) => [...before, ...read.sources]);
       setSkipped((before) => [...before, ...preSkipped, ...plan.skipped, ...read.skipped]);
@@ -109,7 +125,7 @@ export function Intake({
   const readRepo = async (event: FormEvent) => {
     event.preventDefault();
     const url = github.trim();
-    if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(url)) {
+    if (!/^https:\/\/(www\.)?github\.com\/[^/\s]+\/[^/\s]+/i.test(url)) {
       setError("Enter a public repository URL such as https://github.com/owner/repo.");
       return;
     }
@@ -214,7 +230,10 @@ export function Intake({
                 hidden
                 aria-label="Choose files"
                 onChange={(e) => {
-                  if (e.target.files) void take(fromFileList(e.target.files));
+                  if (e.target.files) {
+                    const { files, skipped: folders } = fromFileList(e.target.files, policy);
+                    void take(files, folders);
+                  }
                   e.target.value = "";
                 }}
               />
@@ -226,7 +245,10 @@ export function Intake({
                 aria-label="Choose a code folder"
                 {...{ webkitdirectory: "" }}
                 onChange={(e) => {
-                  if (e.target.files) void take(fromFileList(e.target.files));
+                  if (e.target.files) {
+                    const { files, skipped: folders } = fromFileList(e.target.files, policy);
+                    void take(files, folders);
+                  }
                   e.target.value = "";
                 }}
               />
@@ -274,12 +296,13 @@ export function Intake({
                   {skipped.length} skipped, never read or sent
                 </summary>
                 <ul>
-                  {skipped.map((item, i) => (
+                  {skipped.slice(0, SKIPPED_SHOWN).map((item, i) => (
                     <li key={`${item.path}:${i}`}>
                       <span className="mono">{item.path}</span>
                       <span className="skipped-reason">{item.reason}</span>
                     </li>
                   ))}
+                  {skipped.length > SKIPPED_SHOWN && <li className="muted">and {skipped.length - SKIPPED_SHOWN} more</li>}
                 </ul>
               </details>
             )}
