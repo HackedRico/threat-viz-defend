@@ -17,6 +17,10 @@ To come back later, choose **Sign in** on the home page, or open `/signin`, and 
 
 There is no password reset. If you forget your password, ask the operator to delete the account, then create a new one.
 
+### Themes
+
+The picker at the top right of the home page, and in the account menu once you sign in, switches the colors. **System** follows your device's light or dark setting, and **Light** and **Dark** fix one. **hackUMBC** is a black and gold theme with Dawg, a pixel guard dog. He sits on the home page replay, the sign in and create account panels, the loading and welcome screens and, once you have a board, the expanded sidebar, and he reacts to your Defend answers. The app remembers your choice in this browser. A theme changes colors and decoration only, never what a screen does.
+
 ## The sidebar
 
 The left rail holds everything outside the open board.
@@ -28,7 +32,7 @@ The left rail holds everything outside the open board.
 - **Your boards.** Every board with its status and, once threats are found, its worst severity and threat count. The example board carries an `example` tag. The list refreshes every 15 seconds, so boards a coding agent changes show up on their own.
 - **Example board.** Opens the example. If you deleted it, the button reads **Restore the example board** and adds a fresh copy.
 - **Connect a coding agent.** Opens the coding agents settings.
-- **Account menu.** Your name and today's model calls. Open it for two meters, **Model calls today** and **Voice sessions today**, plus **Connect a coding agent**, **Model provider** and **Sign out**.
+- **Account menu.** Your name and today's model calls. Open it for two meters, **Model calls today** and **Voice sessions today**, the **Theme** picker, plus **Connect a coding agent**, **Model provider** and **Sign out**.
 
 Board statuses read the same everywhere:
 

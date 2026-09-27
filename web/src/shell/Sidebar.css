@@ -192,6 +192,12 @@
   flex: none;
 }
 
+.sidebar-mascot {
+  --mascot-size: 56px;
+  align-self: flex-start;
+  margin: 0 0 -6px var(--space-3);
+}
+
 .sidebar-foot {
   display: flex;
   flex-direction: column;

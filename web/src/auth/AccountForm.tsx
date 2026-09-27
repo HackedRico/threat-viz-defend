@@ -3,16 +3,17 @@ import { useId, useState, type FormEvent, type Ref } from "react";
 import { api, errorMessage } from "../api/client.ts";
 import type { ConfigOut, MeOut } from "../api/types.ts";
 import { ArrowUpRightIcon } from "../shell/icons.tsx";
+import { Mascot } from "../shell/Mascot.tsx";
 import { ViewLink } from "./ViewLink.tsx";
 import "./AccountForm.css";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
-// The sign in and create account forms, each beside a panel with a motto.
-// Creating an account needs the invite code handed out in person. The form
-// carries a `website` honeypot that people never see; bots that fill every
-// field reveal themselves with it.
+// The sign in and create account forms, each beside a panel with a motto, which
+// Dawg guards in the hackUMBC theme. Creating an account needs the invite code
+// handed out in person. A `website` honeypot that people never see catches bots
+// that fill every field.
 
 /** Which account form to show. */
 export type AccountMode = "signin" | "signup";
@@ -24,6 +25,7 @@ interface Copy {
   index: string;
   glyph: string;
   motto: string;
+  dawg: string;
 }
 
 const COPY: Record<AccountMode, Copy> = {
@@ -34,6 +36,7 @@ const COPY: Record<AccountMode, Copy> = {
     index: "TVD / 001",
     glyph: "< / >",
     motto: "Security starts with curiosity.",
+    dawg: "New pup? Got an invite?",
   },
   signin: {
     step: "02 / Welcome back",
@@ -42,6 +45,7 @@ const COPY: Record<AccountMode, Copy> = {
     index: "TVD / 002",
     glyph: "{ }",
     motto: "Find the signal in the noise.",
+    dawg: "Who goes there?",
   },
 };
 
@@ -231,6 +235,7 @@ export function AccountForm({
       <div className="account-side" aria-hidden="true">
         <span className="auth-caps account-side-index">{copy.index}</span>
         <div className="account-side-glyph">{copy.glyph}</div>
+        <Mascot bubble={copy.dawg} className="account-mascot" />
         <p className="account-side-motto">{copy.motto}</p>
       </div>
     </section>

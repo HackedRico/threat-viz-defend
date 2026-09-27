@@ -5,6 +5,7 @@ import type { ConfigOut, MeOut } from "./api/types.ts";
 import { AuthScreen } from "./auth/AuthScreen.tsx";
 import { useProvider } from "./settings/provider.ts";
 import { SessionContext, FALLBACK_APP_NAME, type Session } from "./shell/session.tsx";
+import { Mascot } from "./shell/Mascot.tsx";
 import { Shell } from "./shell/Shell.tsx";
 import "./App.css";
 
@@ -88,6 +89,7 @@ export function App() {
     return (
       <main className="app-status" aria-busy="true">
         <p className="hand app-status-title">{load.state === "ready" ? load.config.app_name : FALLBACK_APP_NAME}</p>
+        <Mascot mood="alert" />
         <span className="spinner" aria-label="Loading" />
       </main>
     );
