@@ -183,7 +183,7 @@
   border-radius: 4px;
   background: var(--surface-3);
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   color: var(--ink-soft);
 }

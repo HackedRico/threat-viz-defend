@@ -108,9 +108,10 @@
   box-shadow: var(--shadow-1);
 }
 
+/* Voice stays off for a whole server, so its label must still read: faint ink, not a fade. */
 .defend-mode:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  color: var(--ink-faint);
 }
 
 .defend-foot {
@@ -348,7 +349,7 @@ label.option:focus-within {
   color: var(--marker-green);
 }
 .stamp-partial {
-  color: var(--sev-medium);
+  color: var(--sev-medium-text);
 }
 .stamp-wrong {
   color: var(--danger);
