@@ -191,6 +191,10 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
             label="the environment line"
           />
           <Snippet title="Claude Code" value={claudeCommand(origin)} label="the Claude Code command" />
+          <p className="field-hint">
+            Run it in the same shell, from the project folder you start Claude Code in: it adds the server for that folder.
+            To switch tokens, run <code>claude mcp remove threatviz</code> first.
+          </p>
           <Snippet title="Cursor: .cursor/mcp.json" value={cursorConfig(origin)} label="the Cursor config" />
           <p className="field-hint">
             The MCP endpoint is <code>{mcpUrl(origin)}</code>. A Claude Code hook that sends each change to your board

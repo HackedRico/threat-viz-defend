@@ -49,7 +49,7 @@ const CHOICES = [
   { title: "Answer keys from code", text: "A model never decides which answer to a choice question is right." },
   { title: "Uploads are not stored", text: "Only each source's name, kind and size are kept, so there is less to leak." },
   { title: "Plain text output", text: "Model text renders as text, so a poisoned upload cannot inject HTML or links." },
-  { title: "Bring your own model", text: "Point analysis at your own OpenAI-compatible endpoint or at Backboard." },
+  { title: "Memory that builds on you", text: "Backboard remembers what you asked and missed on every board, and your next quiz starts there." },
 ];
 
 /** The sections of the home page below the hero. */

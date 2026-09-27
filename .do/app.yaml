@@ -104,10 +104,13 @@ services:
       - key: LLM_API_KEY
         scope: RUN_TIME
         type: SECRET
-      # Backboard
+      # Backboard memory around the model; the key turns it on for every user
       - key: BACKBOARD_BASE_URL
         scope: RUN_TIME
         value: https://app.backboard.io/api
+      - key: BACKBOARD_API_KEY
+        scope: RUN_TIME
+        type: SECRET
       # Voice coach and dictation; the key alone turns on dictation
       - key: ELEVENLABS_API_KEY
         scope: RUN_TIME

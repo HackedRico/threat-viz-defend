@@ -9,7 +9,9 @@ token (`tvd_...`) that you create in the web app under Settings, "Connect a codi
 | Good for | asking about the board, quizzing you in the editor | keeping the board's map current without anyone remembering to |
 | Sends | what the agent passes to a tool | the diff of architectural changes since the last report |
 
-They work well together: MCP for asking and quizzing, the hook for keeping the map current.
+They work well together: MCP for asking and quizzing, the hook for keeping the map current. Let one of them report changes: in a repository with a `.threatviz.json`, the server tells agents to leave `report_change` to the hook unless you ask, since reporting a change twice draws the map twice.
+
+On a local run, use `http://localhost:5173` as the API origin for both: the dev web app proxies `/api` and `/mcp`, and review links then open the live app. Type `localhost`, not `127.0.0.1`, which the dev server does not listen on.
 
 ## Environment variables
 
@@ -31,10 +33,10 @@ agent "quiz me on my threat model board".
 ### Claude Code
 
 ```sh
-claude mcp add --transport http threatviz "$THREATVIZ_API_URL/mcp" --header "Authorization: Bearer $THREATVIZ_TOKEN"
+claude mcp add --transport http threatviz "$THREATVIZ_API_URL/mcp" --header "Authorization: Bearer ${THREATVIZ_TOKEN:?export it first}"
 ```
 
-This writes the expanded token into your Claude Code config. To keep the token out of every file, copy
+Run it from the project folder you open Claude Code in, since it adds the server for that folder. The `:?` form stops the command when the token was never exported, rather than saving an empty one. This writes the expanded token into your Claude Code config. To keep the token out of every file, copy
 [`claude-code/mcp.example.json`](claude-code/mcp.example.json) to `.mcp.json` in your repo instead: Claude Code
 fills in `${THREATVIZ_API_URL}` and `${THREATVIZ_TOKEN}` when it starts, so the file is safe to commit. Check the
 connection with `/mcp`.

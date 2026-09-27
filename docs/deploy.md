@@ -67,6 +67,7 @@ In the control panel: the app > Settings > the `api` component > Environment Var
 | `LLM_API_KEY` | the model access key from "Model access key" below, or leave empty for demo mode | yes |
 | `ELEVENLABS_API_KEY` | from "Voice coach and dictation" below, or leave empty to turn voice and dictation off | yes |
 | `ELEVENLABS_AGENT_ID` | from "Voice coach and dictation" below, or leave empty | no |
+| `BACKBOARD_API_KEY` | an API key from the Backboard dashboard; turns on memory for every user, or leave empty and users can add their own key | yes |
 
 Keep the scope of every secret at Run time. The default scope, Run and build time, passes the value into the Docker build as a build argument, where it can end up in build logs and image layers.
 
@@ -83,7 +84,7 @@ The spec already sets the non-secret values:
 | `TRUST_PROXY` | `true` | App Platform puts the real client IP in `do-connecting-ip`, which rate limits use |
 | `DATABASE_URL` | `${db.DATABASE_URL}` | App Platform fills in the dev database's connection string |
 | `LLM_BASE_URL`, `LLM_MODEL` | DigitalOcean serverless inference, `openai-gpt-oss-120b` | the server's default model |
-| `BACKBOARD_BASE_URL` | `https://app.backboard.io/api` | for users who choose Backboard as their provider |
+| `BACKBOARD_BASE_URL` | `https://app.backboard.io/api` | Backboard's API, the memory layer around the model |
 | `ELEVENLABS_STT_MODEL` | `scribe_v2` | the ElevenLabs Speech to Text model for dictation |
 | `MAX_USERS`, `DAILY_MODEL_CALLS`, `DAILY_DICTATIONS` | `300`, `60`, `30` | budgets; `.env.example` lists the rest with their defaults |
 

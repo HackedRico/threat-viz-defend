@@ -139,7 +139,7 @@ Cookie. Body `SourcesIn`: `sources`, 1 to 400 items of `SourceIn`: `name` (up to
 `202` with `BoardOut` in `mapping`. Errors: `400` when nothing readable was sent, `409` when the board is busy, `413`, `429` budget or per-minute limit. `400` also covers a saved provider whose base URL is no longer allowed.
 
 ### `POST /api/boards/{board_id}/github`
-Cookie. Body `GithubIn`: `url`, a public repository such as `https://github.com/owner/repo` or `https://github.com/owner/repo/tree/<ref>`. The server downloads the tarball from `codeload.github.com` in a job and draws the map from its text files.
+Cookie. Body `GithubIn`: `url`, a public repository such as `https://github.com/owner/repo`, `https://github.com/owner/repo/tree/<ref>` or `https://github.com/owner/repo/tree/<ref>/<folder>`, which reads only that folder. A `/blob/` link reads its ref, and `www.`, a query or a fragment copied from the address bar are ignored. The server downloads the tarball from `codeload.github.com` in a job, trying the shortest ref first when the ref and folder could split more than one way, and draws the map from the text files that say most about the system.
 
 `202` with `BoardOut` in `mapping`. Errors: `400` for any other URL, `409`, `429`. A missing repository, a tarball over 30 MB, or one with no readable files fails the job and shows in `error`.
 
@@ -150,7 +150,7 @@ Cookie. Body `MapIn`: `map`, a full `SystemMap`. The map is sanitized, the old m
 Cookie. No body. Accepts the drafted map and starts finding threats. `202` with `BoardOut` in `analyzing`. Errors: `409` unless the board is in `review` with a map, `429`.
 
 ### `POST /api/boards/{board_id}/ask`
-Cookie. Body `AskIn`: `question` (up to 2,000 characters) and optional `focus`, a node or flow id the user selected. `200` with `Answer`: `answer` (plain text) and `highlight` (ids on the board). Errors: `409` until the board has threats, `429`, `502` or `503` `model_error`.
+Cookie. Body `AskIn`: `question` (up to 2,000 characters) and optional `focus`, a node or flow id the user selected. `200` with `AskOut`: `answer` (plain text), `highlight` (ids on the board) and `memory`, null while memory is off, else `MemoryUse`: `recalled`, the earlier notes Backboard fed into the prompt, and `kept`, true once a note of this question is queued. Errors: `409` until the board has threats, `429`, `502` or `503` `model_error`.
 
 ### `GET /api/boards/{board_id}/brief`
 Cookie. `200` with `BriefOut`: `text`, a plain spoken walkthrough of the system, its boundaries, AI exposure and top threats. Threats appear only on a `ready` board, since stored threats for an edited map name parts it may no longer have. Error: `409` without a map.
@@ -161,12 +161,12 @@ Cookie. `200` with `text/markdown` as an attachment named `threat-model.md`: sum
 ## Quiz and voice
 
 ### `GET /api/boards/{board_id}/quiz`
-Cookie. `200` with `QuizOut`: `analysis_version`, `questions` (each `id`, `topic`, `kind`, `prompt`, `options`; never the key), `results` keyed by question id, and `mastery` (`total`, `answered`, `correct`, `partial`, `score` from 0 to 1, `weak_spots`). A board that is not `ready` has no questions: they need the threats found on the current map. Answers are kept per `analysis_version`, so confirming an edited map starts the quiz over.
+Cookie. `200` with `QuizOut`: `analysis_version`, `questions` (each `id`, `topic`, `kind`, `prompt`, `options`; never the key), `results` keyed by question id, and `mastery` (`total`, `answered`, `correct`, `partial`, `score` from 0 to 1, `weak_spots`), and `focus`: null, or the `topics` Backboard memory says the developer missed before, which the questions list first, with the `notes` that say so. A board that is not `ready` has no questions: they need the threats found on the current map. Answers are kept per `analysis_version`, so confirming an edited map starts the quiz over.
 
 ### `POST /api/boards/{board_id}/quiz/answers`
 Cookie. Body `AnswerIn`: `question_id`, `choice_ids` (up to 10, for `single` and `multi` questions) or `text` (up to 3,000 characters, for `open` questions).
 
-`200` with `AnsweredOut`: `attempt` and the new `mastery`. `attempt` holds `result` (`correct`, `partial` or `wrong`), `feedback`, `explanation`, `evidence` (quotes from the map), `highlight`, `correct_ids`, `your_ids` and `your_text`.
+`200` with `AnsweredOut`: `attempt`, the new `mastery`, and `memory` (`MemoryUse` as for asking, null while memory is off; only open answers recall notes, every answer keeps one). `attempt` holds `result` (`correct`, `partial` or `wrong`), `feedback`, `explanation`, `evidence` (quotes from the map), `highlight`, `correct_ids`, `your_ids` and `your_text`.
 
 Errors: `400` with no option picked or an empty open answer, `404` when the question is out of date because the board changed, `409` when the board changed while grading (the answer is not saved), `429`, `502` or `503` for open answers.
 
@@ -185,36 +185,45 @@ Errors: `503` `not_configured` when dictation is off, `400` when `audio` is not 
 
 ## Model provider
 
-`ProviderOut` holds `source` (`custom`, `server` or `demo`), `kind`, `base_url`, `model`, `key_preview` (`...` and the last four characters, or null), `memory`, `label` and `updated_at`. The key itself is never returned.
+The model is always an OpenAI-compatible endpoint; Backboard is memory, under [Memory](#memory). `ProviderOut` holds `source` (`custom`, `server` or `demo`), `kind`, `base_url`, `model`, `key_preview` (`...` and the last four characters, or null), `label` and `updated_at`. The key itself is never returned. A provider saved as `backboard` before memory moved out is ignored, and the server's default serves the user.
 
 ### `GET /api/provider`
 Cookie. `200` with `ProviderOut`: the user's saved provider, or the server's default.
 
 ### `PUT /api/provider`
-Cookie. Body `ProviderIn`: `kind` (`openai_compatible` or `backboard`), `base_url`, `model` (Backboard models as `provider/model`), `api_key` (null keeps the saved key when the kind and base URL are unchanged, and is refused otherwise; an OpenAI-compatible provider may be saved without one), `memory` (Backboard only).
+Cookie. Body `ProviderIn`: `kind` (`openai_compatible`, the default), `base_url`, `model`, `api_key` (null keeps the saved key when the base URL is unchanged, and is refused otherwise; a provider may be saved without one).
 
-`200` with `ProviderOut`. Errors: `400` when the base URL is not https (plain http only where private addresses are allowed), holds credentials, a query or a fragment, does not resolve within 3 seconds, or resolves to a private or local address; also when a new Backboard provider has no key or the model lacks its `provider/` prefix.
+`200` with `ProviderOut`. Errors: `400` when the base URL is not https (plain http only where private addresses are allowed), holds credentials, a query or a fragment, does not resolve within 3 seconds, or resolves to a private or local address; `422` for any other kind.
 
 ### `DELETE /api/provider`
 Cookie. Forgets the provider and key; the server's default takes over. `204`.
 
 ### `POST /api/provider/test`
-Cookie. Body `ProviderIn`. Checks the URL the same way, then lists the endpoint's models (OpenAI-compatible) or its assistants (Backboard). Nothing is saved.
+Cookie. Body `ProviderIn`. Checks the URL the same way, then lists the endpoint's models. Nothing is saved.
 
-`200` with `ProviderTestOut`: `ok`, `label`, `message` and up to 200 `models`. A rejected key, an unreachable host, or a model the endpoint does not list is `ok: false` with a message, not an HTTP error. With `api_key` null the saved key is used, but only for the same kind and base URL. Errors: `400` for a refused URL, `429` over 10 tests per 5 minutes.
+`200` with `ProviderTestOut`: `ok`, `label`, `message` and up to 200 `models`. A rejected key, an unreachable host, or a model the endpoint does not list is `ok: false` with a message, not an HTTP error. With `api_key` null the saved key is used, but only for the same base URL. Errors: `400` for a refused URL, `429` over 10 tests per 5 minutes.
 
 ## Memory
 
-Backboard memory apart from the model provider. It applies only while the user has their own OpenAI-compatible provider. `MemoryOut` holds `saved`, `active` (memory applies to the user's analyses now), `key_preview`, `message` (the status in words) and `updated_at`. The key is never returned.
+Backboard memory around whichever model serves the user ([architecture](architecture.md#memory)). With `BACKBOARD_API_KEY` set, every user has it unless they turn it off; a user may also save their own Backboard key, which then holds their notes instead. `MemoryOut` holds `enabled` (the user's switch), `active` (memory works now), `source` (`own`, `server` or `none`: whose Backboard account holds the notes), `saved` (an own key is saved), `key_preview`, `message` (the status in words) and `updated_at`. The key is never returned.
 
 ### `GET /api/memory`
 Cookie. `200` with `MemoryOut`.
 
+### `PUT /api/memory/enabled`
+Cookie. Body `MemorySwitchIn`: `enabled`. Turns memory on or off; notes already kept stay until forgotten. `200` with `MemoryOut`.
+
+### `GET /api/memory/notes`
+Cookie. `200` with `MemoryNotesOut`: `source` and `notes`, newest first, each `id`, `content` and `created_at` as Backboard sent it. Listed even while memory is off. Errors: `429` over 30 reads a minute, `503` `memory_error` when Backboard cannot be reached.
+
+### `DELETE /api/memory/notes`
+Cookie. Deletes every note in the account that holds the user's memory now. `204`. Errors: `429` over 5 in 5 minutes, `503` `memory_error`.
+
 ### `PUT /api/memory`
-Cookie. Body `MemoryIn`: `api_key` (null keeps the saved key). `200` with `MemoryOut`. Errors: `400` when no key is saved and none is given. A different key forgets the saved assistant id.
+Cookie. Body `MemoryIn`: `api_key` (null keeps the saved key). Saves the user's own Backboard key, which then holds their memory instead of the server's account. `200` with `MemoryOut`. Errors: `400` when no key is saved and none is given. A different key forgets the saved assistant id.
 
 ### `DELETE /api/memory`
-Cookie. Forgets the key; notes already kept stay in the user's Backboard account. `204`.
+Cookie. Forgets the user's own key; the server's account holds their memory from then on, when there is one. Notes already kept stay in the user's Backboard account. `204`.
 
 ### `POST /api/memory/test`
 Cookie. Body `MemoryIn`. Lists the account's Backboard assistants with the typed key, or the saved one when `api_key` is null. Nothing is saved.
@@ -233,17 +242,17 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 
 ## MCP tools
 
-`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. Until the board is `ready`, `get_board` leaves out threats, `ask_board` is refused and the quiz tools have no questions. [integrations/README.md](../integrations/README.md) has the client setup.
+`/mcp` is a remote MCP server over streamable HTTP, stateless, answering each request with an event stream so its headers go out before a slow tool finishes. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. Until the board is `ready`, `get_board` leaves out threats, `ask_board` is refused and the quiz tools have no questions. [integrations/README.md](../integrations/README.md) has the client setup.
 
 | Tool | Arguments | Does | Spends |
 |---|---|---|---|
 | `list_boards` | none | Lists boards: id, title, status, threat counts | nothing |
 | `get_board` | `board_id` | Describes the system, its trust zones, AI exposure, up to 6 threats with fixes and the status, then lists the node and flow ids `describe_element` takes, each flow named as `Source to Target: label` | nothing |
 | `describe_element` | `board_id`, `element_id` | Describes one node or flow and the threats pinned to it; an id the map does not hold is a tool error | nothing |
-| `ask_board` | `board_id`, `question` | Answers a question about a finished board on one line, then lists related ids on the next | 1 model call |
-| `report_change` | `board_id`, `summary`, `diff`, `files` | Updates the map from a change the agent made; the developer reviews it in the app | 1 model call, 1 of 30 agent changes per hour |
-| `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered; a map with no questions is a tool error | nothing |
-| `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or `A and C` (only standalone letters count; none, or one past the last option, is a tool error) or the developer's own words, and returns the result, feedback and explanation on one line | 1 model call for open questions |
+| `ask_board` | `board_id`, `question` | Answers a question about a finished board on one line, then lists related ids on the next; with memory on, a last line says how many earlier notes Backboard recalled and that it kept this one | 1 model call |
+| `report_change` | `board_id`, `summary`, `diff`, `files` | Updates the map from a change the agent made; the developer reviews it in the app. Agents skip it in a repository with a `.threatviz.json`, whose hook reports each turn's changes, unless the developer asks | 1 model call, 1 of 30 agent changes per hour |
+| `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered; a map with no questions is a tool error. Topics memory says the developer missed come first, and such a question says so | nothing |
+| `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or `a and c`, reading only capital letters inside a sentence so "B, because it is a boundary" is B (none, or one past the last option, is a tool error), or the developer's own words, and returns the result, feedback and explanation on one line; with memory on, a last line says a note was kept | 1 model call for open questions |
 
 ## Examples
 

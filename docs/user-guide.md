@@ -100,7 +100,7 @@ The server checks every file again, and replaces anything shaped like a secret (
 
 ### A GitHub repository
 
-Under "Or read a public GitHub repository", paste a URL such as `https://github.com/owner/repo`, or `https://github.com/owner/repo/tree/main` for a branch or tag, and choose **Read repository**. The server downloads the repository and reads its text files with the same rules. Repositories over 30 MB are refused; upload their key folder instead.
+Under "Or read a public GitHub repository", paste a URL such as `https://github.com/owner/repo`, `https://github.com/owner/repo/tree/main` for a branch or tag, or `https://github.com/owner/repo/tree/main/examples/app` for one folder, and choose **Read repository**. A link copied from the address bar works as it is. The server downloads the repository and reads the files that say most about the system with the same rules: manifests, entry points and routes before docs and tests. Repositories over 30 MB are refused; use a folder URL or upload their key folder instead.
 
 ### Send it
 
@@ -265,10 +265,10 @@ Open **Activity and sources** in the review panel, or the **Log** tab on a ready
 Open **Connect a coding agent** from the sidebar, the account menu or a board header.
 
 1. **Make a personal token.** Give it a name such as "Laptop Claude Code" and choose **Create token**. Copy it right away; it is shown once and never again. The table below lists your tokens by name, first characters, creation time and last use. **Revoke** stops a token at once. You can hold up to 10.
-2. **Add the server to your agent.** Copy the ready-made **Claude Code** command, or the **Cursor** `.cursor/mcp.json` file plus the `export THREATVIZ_TOKEN=...` line for the shell that starts Cursor. The token fills in once you create it. The MCP endpoint is shown too.
+2. **Add the server to your agent.** Run the `export THREATVIZ_TOKEN=...` line first, in the shell that starts your agent, then copy the ready-made **Claude Code** command, which stops with a message if the token was not exported, or the **Cursor** `.cursor/mcp.json` file. Run the Claude Code command from the project folder you open Claude Code in, since it adds the server for that folder, and run `claude mcp remove threatviz` first to switch tokens. The token fills in once you create it. The MCP endpoint is shown too. On a local run, use `http://localhost:5173`, never `127.0.0.1`, for both.
 3. **Tell the agent which board.** Pick a board and copy its id; the agent's tools take it.
 
-Once connected, the agent can list and read your boards, ask about them, report changes it makes, and quiz you in the editor. Each reported change redraws the map and waits in **Check the map** for you. [integrations/README.md](../integrations/README.md) covers the tools and the hook that reports each turn's changes on its own.
+Once connected, the agent can list and read your boards, ask about them, report changes it makes, and quiz you in the editor. Each reported change redraws the map and waits in **Check the map** for you. [integrations/README.md](../integrations/README.md) covers the tools and the hook that reports each turn's changes on its own. With the hook set up, the agent leaves reporting to it, so no change is drawn twice.
 
 ## Choose a model provider
 
@@ -278,25 +278,33 @@ Open the account menu and choose **Model provider**. Maps, threats, answers and 
 
 To use your own:
 
-1. Pick a **Kind**:
-   - **OpenAI compatible**: OpenAI, DigitalOcean, OpenRouter, Featherless, Ollama and other services that speak the Chat Completions API.
-   - **Backboard**: many models through one key, with optional memory.
-2. Choose a preset to fill the **Base URL** and suggest a model: OpenAI, DigitalOcean, OpenRouter, Featherless or Ollama, or Backboard. Or type your own base URL.
-3. Enter the **Model**. Backboard models are written as `provider/model`, such as `openai/gpt-4o`.
-4. Paste the **API key**. Local services such as Ollama may need none. Once saved, the key is never shown again; leave the field empty to keep it.
-5. For Backboard, turn on **Remember my progress across boards** if you want memory.
-6. Choose **Test connection**. It checks the address and the key and lists the models the service offers; click one to use it. Nothing is saved yet.
-7. Choose **Save**. New analyses run on your model, and each board names the model that analyzed it.
+1. Choose a preset to fill the **Base URL** and suggest a model: DigitalOcean, OpenAI, OpenRouter, Featherless or Ollama. Or type the base URL of any service that speaks the OpenAI Chat Completions API.
+2. Enter the **Model**.
+3. Paste the **API key**. Local services such as Ollama may need none. Once saved, the key is never shown again; leave the field empty to keep it.
+4. Choose **Test connection**. It checks the address and the key and lists the models the service offers; click one to use it. Nothing is saved yet.
+5. Choose **Save**. New analyses run on your model, and each board names the model that analyzed it.
 
 **Remove and use the server default** forgets your provider and key.
 
 Base URLs must use https and point at a public address. The Ollama preset uses `localhost`, which means the server's own machine, so it only works where the server allows private addresses, such as a local development server.
 
-**What memory does.** With memory on, Backboard keeps what you asked the analyst and how your quiz answers went, and may keep facts from the map and threats they were about, such as component names. It uses them in later answers and grading, across boards. Drawing maps and finding threats only read memory, and answers and grading get your map without its evidence quotes, how-it-works notes and code locations, so your uploaded material is never written into it. Leaving the quotes out means answers and grading cannot use a detail only a quote holds, such as how often a job runs.
-
-**Memory with any model.** The **Memory** section below the provider form takes a Backboard key on its own, so a model from another service, such as Featherless, can remember your progress. Paste the key, choose **Test key**, then **Save**. It works only with your own OpenAI-compatible model; with a Backboard provider, use that provider's memory switch instead. Backboard receives the questions you ask and the quiz questions with each verdict, never your uploads, maps or answer text. Model calls spend your model service's credits and memory calls spend your Backboard credits. **Turn off memory** forgets the key; notes already kept stay in your Backboard account.
-
 Calls on your own key do not count against the daily allowance, only against the limit of 6 model calls per minute.
+
+## Memory
+
+Backboard is the memory layer around the model. The model draws maps, finds threats and answers; Backboard remembers what you asked and how your quiz answers went, on every board, and feeds it back in. Open it from **Backboard memory** in the sidebar, where it says whether memory is on, or from the account menu.
+
+- **Recall.** Before the model answers a question or grades an open answer, Backboard finds your earlier notes that relate to it, and they go into the prompt. Under the answer or grade, "Backboard fed 2 earlier notes into this answer" opens to show them.
+- **Keep.** After every question you ask and every quiz answer you give, a note is kept, and the answer says **Saved to memory**.
+- **Focus.** When a quiz opens, the topics you got wrong or partly right before come first, with a note that says so, on the web, in Claude Code or Cursor, and with the voice coach.
+
+On the **Memory** page:
+
+- **Remember my progress** turns memory on or off. Off, nothing new is kept and nothing is recalled.
+- **What Backboard remembers about you** lists every note, newest first. **Forget everything** deletes them all.
+- **Use your own Backboard key** is optional. With your own key your notes live in your Backboard account instead of the server's; paste it, choose **Test key**, then **Save**, and **Remove my key** goes back to the server's.
+
+Notes hold the board's name, your question, the quiz topic and how it went. Your uploads, maps, threats and the words of your answers never go to Backboard. When Backboard is unreachable, answers and grading go on without memory. Without a Backboard key on the server, memory is off until you add your own.
 
 ## Usage limits
 

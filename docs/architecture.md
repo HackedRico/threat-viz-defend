@@ -9,9 +9,10 @@ ThreatViz Defend is one Python API and one React app. The API owns every rule, e
   Browser  ------------------------------>  API  ---------------->  Postgres or SQLite
   (React app)                            (FastAPI)
      |                                      |
-     | WebRTC with a one-time token         +--> model provider: OpenAI-compatible endpoint,
-     v                                      |    or Backboard (adds per-user memory)
-  ElevenLabs agent                          +--> codeload.github.com (repository tarballs)
+     | WebRTC with a one-time token         +--> model: DigitalOcean serverless inference,
+     v                                      |    or the user's own OpenAI-compatible endpoint
+  ElevenLabs agent                          +--> Backboard (memory: recall and keep notes)
+                                            +--> codeload.github.com (repository tarballs)
                                             +--> api.elevenlabs.io (mints conversation tokens)
   Coding agent (Claude Code, Cursor)        |
      |   MCP over HTTP, bearer token        |
@@ -25,13 +26,13 @@ ThreatViz Defend is one Python API and one React app. The API owns every rule, e
 | Browser | API | JSON over HTTPS with an HttpOnly session cookie. It polls a board every 1.5 seconds while the server works on it and every 5 seconds otherwise, and polls the board list every 15 seconds, only while the tab is visible. |
 | API | Database | SQLAlchemy. SQLite in development and tests, Postgres in production. |
 | API | Model provider | The server's default model, or the provider the user saved. See [Provider seam](#provider-seam). |
-| API | Backboard | Only for users who pick Backboard as their provider. |
+| API | Backboard | The memory layer around the model: searches a user's notes before an answer or grade, and keeps a note after every question and quiz answer. With `BACKBOARD_API_KEY` for everyone, or with a user's own key. See [Memory](#memory). |
 | API | GitHub | Downloads one tarball per import from `codeload.github.com`. |
 | API | ElevenLabs | Asks for a one-conversation token for the private voice agent, and sends dictated questions to Speech to Text. The ElevenLabs key never leaves the server. |
 | Browser | ElevenLabs | Starts a WebRTC voice session with that token. The agent calls tools in the browser, which call the API. |
 | Coding agent | API | The remote MCP server at `/mcp`, or the hook in [integrations/](../integrations/README.md), both with a personal token. |
 
-[main.py](../api/app/main.py) builds the app. `create_app` wires settings, the database, the analyst, the job runner and the voice clients into `Services` ([context.py](../api/app/context.py)), mounts the JSON routes from [routes/](../api/app/routes/), serves the built web app when `STATIC_DIR` is set, and mounts the MCP app last because it matches every path. Every request first passes `RequestGuard` in [web.py](../api/app/web.py), which checks the Host header, the body size, cross-site writes and content type, and adds the security headers. [docs/security.md](security.md) describes each check.
+[main.py](../api/app/main.py) builds the app. `create_app` wires settings, the database, the analyst, Backboard memory, the job runner and the voice clients into `Services` ([context.py](../api/app/context.py)), mounts the JSON routes from [routes/](../api/app/routes/), serves the built web app when `STATIC_DIR` is set, and mounts the MCP app last because it matches every path. Every request first passes `RequestGuard` in [web.py](../api/app/web.py), which checks the Host header, the body size, cross-site writes and content type, and adds the security headers. [docs/security.md](security.md) describes each check.
 
 Every error leaves the API as `{"error": {"code", "message"}}`. Routes raise `AppError` from [errors.py](../api/app/errors.py), and the handlers in `main.py` turn validation errors and unexpected exceptions into the same shape.
 
@@ -49,8 +50,8 @@ A board holds one system's threat model. Its status says what it is waiting for.
 
 [boards/service.py](../api/app/boards/service.py) owns every transition.
 
-- **Background jobs.** Drawing a map or finding threats can take up to the model timeout (`LLM_TIMEOUT_S`, 120 seconds by default), so those routes answer `202` with the board in its busy status. `Boards._begin` checks the board is idle, picks the user's analyst, spends one model call from the budget, sets the busy status and commits, and only then hands the work to a `Jobs` runner ([jobs.py](../api/app/jobs.py)). Committing first matters: a job that wrote the board inside the open transaction would deadlock on SQLite. `ThreadJobs` runs jobs on a pool of 8 threads, which also caps concurrent background model calls. Tests use `InlineJobs`. Questions and the grading of open answers run inside the request instead, so the model client holds them to 30 seconds, retries included. The client retries a busy or failing provider itself, honoring its `Retry-After` up to 60 seconds, and logs each retry as `[llm] ... retrying in Ns`.
-- **Failure.** A failed job puts the board back to the stable status it had before (`empty`, `review` or `ready`), stores the message in `board.error`, and adds a `failed` line to the activity log. The browser shows the error in a banner.
+- **Background jobs.** Drawing a map or finding threats can take up to the model timeout (`LLM_TIMEOUT_S`, 120 seconds by default), so those routes answer `202` with the board in its busy status. `Boards._begin` checks the board is idle, picks the user's analyst, claims the board with one conditional write so two requests that both saw it idle cannot both start a job, spends one model call from the budget, and commits, and only then hands the work to a `Jobs` runner ([jobs.py](../api/app/jobs.py)). Committing first matters: a job that wrote the board inside the open transaction would deadlock on SQLite. `ThreadJobs` runs jobs on a pool of 8 threads, which also caps concurrent background model calls. Tests use `InlineJobs`. Questions and the grading of open answers run inside the request instead, so the model client holds them to 30 seconds, retries included. The client retries a busy or failing provider itself, honoring its `Retry-After` up to 60 seconds, backing off longer for background jobs, and logs each retry as `[llm] ... retrying in Ns`. A timeout is not retried.
+- **Failure.** A failed job, or a job whose final save fails, puts the board back to the stable status it had before (`empty`, `review` or `ready`), stores the message in `board.error`, and adds a `failed` line to the activity log. The browser shows the error in a banner.
 - **Restart recovery.** On startup `recover_interrupted` finds boards left in `mapping` or `analyzing`, returns one left `analyzing` to `review` and one left `mapping` to the status its stored map and analysis allow, and records "The server restarted while this was running. Try again."
 - **Hand edits.** `PUT /api/boards/{id}/map` runs the map through `sanitize_map`, keeps the old map as `previous_map` so review can mark what changed, and sets the board to `review`. The old threats stay stored until the next confirm replaces them. Only a `ready` board's threats describe its map, so the browser shows them only then, and the server reads them through `current_analysis`: the quiz, questions, brief, report, voice and MCP tools ignore them on any other status.
 - **How each part works.** Every node carries `how`, 2 to 4 points naming the library, algorithm, protocol or method it uses, and `code`, up to 4 `path`, `line` and `symbol` references into the material, so a developer can defend the part at a whiteboard without a follow-up question. `sanitize_map` caps both. Maps stored before these fields existed read them as empty lists, and a copy of the built-in example saved then gets them from the example by node id when it is read.
@@ -72,7 +73,7 @@ Every model call goes through an `Analyst` ([analysis/analyst.py](../api/app/ana
 
 **Fencing.** Untrusted text enters a prompt only through `fence(tag, body)`. It wraps the body in a named block after `neutralize` escapes anything that looks like one of our own block tags, so a document cannot close its block and speak as instructions. Every system prompt ends with `untrusted(...)`, which names the blocks that hold data and tells the model to ignore instructions inside them.
 
-**Material.** [boards/ingest.py](../api/app/boards/ingest.py) builds the `<material>` block. It drops files the file policy skips, masks credential-shaped values, and when there is too much, keeps what says most about architecture: pasted text first, then READMEs and design docs, manifests, deploy files, API specs, entry points, route and service folders, then other source files. A code folder also gets a file tree. Each line of a code file gets its number, as `12| `, so the map can point at `path:line`; prose and pasted text do not. Masking runs first, so the numbers never break a line-anchored pattern. The block is capped at 150,000 characters and each file at 24,000. Agent changes become material the same way through `agent_material`, which also drops whole diff sections for files that should never be read.
+**Material.** [boards/ingest.py](../api/app/boards/ingest.py) builds the `<material>` block. It drops files the file policy skips, masks credential-shaped values, and when there is too much, keeps what says most about architecture: pasted text first, then READMEs and design docs, manifests, deploy files, API specs, entry points, route and service folders, then other source files, with tests, fixtures, examples and generated types last. READMEs and docs together stop at 40,000 characters, so a well documented project still sends its code, and the name of a picked folder, such as `api/`, never ranks every file in it. The GitHub importer ranks every file in the archive the same way before reading any. A code folder also gets a file tree. Each line of a code file gets its number, as `12| `, so the map can point at `path:line`; prose and pasted text do not. Masking runs first, so the numbers never break a line-anchored pattern. The block is capped at 150,000 characters and each file at 24,000. Agent changes become material the same way through `agent_material`, which also drops whole diff sections for files that should never be read.
 
 **Schema validation.** The Pydantic models in [domain/models.py](../api/app/domain/models.py) double as the JSON Schemas the model fills. Every key is required and unknown keys are rejected, which strict structured output needs. [llm/base.py](../api/app/llm/base.py) holds the helpers every adapter shares:
 
@@ -117,41 +118,49 @@ The same functions feed `BoardOut.exposure` and `BoardOut.crossings` ([boards/vi
 
 Questions about flows and components show at most 5 options (4 for the `threat` question), always keep room for one wrong option, and list options in map order so position gives nothing away. The `stride` question shows all six categories. `grade_choice` returns `correct`, `partial` (some right picks) or `wrong`. Open answers go to the analyst's `grade`, and its verdict maps solid to `correct`, partial to `partial` and missed to `wrong`.
 
-[quiz_service.py](../api/app/quiz_service.py) stores each attempt with the board's `analysis_version`. Questions are rebuilt from every new analysis, so only attempts on the current version count. Mastery is `(correct + 0.5 * partial) / total`, and its weak spots are the elements behind every answer that was not fully correct. The answer key and explanation reach the browser only after the question is answered.
+[quiz_service.py](../api/app/quiz_service.py) stores each attempt with the board's `analysis_version`. Questions are rebuilt from every new analysis, so only attempts on the current version count. Mastery is `(correct + 0.5 * partial) / total`, and its weak spots are the elements behind every answer that was not fully correct. The answer key and explanation reach the browser only after the question is answered. With memory on, `Quiz.focus` moves the topics a developer missed before to the front; see [Memory](#memory).
 
 ## Provider seam
 
 ```
 Llm protocol           OpenAICompatibleLlm      any Chat Completions endpoint
-(llm/base.py)          BackboardLlm             Backboard threads, optional memory
+(llm/base.py)
 
-Analyst protocol       LlmAnalyst               wraps an Llm and an optional Memory, runs the sanitizers
+Analyst protocol       LlmAnalyst               wraps an Llm, runs the sanitizers
 (analysis/analyst.py)  DemoAnalyst              replays the built-in example, grades by keyword
-
-Memory protocol        BackboardMemory          notes in the user's Backboard assistant, memory API only
-(memory.py)
 
 AnalystSource          Providers.for_user       the user's saved provider, else the server's analyst
 (providers/service.py) FixedAnalyst             one analyst for everyone, used by tests
+
+MemorySource           MemorySettings.for_user  the user's Backboard memory while it is on
+(memory.py)            NoMemory                 no memory, used by tests
 ```
 
-- `Llm.generate(request)` takes a task name, a system prompt, the user text and a schema, and returns a validated instance or raises `LlmError` with a code: `not_configured`, `auth`, `rate_limited`, `timeout`, `unavailable`, `bad_output` or `refused`.
-- `Llm.remembers(task)` says whether the provider may keep what a call for that task sends as memory that later calls see. For those calls `LlmAnalyst` sends the map without its node and flow evidence, the fields that quote the material, or each node's `how` and `code`, which restate it closely. Every other call keeps the evidence, since answers and grades use details only a quote holds.
-- `OpenAICompatibleLlm` ([llm/openai_compat.py](../api/app/llm/openai_compat.py)) uses the OpenAI SDK against any base URL.
-- `BackboardLlm` ([llm/backboard.py](../api/app/llm/backboard.py)) sends each call as a message on a fresh thread of the user's Backboard assistant, and repairs in the same thread. Models are written `provider/model`. With memory on, `answer` and `grade` read and write memory and get the map without its evidence, `how` and `code`, while `draft_map` and `find_threats` only read it, so uploaded material is never written into memory. The assistant id Backboard returns is saved so memory carries across sessions.
-- `BackboardMemory` ([memory.py](../api/app/memory.py)) is memory apart from the model, so any OpenAI-compatible provider can remember a user's progress. `LlmAnalyst` calls it around `answer` and `grade` only: `recall` searches earlier notes with the question, and they enter the prompt fenced as `<memory>`; `keep` then stores a note the analyst writes, the question for `answer` and the question plus verdict for `grade`. Uploads, maps and the developer's answer text never go to it. The assistant is created on the first note and its id is saved. A Backboard failure is logged and the call goes on without memory. [providers/memory.py](../api/app/providers/memory.py) holds the setting; it applies only with the user's own OpenAI-compatible provider, since a Backboard provider has its own memory.
+- `Llm.generate(request)` takes a task name, a system prompt, the user text and a schema, and returns a validated instance or raises `LlmError` with a code: `not_configured`, `auth`, `rate_limited`, `timeout`, `unavailable`, `bad_output` or `refused`. `parse_json` takes the first JSON object in the reply that fits the schema, whatever prose, notes or thinking blocks surround it, and bends the slips a model makes without schema enforcement: an enum in another case, a STRIDE category spelled out, a null or supporting list left out, an extra key. Anything else still fails and gets one repair round.
+- `OpenAICompatibleLlm` ([llm/openai_compat.py](../api/app/llm/openai_compat.py)) uses the OpenAI SDK against any base URL. With `LLM_CONCURRENCY` set, calls to the server's model queue for a slot, so a provider that serves one call at a time never sees two: a background job waits up to 10 minutes for its turn, a question or grade up to its 30 second budget. A timeout is reported at once rather than resent.
 - `DemoAnalyst` runs when the server has no `LLM_API_KEY` and `LLM_MODEL`. It maps only text that contains the example's material, finds threats only on the example map, answers only recorded questions, and grades open answers by the words they share with the expected elements and rubric.
 - `Providers.for_user(user_id)` returns `Chosen(analyst, own_key)`. With a saved provider it checks the base URL again, decrypts the key, and builds the adapter; `own_key=True` means the call spends the user's key, so only the per-minute limit applies. Without one it returns the server's analyst.
 
+## Memory
+
+Backboard is the memory layer around the model calls; it never makes one. [memory.py](../api/app/memory.py) holds `BackboardMemory`, one Backboard assistant per user reached through Backboard's memory API only, and [providers/memory.py](../api/app/providers/memory.py) holds `MemorySettings`, which decides whose account that is and whether memory is on.
+
+- **Whose account.** A user's own Backboard key, sealed like a provider key, when they saved one; else the server's `BACKBOARD_API_KEY`; else none. The assistant is created on the first note and its id is saved, in `memories` for an own key and in `memory_prefs` for the server's. A lock around creation keeps two notes kept at once from making two assistants.
+- **Recall.** Before `Boards.ask` and before `Quiz.answer` grades an open answer, `recall` searches the user's notes with the question and passes up to five to the analyst, which fences them into the prompt as `<memory>`. The prompts say to use them only to pitch the reply, never as facts about the system, and never to change a verdict.
+- **Keep.** After every question and every quiz answer, choice questions included, a note goes to Backboard on a background job, so Backboard never slows the reply. [domain/notes.py](../api/app/domain/notes.py) writes them: the board's title and the question, or the quiz topic, the question and whether it was right, partly right or wrong. Uploads, maps and the developer's own answer text never go in.
+- **Focus.** `Quiz.focus` recalls notes about missed questions, reads them back into quiz topics with `weak_topics`, and the quiz orders those topics first. It is cached per board and analysis for 20 minutes so the order holds still through one sitting, and dropped when the quiz starts over. The web quiz, the MCP quiz tools and the voice coach's brief all use it.
+- **Showing it.** Answers and grades carry `memory` (`recalled` notes and whether one was `kept`), and the quiz carries `focus`. The web app shows both; MCP tools add a line saying what memory did.
+- **Failures.** A Backboard error is logged and the call goes on without memory. Only the memory page reports one, as `503 memory_error`.
+
 ## Voice coach
 
-[voice.py](../api/app/voice.py) mints a WebRTC conversation token for the private ElevenLabs agent with the server's key. `POST /api/boards/{id}/voice` spends one voice session and returns the token plus a short spoken brief of the board as dynamic variables. The browser ([web/src/voice/](../web/src/voice/AGENTS.md)) starts the session and registers four client tools: `get_next_question`, `submit_answer`, `show_on_board` and `get_board_brief`. `submit_answer` posts to the same quiz route as the text quiz, so grading happens on the server either way.
+[voice.py](../api/app/voice.py) mints a WebRTC conversation token for the private ElevenLabs agent with the server's key. `POST /api/boards/{id}/voice` spends one voice session and returns the token plus a short spoken brief of the board as dynamic variables. With memory on, the brief starts with the topics the developer found hard before. The browser ([web/src/voice/](../web/src/voice/AGENTS.md)) starts the session and registers four client tools: `get_next_question`, `submit_answer`, `show_on_board` and `get_board_brief`. `submit_answer` posts to the same quiz route as the text quiz, so grading happens on the server either way.
 
 Dictation uses the same key through `ElevenLabsTranscriber` in the same file. The mic beside **Ask** records a clip with `MediaRecorder` and posts it as base64 JSON to `POST /api/dictation`, which spends one dictation in its own short transaction, then sends the clip to ElevenLabs Speech to Text outside it, as asking does with the model. The text comes back to the ask box and nothing is stored. Because the browser only talks to the API, dictation needs no CSP change on either hosting layout.
 
 ## Coding agents
 
-- **MCP server.** [mcp_tools.py](../api/app/mcp_tools.py) serves stateless streamable HTTP with JSON responses at `/mcp`. A token verifier accepts personal tokens and passes the owner's user id to each tool. Tools run the same services the web app uses, as that user, on a worker thread, and turn `AppError` into a tool error the agent can read. [docs/api.md](api.md#mcp-tools) lists the tools.
+- **MCP server.** [mcp_tools.py](../api/app/mcp_tools.py) serves stateless streamable HTTP at `/mcp`, answering with an event stream so headers go out at once; Claude Code gives up on a response without headers after 60 seconds, which a model-backed tool can take. A token verifier accepts personal tokens and passes the owner's user id to each tool. Tools run the same services the web app uses, as that user, on a worker thread, and turn `AppError` into a tool error the agent can read. [docs/api.md](api.md#mcp-tools) lists the tools.
 - **Agent route.** `POST /api/agent/boards/{id}/changes` takes a summary, a diff and a file list and treats them as new material.
 - **Hook.** [integrations/hook/threatviz_hook.py](../integrations/hook/threatviz_hook.py) runs in Claude Code or Cursor. On each stop it snapshots the worktree, diffs it against the last reported snapshot, skips files the server's file policy skips, masks secrets, and posts the change only when it touches architecture. See [integrations/README.md](../integrations/README.md).
 
@@ -168,8 +177,9 @@ Dictation uses the same key through `ElevenLabsTranscriber` in the same file. Th
 | `board_events` | Activity log lines |
 | `quiz_attempts` | Each answer: picked option ids or the typed text, the result and the feedback |
 | `usage` | One row per model call, voice session or dictation, for budgets |
-| `providers` | A user's provider kind, base URL, model, the API key sealed with AES-GCM, its last four characters, the memory flag and the Backboard assistant id |
-| `memories` | A user's Backboard key for memory, sealed with AES-GCM, its last four characters and the Backboard assistant id |
+| `providers` | A user's provider kind, base URL, model, the API key sealed with AES-GCM and its last four characters. The `memory` and `assistant_id` columns are unused, kept so older databases load; a row with the old `backboard` kind is ignored |
+| `memories` | A user's own Backboard key for memory, sealed with AES-GCM, its last four characters and the Backboard assistant id in their account |
+| `memory_prefs` | A user's memory switch, and their Backboard assistant id in the server's account |
 
 Stored: maps and analyses as JSON, validated again when read. A stored value that no longer validates is logged and treated as missing. Also stored: source records, activity lines, quiz answers including open answers in the user's words.
 
