@@ -944,7 +944,7 @@ def settings_snippet(repo: Repo | None, harness: str) -> dict[str, object]:
         return {"version": 1, "hooks": {"beforeSubmitPrompt": [{"command": command}], "stop": [{"command": command}]}}
     prompt = {"type": "command", "command": command, "async": True, "timeout": 60}
     # Headless `claude -p` exits without finishing async hooks. On stop the hook forks and returns at once anyway,
-    # so a synchronous Stop only waits for Python to start.
+    # so a synchronous Stop only waits for Python to start; without fork, on Windows, it waits for the report.
     stop = {"type": "command", "command": command, "timeout": 60}
     return {"hooks": {"UserPromptSubmit": [{"hooks": [prompt]}], "Stop": [{"hooks": [stop]}]}}
 
