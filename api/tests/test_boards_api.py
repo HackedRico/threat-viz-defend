@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 
@@ -12,8 +13,9 @@ from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
+from app.errors import AppError
 from app.llm.base import LlmError
-from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow
+from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow, UsageRow
 from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
@@ -308,3 +310,25 @@ def test_an_answer_graded_while_the_board_changed_is_not_saved(make_client: Clie
     db = client.app.state.services.db  # type: ignore[attr-defined]
     with db.session() as session:
         assert session.scalar(select(func.count()).select_from(QuizAttemptRow)) == 0
+
+
+def test_two_requests_that_both_saw_an_idle_board_start_one_job(make_client: ClientFactory) -> None:
+    client = make_client()
+    sign_up(client)
+    services = client.app.state.services  # type: ignore[attr-defined]
+    user_id = client.get("/api/auth/me").json()["user"]["id"]
+    board_id = client.get("/api/boards").json()[0]["id"]
+
+    def another_request_claims_it_first(row: BoardRow) -> None:
+        # Between this request's read and its claim, a coding agent's change starts drawing the board.
+        with services.db.session() as session:
+            session.execute(update(BoardRow).where(BoardRow.id == board_id).values(status="mapping"))
+
+    with pytest.raises(AppError) as info:
+        services.boards._begin(
+            user_id, board_id, "find_threats", "analyzing", lambda row, session: None, another_request_claims_it_first
+        )
+    assert info.value.status == 409
+    with services.db.session() as session:
+        assert session.scalar(select(func.count()).select_from(UsageRow)) == 0
+        assert session.get(BoardRow, board_id).status == "mapping"

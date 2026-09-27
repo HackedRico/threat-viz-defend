@@ -194,6 +194,7 @@ def _analyst_for(settings: Settings) -> Analyst:
         json_mode=settings.llm_json_mode,
         timeout_s=settings.llm_timeout_s,
         max_tokens=settings.llm_max_tokens,
+        concurrency=settings.llm_concurrency,
     )
     return LlmAnalyst(llm)
 

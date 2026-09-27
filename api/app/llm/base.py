@@ -1,7 +1,8 @@
 import json
 import re
+import types
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, Union, get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 
@@ -11,7 +12,10 @@ from pydantic import BaseModel, ValidationError
 # The one seam every model call goes through. An `Llm` takes an `LlmRequest`,
 # a system prompt, user text and a Pydantic schema, and returns a validated
 # instance of that schema or raises `LlmError`. `strict_schema` and `parse_json`
-# are the helpers every adapter shares.
+# are the helpers every adapter shares. `parse_json` forgives the slips a model
+# makes when only the prompt asks for JSON, such as prose around the object, a
+# thinking block, an enum in the wrong case or a null left out, since each slip
+# would otherwise cost a repair round that a person sits through.
 
 LlmErrorCode = Literal["not_configured", "auth", "rate_limited", "timeout", "unavailable", "bad_output", "refused"]
 JsonMode = Literal["json_schema", "json_object", "prompt"]
@@ -54,6 +58,11 @@ class Llm(Protocol):
 # =============================================================================
 
 _FENCED = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
+# Reasoning models may think aloud first, braces and all.
+_THINKING = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
+# Supporting lists a model drops when it has nothing for them. The lists that carry a reply, such as a map's
+# nodes or an analysis's threats, stay required: filling those would pass off a broken reply as an empty one.
+_SPARE_LISTS = frozenset({"how", "code", "refs", "highlight", "assumptions"})
 
 
 def strict_schema(schema: type[BaseModel]) -> dict[str, Any]:
@@ -87,18 +96,74 @@ def schema_instructions(schema: type[BaseModel]) -> str:
 
 
 def parse_json[T: BaseModel](text: str, schema: type[T]) -> T:
-    """Parse model text as `schema`, tolerating code fences and prose around one JSON object."""
-    stripped = text.strip()
+    """Parse model text as `schema`: the first JSON object in it that fits, whatever text surrounds it."""
+    stripped = _THINKING.sub("", text).strip()
     fenced = _FENCED.match(stripped)
     if fenced:
         stripped = fenced.group(1)
-    if not stripped.startswith("{"):
-        # Some models wrap the object in a sentence; take the outermost braces.
-        start, end = stripped.find("{"), stripped.rfind("}")
-        if start == -1 or end <= start:
-            raise ValueError("The reply held no JSON object.")
-        stripped = stripped[start : end + 1]
-    return schema.model_validate_json(stripped)
+    decoder = json.JSONDecoder()
+    invalid: ValidationError | None = None
+    start = stripped.find("{")
+    while start != -1:
+        try:
+            value, end = decoder.raw_decode(stripped, start)
+        except json.JSONDecodeError:
+            # A brace in prose, such as "{like this}", starts no object; the reply's object comes later.
+            start = stripped.find("{", start + 1)
+            continue
+        if isinstance(value, dict):
+            try:
+                return schema.model_validate(_bend(value, schema))
+            except ValidationError as exc:
+                # Kept for the repair message: the first whole object is the one the model meant as its reply.
+                invalid = invalid or exc
+        start = stripped.find("{", end)
+    if invalid is not None:
+        raise invalid
+    raise ValueError("The reply held no JSON object.")
+
+
+def _bend(value: Any, annotation: Any) -> Any:
+    """Bend `value` toward `annotation` where models commonly slip, leaving every real mistake for validation.
+
+    The slips: an enum in another case, a STRIDE category spelled out, a nullable field or a supporting list left
+    out, and an extra key. Anything else missing stays missing, since inventing it would hide a broken reply.
+    """
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        if not isinstance(value, dict):
+            return value
+        bent: dict[str, Any] = {}
+        for name, field in annotation.model_fields.items():
+            if name in value:
+                bent[name] = _bend(value[name], field.annotation)
+            elif _allows_none(field.annotation):
+                bent[name] = None
+            elif name in _SPARE_LISTS and get_origin(field.annotation) is list:
+                bent[name] = []
+        return bent
+    origin, args = get_origin(annotation), get_args(annotation)
+    if origin is list and isinstance(value, list):
+        item = args[0] if args else Any
+        return [_bend(each, item) for each in value]
+    if origin is Literal and isinstance(value, str):
+        wanted = value.strip()
+        for option in args:
+            if isinstance(option, str) and option.lower() == wanted.lower():
+                return option
+        # STRIDE letters: a model may write "Tampering" or "Information disclosure" for T or I.
+        letters = [a for a in args if isinstance(a, str) and len(a) == 1]
+        if len(letters) == len(args) and wanted[:1].upper() in letters:
+            return wanted[:1].upper()
+        return value
+    if origin in (Union, types.UnionType) and value is not None:
+        options = [a for a in args if a is not type(None)]
+        return _bend(value, options[0]) if len(options) == 1 else value
+    return value
+
+
+def _allows_none(annotation: Any) -> bool:
+    """Whether a field's type admits `None`, as `str | None` does."""
+    return get_origin(annotation) in (Union, types.UnionType) and type(None) in get_args(annotation)
 
 
 def repair_message(error: ValidationError | ValueError) -> str:

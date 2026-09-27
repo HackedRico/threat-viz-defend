@@ -1,10 +1,10 @@
 import logging
 import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ValidationError
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.analyst import Analyst
@@ -211,17 +211,22 @@ class Boards:
                 log.exception("[boards] Finding threats for %s failed unexpectedly.", board_id)
                 self._fail(board_id, "review", "Finding threats failed. Try again.")
                 return
-            with self._db.session() as session:
-                target = session.get(BoardRow, board_id)
-                if target is None:
-                    return
-                target.analysis = analysis.model_dump(mode="json")
-                target.analysis_version += 1
-                target.analyzed_by = analyst.label
-                target.status = "ready"
-                target.error = None
-                _event(session, board_id, "analyzed", f"Found {len(analysis.threats)} threats. {analysis.verdict}")
-                _touch(target)
+            try:
+                with self._db.session() as session:
+                    target = session.get(BoardRow, board_id)
+                    if target is None:
+                        return
+                    target.analysis = analysis.model_dump(mode="json")
+                    target.analysis_version += 1
+                    target.analyzed_by = analyst.label
+                    target.status = "ready"
+                    target.error = None
+                    _event(session, board_id, "analyzed", f"Found {len(analysis.threats)} threats. {analysis.verdict}")
+                    _touch(target)
+            except Exception:
+                # A failed save must still end the busy status, or the board spins until the next restart.
+                log.exception("[boards] Saving the threats for %s failed.", board_id)
+                self._fail(board_id, "review", "Saving the threats failed. Try again.")
 
         self._jobs.submit(work, f"find_threats {board_id}")
 
@@ -295,12 +300,19 @@ class Boards:
             row = self.get(session, user_id, board_id)
             if row.status in BUSY:
                 raise conflict("The board is already working. Wait for it to finish, then try again.")
-            # Checked in this transaction, so two confirms that race cannot both spend and start a job.
             if require is not None:
                 require(row)
-            self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             restore = _stable_status(row)
             current = read_map(row)
+            # One conditional write claims the board, so two requests that both saw it idle, such as a coding
+            # agent's change and a click on confirm, cannot both spend a call and start a job.
+            claim = update(BoardRow).where(BoardRow.id == board_id, BoardRow.status.not_in(BUSY))
+            claimed = session.execute(
+                claim.values(status=status, error=None).execution_options(synchronize_session=False)
+            )
+            if cast(CursorResult[tuple[()]], claimed).rowcount != 1:
+                raise conflict("The board is already working. Wait for it to finish, then try again.")
+            self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             row.status = status
             row.error = None
             record(row, session)
@@ -326,36 +338,41 @@ class Boards:
                 log.exception("[boards] Drawing the map for %s failed unexpectedly.", board_id)
                 self._fail(board_id, restore, "Reading the material failed. Try again.")
                 return
-            with self._db.session() as session:
-                target = session.get(BoardRow, board_id)
-                if target is None:
-                    return
-                target.previous_map = current.model_dump(mode="json") if current else None
-                target.map = drawn.model_dump(mode="json")
-                target.status = "review"
-                target.error = None
-                verb = "Updated" if current else "Drew"
-                _event(
-                    session,
-                    board_id,
-                    "mapped",
-                    f"{verb} the map: {len(drawn.nodes)} parts and {len(drawn.flows)} flows. Check it, then confirm.",
-                )
-                _touch(target)
+            try:
+                with self._db.session() as session:
+                    target = session.get(BoardRow, board_id)
+                    if target is None:
+                        return
+                    target.previous_map = current.model_dump(mode="json") if current else None
+                    target.map = drawn.model_dump(mode="json")
+                    target.status = "review"
+                    target.error = None
+                    verb = "Updated" if current else "Drew"
+                    parts = f"{len(drawn.nodes)} parts and {len(drawn.flows)} flows"
+                    _event(session, board_id, "mapped", f"{verb} the map: {parts}. Check it, then confirm.")
+                    _touch(target)
+            except Exception:
+                # A failed save must still end the busy status, or the board spins until the next restart.
+                log.exception("[boards] Saving the map for %s failed.", board_id)
+                self._fail(board_id, restore, "Saving the map failed. Try again.")
 
         self._jobs.submit(work, f"draft_map {board_id}")
 
     def _fail(self, board_id: str, status: str, message: str) -> None:
         """Record a failed job and put the board back to `status`."""
         log.warning("[boards] Job on %s failed: %s", board_id, message)
-        with self._db.session() as session:
-            row = session.get(BoardRow, board_id)
-            if row is None:
-                return
-            row.status = status
-            row.error = message
-            _event(session, board_id, "failed", message)
-            _touch(row)
+        try:
+            with self._db.session() as session:
+                row = session.get(BoardRow, board_id)
+                if row is None:
+                    return
+                row.status = status
+                row.error = message
+                _event(session, board_id, "failed", message)
+                _touch(row)
+        except Exception:
+            # Nothing is left to try here; a restart resets busy boards (`recover_interrupted`).
+            log.exception("[boards] Recording the failure on %s failed too.", board_id)
 
 
 # =============================================================================

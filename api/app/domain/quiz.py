@@ -412,7 +412,11 @@ def _fix_question(system: SystemMap, analysis: ThreatAnalysis | None) -> QuizQue
         answer=[],
         expected=[threat.element, threat.id],
         rubric=threat.fixes,
-        explanation=f"Fixes the threat model suggests: {_join(threat.fixes)}.",
+        explanation=(
+            f"Fixes the threat model suggests: {_join(threat.fixes)}."
+            if threat.fixes
+            else f"The threat model names no fix yet; start where {threat.id} happens and cut off its path."
+        ),
         evidence=[QuizEvidence(id=threat.id, label=f"{threat.id} {threat.title}", evidence=threat.evidence)],
         highlight=[threat.element, threat.id],
     )
