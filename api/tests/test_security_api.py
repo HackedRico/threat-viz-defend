@@ -77,6 +77,7 @@ def test_agent_review_links_use_the_configured_web_app(make_client: ClientFactor
     body = {"agent": "Claude Code", "summary": example_material()["sources"][0]["text"], "diff": "", "files": []}
     headers = {"Authorization": f"Bearer {token}"}
     response = client.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers)
+    assert response.status_code == 202, response.text
     assert response.json()["review_url"] == f"https://app.example.com/boards/{board['id']}"
 
 
