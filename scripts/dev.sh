@@ -73,6 +73,8 @@ if $RUN_API; then
   pids+=($!)
 fi
 if $RUN_WEB; then
+  # Vite proxies `/api` and `/mcp` to this port.
+  export API_PORT
   (cd "$ROOT/web" && exec npm run dev -- --port "$WEB_PORT" --strictPort) &
   pids+=($!)
 fi

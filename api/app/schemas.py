@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -359,7 +359,7 @@ class AgentChangeIn(RequestBody):
     agent: str = Field(default="Coding agent", min_length=1, max_length=40)
     summary: str = Field(default="", max_length=4_000)
     diff: str = Field(default="", max_length=200_000)
-    files: list[str] = Field(default_factory=list, max_length=500)
+    files: list[Annotated[str, Field(max_length=1_000)]] = Field(default_factory=list, max_length=500)
 
 
 class AgentChangeOut(BaseModel):

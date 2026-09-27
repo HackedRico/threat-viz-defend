@@ -2,7 +2,7 @@ from fastapi import APIRouter, Response, status
 
 from app.boards.github import fetch_repo, parse_repo_url
 from app.boards.ingest import SourceItem, build_material
-from app.boards.service import read_analysis, read_map
+from app.boards.service import current_analysis, read_map
 from app.boards.views import board_out, board_summary
 from app.context import CurrentUser, Db, Svc
 from app.db import utcnow
@@ -108,7 +108,7 @@ def get_brief(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> BriefO
     system = read_map(row)
     if system is None:
         raise conflict("This board has no map yet. Add material first.")
-    return BriefOut(text=brief(system, read_analysis(row)))
+    return BriefOut(text=brief(system, current_analysis(row)))
 
 
 @router.get("/{board_id}/report.md", response_class=Response)
@@ -118,7 +118,7 @@ def report(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Response:
     system = read_map(row)
     if system is None:
         raise conflict("This board has no map yet, so there is nothing to export.")
-    text = render_report(row.title, system, read_analysis(row), row.analyzed_by)
+    text = render_report(row.title, system, current_analysis(row), row.analyzed_by)
     return Response(
         text,
         media_type="text/markdown; charset=utf-8",

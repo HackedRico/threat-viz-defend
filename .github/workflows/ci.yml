@@ -36,6 +36,12 @@ jobs:
         run: uv run mypy
       - name: Test
         run: uv run pytest
+      - name: Lint and type check the hook integration
+        if: hashFiles('integrations/hook/**') != ''
+        run: |
+          uv run ruff check ../integrations/hook
+          uv run ruff format --check ../integrations/hook
+          uv run mypy --strict ../integrations/hook/threatviz_hook.py
       - name: Test the hook integration
         if: hashFiles('integrations/hook/tests/**') != ''
         run: uv run pytest ../integrations/hook/tests

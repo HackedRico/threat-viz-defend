@@ -59,7 +59,7 @@ COPY api/app ./app
 RUN mkdir -p /app/api/data && chown app:app /app/api/data
 USER app
 EXPOSE 8080
-# The API rejects unknown Host headers, so the check sends the configured public host.
+# `/api/health` accepts any Host header; sending the public host keeps the check valid if that ever changes.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import os, urllib.parse as p, urllib.request as r; host = p.urlparse(os.environ.get('PUBLIC_ORIGIN') or 'http://localhost').hostname; r.urlopen(r.Request('http://127.0.0.1:' + os.environ.get('PORT', '8080') + '/api/health', headers={'Host': host}), timeout=4)"]
 CMD ["sh", "-c", "exec uvicorn app.main:app_from_env --factory --host 0.0.0.0 --port \"${PORT:-8080}\""]

@@ -48,6 +48,8 @@ interface CoachProps {
   active: string | null;
   onActive: (id: string) => void;
   onUseText: () => void;
+  /** Told when a call connects or ends, so a tab that hides this panel can still show the call is live. */
+  onLive?: (live: boolean) => void;
 }
 
 /** The voice coach panel, with its own conversation provider. */
@@ -87,6 +89,7 @@ function Coach({
   active,
   onActive,
   onUseText,
+  onLive,
   turns,
   problem,
   setProblem,
@@ -100,12 +103,25 @@ function Coach({
   const [micBlocked, setMicBlocked] = useState(false);
   const level = useRef<HTMLSpanElement>(null);
   const transcript = useRef<HTMLOListElement>(null);
+  // False once the panel is gone, so a start still waiting on the mic prompt or the token never opens a call.
+  const alive = useRef(true);
   const live = status === "connected";
 
   useVoiceTools({ board, map, state, onActive });
 
+  useEffect(() => {
+    onLive?.(live);
+    return () => onLive?.(false);
+  }, [live, onLive]);
+
   // End the call when the panel closes, so the microphone never stays open unseen.
-  useEffect(() => () => endSession(), [endSession]);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      endSession();
+    };
+  }, [endSession]);
 
   useEffect(() => {
     transcript.current?.lastElementChild?.scrollIntoView({ block: "nearest" });
@@ -138,6 +154,7 @@ function Coach({
         const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
         probe.getTracks().forEach((track) => track.stop());
       } catch (caught) {
+        if (!alive.current) return;
         const denied = caught instanceof DOMException && (caught.name === "NotAllowedError" || caught.name === "SecurityError");
         setMicBlocked(denied);
         setProblem(
@@ -147,8 +164,11 @@ function Coach({
         );
         return;
       }
+      // The mic prompt can sit for seconds; if the panel closed meanwhile, spend nothing and open nothing.
+      if (!alive.current) return;
       const session = await api.voiceSession(board.id);
       refreshMe();
+      if (!alive.current) return;
       clearTurns();
       startSession({
         conversationToken: session.conversation_token,
@@ -157,10 +177,11 @@ function Coach({
         workletPaths: WORKLETS,
       });
     } catch (caught) {
+      if (!alive.current) return;
       const busy = caught instanceof ApiError && caught.status === 429;
       setProblem(busy ? `${errorMessage(caught)} The text quiz works meanwhile.` : errorMessage(caught));
     } finally {
-      setStarting(false);
+      if (alive.current) setStarting(false);
     }
   };
 

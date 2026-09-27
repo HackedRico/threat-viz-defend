@@ -125,18 +125,34 @@ class Accounts:
         # and a looser one per username still stops a distributed guess.
         failures = f"login-fail:{name}:{ip}"
         spread = f"login-fail:{name}"
-        if self._limiter.count(failures, 900) >= 5 or self._limiter.count(spread, 900) >= 50:
-            raise too_many("Too many failed sign ins for this account. Try again in 15 minutes.", 900)
-        user = session.scalar(select(UserRow).where(UserRow.username == name))
-        if user is None or not _verify(user.password_hash, password):
+        # Each attempt reserves a failure before the slow password check, so parallel guesses cannot all
+        # pass a count taken before any of them failed; a right password gives its reservation back.
+        locked = "Too many failed sign ins for this account. Try again in 15 minutes."
+        try:
+            self._limiter.hit(failures, 5, 900, locked)
+        except AppError:
+            raise too_many(locked, 900) from None
+        try:
+            self._limiter.hit(spread, 50, 900, locked)
+        except AppError:
+            self._limiter.undo(failures)
+            raise too_many(locked, 900) from None
+        try:
+            user = session.scalar(select(UserRow).where(UserRow.username == name))
+            matched = user is not None and _verify(user.password_hash, password)
             if user is None:
                 _verify(_DUMMY_HASH, password)
-            self._limiter.hit(failures, 1000, 900, "")
-            self._limiter.hit(spread, 1000, 900, "")
+        except Exception:
+            # A busy hash slot or a database error says nothing about the password, so it is not a failure.
+            self._limiter.undo(spread)
+            self._limiter.undo(failures)
+            raise
+        if user is None or not matched:
             raise unauthorized("Wrong username or password.")
+        self._limiter.undo(spread)
+        self._limiter.reset(failures)
         if user.disabled:
             raise forbidden("This account is disabled. Ask the organizers.")
-        self._limiter.reset(failures)
         if _hasher.check_needs_rehash(user.password_hash):
             user.password_hash = _hash(password)
         user.last_login_at = utcnow()

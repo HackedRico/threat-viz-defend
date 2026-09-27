@@ -96,6 +96,7 @@ def current_user(request: Request, svc: Svc, session: Db) -> UserRow:
     user = svc.accounts.user_for_session(session, token) if token else None
     if user is None:
         raise unauthorized()
+    _commit_touch(session)
     return user
 
 
@@ -110,7 +111,16 @@ def agent_user(request: Request, svc: Svc, session: Db) -> UserRow:
         raise unauthorized(
             "Send a personal token as `Authorization: Bearer tvd_...`. Create one under Connect an agent."
         )
+    _commit_touch(session)
     return user
+
+
+def _commit_touch(session: Session) -> None:
+    """Commit a refreshed `last_seen_at` or `last_used_at` now, so the request holds no lock or connection."""
+    # Left pending, the next query flushes it and SQLite keeps its one write lock until the request ends,
+    # so a service that opens its own session, as `Boards._begin` does, waits out `busy_timeout` and fails.
+    # Committing also returns the connection to the pool while a route waits on a model; later queries take one again.
+    session.commit()
 
 
 AgentUser = Annotated[UserRow, Depends(agent_user)]

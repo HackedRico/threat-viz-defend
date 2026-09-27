@@ -12,6 +12,7 @@ import { layoutKey, layOutMap, type LayoutEngine, type MapLayouts } from "./layo
 // flipping a flag or editing evidence reuses the layouts on screen.
 
 let enginePromise: Promise<LayoutEngine> | null = null;
+const RELAYOUT_DELAY_MS = 350;
 
 function loadEngine(): Promise<LayoutEngine> {
   // The bundled build runs ELK on the main thread; a worker would need a blob URL the CSP forbids.
@@ -29,21 +30,31 @@ export function useMapLayout(map: SystemMap | null): { layouts: MapLayouts | nul
   const key = map ? layoutKey(map) : null;
 
   useEffect(() => {
-    if (map === null || key === null || key === state.key) return undefined;
+    if (key !== null && key === state.key) {
+      // Back on the map that last laid out, as after undoing an edit that failed: its layout is current again.
+      if (state.error !== null) setState((prev) => ({ ...prev, error: null }));
+      return undefined;
+    }
+    if (map === null || key === null) return undefined;
     let cancelled = false;
-    loadEngine()
-      .then(async (engine) => {
-        // One direction after the other: ELK holds the main thread while it works, so two short
-        // holds with a break between them keep the page responsive on a large map.
-        const down = await layOutMap(engine, map, "DOWN");
-        const right = await layOutMap(engine, map, "RIGHT");
-        if (!cancelled) setState({ layouts: { DOWN: down, RIGHT: right }, key, error: null });
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : "Layout failed." }));
-      });
+    const run = () =>
+      loadEngine()
+        .then(async (engine) => {
+          if (cancelled) return;
+          // One direction after the other: ELK holds the main thread while it works, so two short
+          // holds with a break between them keep the page responsive on a large map.
+          const down = await layOutMap(engine, map, "DOWN");
+          const right = await layOutMap(engine, map, "RIGHT");
+          if (!cancelled) setState({ layouts: { DOWN: down, RIGHT: right }, key, error: null });
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : "Layout failed." }));
+        });
+    // Typing a name changes the key on every keystroke; waiting for a pause runs ELK once, not per letter.
+    const timer = setTimeout(() => void run(), state.layouts ? RELAYOUT_DELAY_MS : 0);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
     // `map` is read only when `key` changes; its other fields do not move anything on the canvas.
   }, [key]);

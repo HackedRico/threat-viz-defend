@@ -41,6 +41,7 @@ Both end in the same place: a confirmed map with threats and a quiz. A board's `
 ```bash
 uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run pytest ../integrations/hook/tests
+uv run ruff check ../integrations/hook && uv run ruff format --check ../integrations/hook && uv run mypy --strict ../integrations/hook/threatviz_hook.py
 ```
 
 The built-in example in `app/examples/inbox_helper/` is the fixture for everything: `tests/factories.py` loads it by name, and the demo analyst replays it, so the whole static workflow runs without a key. Paste `app/examples/inbox_helper/material.md` into a new board to watch it end to end.

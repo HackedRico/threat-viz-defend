@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.auth import service as auth_service
 from tests.conftest import INVITE, PASSWORD, ClientFactory, sign_up
 
 
@@ -113,3 +115,31 @@ def test_development_account_is_refused_in_production() -> None:
     base = {"APP_ENV": "production", "PUBLIC_ORIGIN": "https://api.example.com", "APP_SECRET": "s" * 40}
     with pytest.raises(ValueError, match="DEV_USERNAME"):
         load_settings({**base, "INVITE_CODES": "umbc-hack-42", "DEV_USERNAME": "dev", "DEV_PASSWORD": "x" * 12})
+
+
+def test_a_right_password_gives_back_its_reserved_failure(client: TestClient) -> None:
+    sign_up(client, "hana")
+    client.post("/api/auth/logout")
+    for _ in range(4):
+        client.post("/api/auth/login", json={"username": "hana", "password": "wrong password"})
+    for _ in range(3):
+        assert client.post("/api/auth/login", json={"username": "hana", "password": PASSWORD}).status_code == 200
+    for _ in range(4):
+        client.post("/api/auth/login", json={"username": "hana", "password": "wrong password"})
+    assert client.post("/api/auth/login", json={"username": "hana", "password": PASSWORD}).status_code == 200
+
+
+def test_a_busy_sign_in_is_not_counted_as_a_failure(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    sign_up(client, "ines")
+    client.post("/api/auth/logout")
+    monkeypatch.setattr(auth_service, "_HASH_WAIT_S", 0.01)
+    for _ in range(2):
+        assert auth_service._HASH_SLOTS.acquire(timeout=1)
+    try:
+        for _ in range(6):
+            busy = client.post("/api/auth/login", json={"username": "ines", "password": PASSWORD})
+            assert busy.status_code == 503
+    finally:
+        for _ in range(2):
+            auth_service._HASH_SLOTS.release()
+    assert client.post("/api/auth/login", json={"username": "ines", "password": PASSWORD}).status_code == 200

@@ -129,9 +129,10 @@ class OpenAICompatibleLlm:
         try:
             response = self._create(messages, response_format, request.task, deadline)
         except openai.BadRequestError as exc:
-            if response_format is None:
+            if response_format is None or not _about_response_format(exc):
                 raise LlmError("unavailable", f"{self._label} rejected the request: {_brief(exc)}") from exc
             # Many compatible servers reject `response_format`; fall back to asking in the prompt from now on.
+            # Only for that complaint: this client is shared, and a too-long prompt must not cost everyone the schema.
             log.warning("[llm] %s rejected response_format %s; using prompt-only JSON.", self._label, self._json_mode)
             self._json_mode = "prompt"
             messages[0] = {"role": "system", "content": self._system_prompt(request)}
@@ -214,6 +215,12 @@ def _timeout_message(label: str, deadline: float | None) -> str:
     """What to do after a timeout: less material helps a map or threats job, while a question just needs a retry."""
     advice = "Try again in a moment." if deadline is not None else "Try again with less material."
     return f"{label} took too long to answer. {advice}"
+
+
+def _about_response_format(exc: openai.BadRequestError) -> bool:
+    """True when a 400 complains about `response_format` or JSON output, not about the prompt or the model."""
+    text = f"{exc} {exc.body}".lower()
+    return any(word in text for word in ("response_format", "json_schema", "json_object", "json mode", "schema"))
 
 
 def _brief(exc: Exception) -> str:

@@ -1,9 +1,15 @@
+from collections.abc import Iterator
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
 from app.boards.github import parse_repo_url
 from app.config import load_settings
 from app.errors import AppError
+from app.limits import RateLimiter
+from app.tables import BoardRow
 from tests.conftest import ClientFactory, example_material, sign_up
 
 
@@ -161,3 +167,61 @@ def test_ipv6_clients_share_a_limit_per_64() -> None:
 def test_uploads_to_someone_elses_board_stop_before_any_work(signed_in: TestClient) -> None:
     body = {"sources": [{"name": "k.txt", "kind": "text", "text": "-----BEGIN PRIVATE KEY-----\n" * 5000}]}
     assert signed_in.post("/api/boards/not-a-board/sources", json=body).status_code == 404
+
+
+def test_retries_on_a_busy_board_do_not_use_up_agent_changes(signed_in: TestClient) -> None:
+    token = signed_in.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    board = signed_in.post("/api/boards", json={"title": "Agent board"}).json()
+    db = signed_in.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        session.execute(update(BoardRow).where(BoardRow.id == board["id"]).values(status="mapping"))
+    headers = {"Authorization": f"Bearer {token}"}
+    body = {"summary": example_material()["sources"][0]["text"]}
+    for _ in range(31):
+        busy = signed_in.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers)
+        assert busy.status_code == 409
+    with db.session() as session:
+        session.execute(update(BoardRow).where(BoardRow.id == board["id"]).values(status="empty"))
+    assert signed_in.post(f"/api/agent/boards/{board['id']}/changes", json=body, headers=headers).status_code == 202
+
+
+def test_the_web_app_leaves_mcp_to_the_mcp_server(make_client: ClientFactory, tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<!doctype html><title>app</title>")
+    client = make_client(static_dir=tmp_path)
+    assert client.get("/mcp").status_code == 401
+    assert client.get("/boards/abc").text.startswith("<!doctype html>")
+    assert client.get("/mcpserver-notes").status_code == 200
+    assert client.get("/api/nope").status_code == 404
+
+
+def test_a_streamed_body_over_the_cap_gets_413(signed_in: TestClient) -> None:
+    def chunks() -> Iterator[bytes]:
+        for _ in range(30):
+            yield b" " * 100_000
+
+    response = signed_in.post("/api/boards", content=chunks(), headers={"Content-Type": "application/json"})
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
+
+
+def test_voice_sessions_cannot_start_in_a_burst(make_client: ClientFactory) -> None:
+    class FakeVoice:
+        def conversation_token(self) -> str:
+            return "conv-token"
+
+    client = make_client(voice=FakeVoice())
+    sign_up(client)
+    board_id = client.get("/api/boards").json()[0]["id"]
+    statuses = [client.post(f"/api/boards/{board_id}/voice").status_code for _ in range(3)]
+    assert statuses == [200, 200, 429]
+
+
+def test_a_short_window_flood_does_not_erase_a_lockout() -> None:
+    now = [0.0]
+    limiter = RateLimiter(clock=lambda: now[0])
+    for _ in range(5):
+        limiter.hit("login-fail:gina:1.2.3.4", 5, 900, "")
+    now[0] = 400.0
+    for n in range(50_001):
+        limiter.hit(f"signup:{n}", 60, 60, "")
+    assert limiter.count("login-fail:gina:1.2.3.4", 900) == 5

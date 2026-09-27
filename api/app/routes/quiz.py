@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from app.boards.service import read_analysis, read_map
+from app.boards.service import current_analysis, read_map
 from app.context import CurrentUser, Db, Svc
 from app.domain.briefing import brief
 from app.domain.quiz import build_quiz
@@ -45,7 +45,7 @@ def start_voice(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Voic
     system = read_map(row)
     if system is None:
         raise conflict("Add material and draw a map before starting the voice coach.")
-    analysis = read_analysis(row)
+    analysis = current_analysis(row)
     svc.budget.spend(session, user.id, "voice", "conversation")
     token = svc.voice.conversation_token()
     questions = build_quiz(system, analysis)

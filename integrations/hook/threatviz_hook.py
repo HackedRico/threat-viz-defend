@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -25,6 +26,9 @@ from pathlib import Path, PurePosixPath
 
 AGENT_CLAUDE = "Claude Code"
 AGENT_CURSOR = "Cursor"
+# The main worktree's refs; each linked worktree gets its own pair (`Repo.base_ref`), or one worktree's snapshot
+# would become another's base. They stay under `refs/`, not git's per-worktree `refs/worktree/`, because `git gc`
+# in the main worktree does not count a linked worktree's `refs/worktree/` as reachable and would prune them.
 BASE_REF = "refs/threatviz/base"
 PENDING_REF = "refs/threatviz/pending"
 CONFIG_FILE = ".threatviz.json"
@@ -48,7 +52,7 @@ FOREGROUND_ENV = "THREATVIZ_HOOK_FOREGROUND"
 # =============================================================================
 # One standard library file that Claude Code or Cursor runs on every prompt and
 # every stop. `run_hook` saves prompts, then on stop `report_turn` snapshots the
-# worktree into a private ref, diffs it against the last reported `BASE_REF`,
+# worktree into a private ref, diffs it against the last reported base ref,
 # and posts architectural changes to the board. `init`, `status` and
 # `print-config` are for humans setting it up.
 
@@ -147,7 +151,9 @@ BUILTIN_POLICY = FilePolicy(
     max_file_bytes=200_000,
 )  # fmt: skip
 
-# The server also treats config files named like secrets as credential stores; these are not in `file_policy`.
+# The server also treats config files named like secrets as credential stores. Its `file_policy` publishes the same
+# lists (`secretWordsPattern`, `configExtensions`, `secretPaths`), but the hook keeps its own copies, so a change to
+# them in `api/app/domain/masking.py` must be made here too.
 _SECRET_WORDS = re.compile(r"secret|credential|service-?account")
 _CONFIG_EXTENSIONS = frozenset({"json", "yaml", "yml", "toml", "txt", "ini", "xml", "cfg", "conf"})
 # Credential stores whose file name is too generic to skip on its own, keyed by their parent folder.
@@ -478,11 +484,30 @@ class Repo:
 
     root: Path
     git_dir: Path
+    # Where the shared objects and refs live: `git_dir` itself in the main worktree.
+    common_dir: Path | None = None
 
     @property
     def state_dir(self) -> Path:
         """The hook's private folder inside the git dir."""
         return self.git_dir / "threatviz"
+
+    @property
+    def base_ref(self) -> str:
+        """The ref holding this worktree's last reported snapshot."""
+        return self._ref("base")
+
+    @property
+    def pending_ref(self) -> str:
+        """The ref holding this worktree's latest snapshot."""
+        return self._ref("pending")
+
+    def _ref(self, name: str) -> str:
+        """`refs/threatviz/<name>` in the main worktree, else a pair named after this worktree's git dir."""
+        if self.common_dir is None or self.common_dir == self.git_dir.resolve():
+            return f"refs/threatviz/{name}"
+        worktree = hashlib.sha256(os.fsencode(self.git_dir)).hexdigest()[:12]
+        return f"refs/threatviz/worktrees/{worktree}/{name}"
 
 
 def _git(args: Sequence[str], cwd: Path, *, env: Mapping[str, str] | None = None, stdin: bytes | None = None) -> bytes:
@@ -519,10 +544,13 @@ def _nul_paths(raw: bytes) -> list[str]:
 def find_repo(cwd: Path) -> Repo | None:
     """The repo that contains `cwd`, or `None` outside a worktree."""
     try:
-        root, git_dir = _git_text(["rev-parse", "--show-toplevel", "--absolute-git-dir"], cwd).splitlines()
+        root, git_dir, common = _git_text(
+            ["rev-parse", "--show-toplevel", "--absolute-git-dir", "--git-common-dir"], cwd
+        ).splitlines()
     except (GitError, OSError, ValueError):
         return None
-    return Repo(root=Path(root), git_dir=Path(git_dir))
+    # `--git-common-dir` may print a path relative to `cwd`.
+    return Repo(root=Path(root), git_dir=Path(git_dir), common_dir=(cwd / common).resolve())
 
 
 def _ref_commit(repo: Repo, ref: str) -> str | None:
@@ -535,7 +563,7 @@ def _ref_commit(repo: Repo, ref: str) -> str | None:
 
 def resolve_base(repo: Repo) -> str:
     """What the next diff starts from: the last reported snapshot, else `HEAD`, else the empty tree."""
-    for ref in (BASE_REF, "HEAD"):
+    for ref in (repo.base_ref, "HEAD"):
         commit = _ref_commit(repo, ref)
         if commit:
             return commit
@@ -544,7 +572,7 @@ def resolve_base(repo: Repo) -> str:
 
 
 def take_snapshot(repo: Repo, policy: FilePolicy) -> str:
-    """Commit the worktree as it is now, minus skipped files, to `PENDING_REF` and return the commit id."""
+    """Commit the worktree as it is now, minus skipped files, to `Repo.pending_ref` and return the commit id."""
     real_index = repo.root / _git_text(["rev-parse", "--git-path", "index"], repo.root)
     # Excluding vendored folders up front keeps `git add` from hashing them on every turn.
     ignored = [f":(exclude,glob,icase)**/{name}/**" for name in sorted(policy.ignored_dirs)]
@@ -554,7 +582,21 @@ def take_snapshot(repo: Repo, policy: FilePolicy) -> str:
         if real_index.is_file():
             shutil.copyfile(real_index, index)
         env = {"GIT_INDEX_FILE": str(index)}
-        _git(["add", "-A", "--ignore-errors", "--", ".", *ignored], repo.root, env=env)
+        # Only paths that may be sent are added: `git add` writes each file it sees into the object store,
+        # and a skipped file such as an untracked `.env` must never be hashed there.
+        changed = _nul_paths(
+            _git(["ls-files", "-z", "--others", "--modified", "--deleted", "--exclude-standard", "--", ".", *ignored],
+                 repo.root, env=env)
+        )  # fmt: skip
+        wanted = sorted({path for path in changed if not skip_reason(path, policy)})
+        if wanted:
+            _git(
+                ["--literal-pathspecs", "add", "-A", "--ignore-errors",
+                 "--pathspec-from-file=-", "--pathspec-file-nul"],
+                repo.root,
+                env=env,
+                stdin=b"\0".join(os.fsencode(path) for path in wanted),
+            )  # fmt: skip
         tracked = _nul_paths(_git(["ls-files", "-z", "--cached"], repo.root, env=env))
         left_out = [path for path in tracked if skip_reason(path, policy)]
         if left_out:
@@ -567,7 +609,7 @@ def take_snapshot(repo: Repo, policy: FilePolicy) -> str:
             )  # fmt: skip
         tree = _git_text(["write-tree"], repo.root, env=env)
     commit = _git_text(["commit-tree", "--no-gpg-sign", tree, "-m", "ThreatViz snapshot"], repo.root, env=_IDENTITY)
-    _git(["update-ref", PENDING_REF, commit], repo.root)
+    _git(["update-ref", repo.pending_ref, commit], repo.root)
     return commit
 
 
@@ -790,15 +832,18 @@ def report_turn(repo: Repo, config: Config, agent: str) -> tuple[str, str]:
     base = resolve_base(repo)
     files = changed_files(repo, base, snapshot, policy)
     diff = build_diff(repo, base, snapshot, files)
+    prompts = load_prompts(repo)
     if not diff.strip():
         # Nothing sendable changed; moving the base is safe because the diff from it is empty.
-        _git(["update-ref", BASE_REF, snapshot], repo.root)
+        _git(["update-ref", repo.base_ref, snapshot], repo.root)
+        # The prompts behind a skipped change describe work no later diff will carry, so they go too.
+        drop_prompts(repo, [item["id"] for item in prompts])
         return "skipped", "no changes to report"
     if not is_architectural(files, diff):
         # Judge each change once, so later diffs stay small and only carry new work.
-        _git(["update-ref", BASE_REF, snapshot], repo.root)
+        _git(["update-ref", repo.base_ref, snapshot], repo.root)
+        drop_prompts(repo, [item["id"] for item in prompts])
         return "skipped", f"no architectural change in {len(files)} file(s)"
-    prompts = load_prompts(repo)
     summary = build_summary([item["prompt"] for item in prompts], agent)
     try:
         reply = post_change(config, agent, summary, diff, files)
@@ -806,7 +851,7 @@ def report_turn(repo: Repo, config: Config, agent: str) -> tuple[str, str]:
         return "error", f"could not reach {config.api_url}: {exc}"
     note = f"; {policy_note}" if policy_note else ""
     if reply.status == 202:
-        _git(["update-ref", BASE_REF, snapshot], repo.root)
+        _git(["update-ref", repo.base_ref, snapshot], repo.root)
         drop_prompts(repo, [item["id"] for item in prompts])
         review = reply.body.get("review_url", "") if isinstance(reply.body, dict) else ""
         return "reported", f"{len(files)} file(s) sent, review at {review}{note}"
@@ -941,7 +986,7 @@ def cmd_init(board_id: str, api_url: str | None) -> int:
     (repo.root / CONFIG_FILE).write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8")
     policy, note = fetch_policy(origin)
     snapshot = take_snapshot(repo, policy)
-    _git(["update-ref", BASE_REF, snapshot], repo.root)
+    _git(["update-ref", repo.base_ref, snapshot], repo.root)
     record_outcome(repo, "initialized", note)
     print(f"Tracking board {boards[board_id]!r} ({board_id}) from {repo.root}.")
     print(f"Wrote {CONFIG_FILE}; it holds no secrets or API origin and can be committed.")
@@ -960,7 +1005,7 @@ def cmd_status() -> int:
     trusted = trusted_api_url(repo, env)
     api_url = trusted or "(missing, run `init` or export THREATVIZ_API_URL)"
     board = env.get("THREATVIZ_BOARD_ID") or stored.get("board_id") or "(missing)"
-    base = _ref_commit(repo, BASE_REF)
+    base = _ref_commit(repo, repo.base_ref)
     last = _read_json(repo.state_dir / "last.json")
     print(f"repo:     {repo.root}")
     print(f"api url:  {api_url}")

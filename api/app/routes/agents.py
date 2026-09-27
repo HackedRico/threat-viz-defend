@@ -25,6 +25,8 @@ def agent_boards(user: AgentUser, svc: Svc, session: Db) -> list[BoardSummary]:
 @router.post("/boards/{board_id}/changes", status_code=status.HTTP_202_ACCEPTED)
 def report_change(board_id: str, body: AgentChangeIn, user: AgentUser, svc: Svc, session: Db) -> AgentChangeOut:
     """Update the board's map from a coding agent's change."""
+    # A hook retries a busy board on its next turn, and those retries must not use up the hour's changes.
+    svc.boards.check_idle(session, user.id, board_id)
     svc.limiter.hit(f"agent-change:{user.id}", 30, 3600, "Too many agent changes this hour. Batch them or wait.")
     material = agent_material(body.agent, body.summary, body.diff, body.files, utcnow())
     svc.boards.add_material(user.id, board_id, material)

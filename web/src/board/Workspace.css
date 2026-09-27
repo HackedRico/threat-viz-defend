@@ -264,6 +264,16 @@
 
 /* ---------- busy overlay ---------- */
 
+/* Floats over the map, which keeps its last good layout underneath. */
+.workspace-layout-error {
+  position: absolute;
+  inset: var(--space-3) var(--space-3) auto;
+  z-index: 2;
+  margin: 0 auto;
+  max-width: 560px;
+  box-shadow: var(--shadow-3);
+}
+
 .workspace-busy {
   position: absolute;
   inset: auto 0 64px;

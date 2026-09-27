@@ -61,6 +61,7 @@ Rate limits count hits in a sliding window, in memory ([limits.py](../api/app/li
 | Model calls | user | 6 per minute, on any provider | `MODEL_CALLS_PER_MINUTE` |
 | Model calls on the server's key | user | 60 per day | `DAILY_MODEL_CALLS` |
 | Model calls on the server's key | everyone | 3000 per day | `GLOBAL_DAILY_MODEL_CALLS` |
+| Voice sessions | user | 2 per minute | fixed |
 | Voice sessions | user | 10 per day | `DAILY_VOICE_SESSIONS` |
 | Dictations | user | 10 per minute | fixed |
 | Dictations | user | 30 per day | `DAILY_DICTATIONS` |
@@ -140,7 +141,7 @@ Cookie. Body `SourcesIn`: `sources`, 1 to 400 items of `SourceIn`: `name` (up to
 ### `POST /api/boards/{board_id}/github`
 Cookie. Body `GithubIn`: `url`, a public repository such as `https://github.com/owner/repo` or `https://github.com/owner/repo/tree/<ref>`. The server downloads the tarball from `codeload.github.com` in a job and draws the map from its text files.
 
-`202` with `BoardOut` in `mapping`. Errors: `400` for any other URL, `409`, `429`. A missing repository or a tarball over 30 MB fails the job and shows in `error`.
+`202` with `BoardOut` in `mapping`. Errors: `400` for any other URL, `409`, `429`. A missing repository, a tarball over 30 MB, or one with no readable files fails the job and shows in `error`.
 
 ### `PUT /api/boards/{board_id}/map`
 Cookie. Body `MapIn`: `map`, a full `SystemMap`. The map is sanitized, the old map becomes `previous_map`, and the board goes to `review`. `200` with `BoardOut`. Errors: `400` when no nodes remain, `409` when the board is busy.
@@ -152,22 +153,22 @@ Cookie. No body. Accepts the drafted map and starts finding threats. `202` with 
 Cookie. Body `AskIn`: `question` (up to 2,000 characters) and optional `focus`, a node or flow id the user selected. `200` with `Answer`: `answer` (plain text) and `highlight` (ids on the board). Errors: `409` until the board has threats, `429`, `502` or `503` `model_error`.
 
 ### `GET /api/boards/{board_id}/brief`
-Cookie. `200` with `BriefOut`: `text`, a plain spoken walkthrough of the system, its boundaries, AI exposure and top threats. Error: `409` without a map.
+Cookie. `200` with `BriefOut`: `text`, a plain spoken walkthrough of the system, its boundaries, AI exposure and top threats. Threats appear only on a `ready` board, since stored threats for an edited map name parts it may no longer have. Error: `409` without a map.
 
 ### `GET /api/boards/{board_id}/report.md`
-Cookie. `200` with `text/markdown` as an attachment named `threat-model.md`: summary, verdict, components, flows, lethal trifecta, threats, attack paths and assumptions. Model text is escaped so it renders as plain text. Error: `409` without a map.
+Cookie. `200` with `text/markdown` as an attachment named `threat-model.md`: summary, verdict, components, flows, lethal trifecta, threats, attack paths and assumptions. Threats, attack paths and the verdict appear only on a `ready` board. Model text is escaped so it renders as plain text. Error: `409` without a map.
 
 ## Quiz and voice
 
 ### `GET /api/boards/{board_id}/quiz`
-Cookie. `200` with `QuizOut`: `analysis_version`, `questions` (each `id`, `topic`, `kind`, `prompt`, `options`; never the key), `results` keyed by question id, and `mastery` (`total`, `answered`, `correct`, `partial`, `score` from 0 to 1, `weak_spots`). A board without a map has no questions.
+Cookie. `200` with `QuizOut`: `analysis_version`, `questions` (each `id`, `topic`, `kind`, `prompt`, `options`; never the key), `results` keyed by question id, and `mastery` (`total`, `answered`, `correct`, `partial`, `score` from 0 to 1, `weak_spots`). A board that is not `ready` has no questions: they need the threats found on the current map. Answers are kept per `analysis_version`, so confirming an edited map starts the quiz over.
 
 ### `POST /api/boards/{board_id}/quiz/answers`
 Cookie. Body `AnswerIn`: `question_id`, `choice_ids` (up to 10, for `single` and `multi` questions) or `text` (up to 3,000 characters, for `open` questions).
 
 `200` with `AnsweredOut`: `attempt` and the new `mastery`. `attempt` holds `result` (`correct`, `partial` or `wrong`), `feedback`, `explanation`, `evidence` (quotes from the map), `highlight`, `correct_ids`, `your_ids` and `your_text`.
 
-Errors: `400` with no option picked or an empty open answer, `404` when the question is out of date because the board changed, `409` when the board changed while grading, `429`, `502` or `503` for open answers.
+Errors: `400` with no option picked or an empty open answer, `404` when the question is out of date because the board changed, `409` when the board changed while grading (the answer is not saved), `429`, `502` or `503` for open answers.
 
 ### `DELETE /api/boards/{board_id}/quiz`
 Cookie. Forgets every answer on the board. `204`.
@@ -192,7 +193,7 @@ Cookie. `200` with `ProviderOut`: the user's saved provider, or the server's def
 ### `PUT /api/provider`
 Cookie. Body `ProviderIn`: `kind` (`openai_compatible` or `backboard`), `base_url`, `model` (Backboard models as `provider/model`), `api_key` (null keeps the saved key when the kind and base URL are unchanged, and is refused otherwise; an OpenAI-compatible provider may be saved without one), `memory` (Backboard only).
 
-`200` with `ProviderOut`. Errors: `400` when the base URL is not https (plain http only where private addresses are allowed), holds credentials, a query or a fragment, does not resolve, or resolves to a private or local address; also when a new Backboard provider has no key or the model lacks its `provider/` prefix.
+`200` with `ProviderOut`. Errors: `400` when the base URL is not https (plain http only where private addresses are allowed), holds credentials, a query or a fragment, does not resolve within 3 seconds, or resolves to a private or local address; also when a new Backboard provider has no key or the model lacks its `provider/` prefix.
 
 ### `DELETE /api/provider`
 Cookie. Forgets the provider and key; the server's default takes over. `204`.
@@ -226,13 +227,13 @@ Cookie. Body `MemoryIn`. Lists the account's Backboard assistants with the typed
 Bearer. `200` with the token owner's boards as `BoardSummary`. The hook uses it to check a board id.
 
 ### `POST /api/agent/boards/{board_id}/changes`
-Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to 4,000 characters), `diff` (a unified diff, up to 200,000 characters), `files` (up to 500 paths). Diff sections for files the policy skips are dropped, values are masked, and the map is updated from the change.
+Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to 4,000 characters), `diff` (a unified diff, up to 200,000 characters), `files` (up to 500 paths of up to 1,000 characters). Diff sections for files the policy skips are dropped, values are masked, and the map is updated from the change.
 
-`202` with `AgentChangeOut`: `board_id`, `status` and `review_url`, a link to the board in the web app (the first `CORS_ORIGINS` entry, else `PUBLIC_ORIGIN`). Errors: `401`, `404`, `409` when the board is busy, `429`.
+`202` with `AgentChangeOut`: `board_id`, `status` and `review_url`, a link to the board in the web app (the first `CORS_ORIGINS` entry, else `PUBLIC_ORIGIN`; a path alone when neither is set, as in a local run). Errors: `401`, `404`, `409` when the board is busy, `429`. A busy board is refused before the hourly limit is counted, so a hook's retries do not use it up.
 
 ## MCP tools
 
-`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. [integrations/README.md](../integrations/README.md) has the client setup.
+`/mcp` is a remote MCP server over streamable HTTP, stateless, with JSON responses. Connect with a personal token as `Authorization: Bearer tvd_...`; without one it answers `401`. Each tool acts as the token's owner. A tool that cannot do what was asked returns a tool error, with `isError` set and a message that says what to do next. App errors, such as a busy board or a spent budget, come back this way with the app's message. On a board with no map yet, `describe_element` and both quiz tools return a tool error that asks the developer to add material and confirm the map in the web app, and `get_board` reports the board's status. Until the board is `ready`, `get_board` leaves out threats, `ask_board` is refused and the quiz tools have no questions. [integrations/README.md](../integrations/README.md) has the client setup.
 
 | Tool | Arguments | Does | Spends |
 |---|---|---|---|
@@ -242,7 +243,7 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 | `ask_board` | `board_id`, `question` | Answers a question about a finished board on one line, then lists related ids on the next | 1 model call |
 | `report_change` | `board_id`, `summary`, `diff`, `files` | Updates the map from a change the agent made; the developer reviews it in the app | 1 model call, 1 of 30 agent changes per hour |
 | `next_quiz_question` | `board_id` | The next unanswered question with lettered options, or the score when all are answered; a map with no questions is a tool error | nothing |
-| `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or the developer's own words, and returns the result, feedback and explanation | 1 model call for open questions |
+| `answer_quiz_question` | `board_id`, `question_id`, `answer` | Grades letters such as `A, C` or `A and C` (only standalone letters count; none, or one past the last option, is a tool error) or the developer's own words, and returns the result, feedback and explanation on one line | 1 model call for open questions |
 
 ## Examples
 

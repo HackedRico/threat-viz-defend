@@ -228,6 +228,24 @@ summary.panel-label {
   gap: var(--space-4);
 }
 
+/* Marks a voice call still running while another tab is shown; a word, not only a color. */
+.tab-live {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: var(--ink-inverse);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+/* A hidden Defend panel stays mounted; `display: flex` above would otherwise override the attribute. */
+.tab-panel[hidden] {
+  display: none;
+}
+
 /* ---------- threats ---------- */
 
 .threat-list,

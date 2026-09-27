@@ -16,6 +16,7 @@ from app.config import Settings
 # response. `spa_file` picks what to serve for a browser path.
 
 MAX_BODY_BYTES = 2_500_000
+_TOO_LARGE = "That upload is too large. Send fewer or smaller files."
 _UNSAFE = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Token-authenticated paths: no cookie rides along, so cross-site request forgery cannot reach them.
 _TOKEN_PATHS = ("/api/agent/", "/mcp")
@@ -69,17 +70,28 @@ class RequestGuard:
             return
 
         received = 0
+        too_large = False
+        answered = False
 
         async def counted_receive() -> Message:
-            nonlocal received
+            nonlocal received, too_large
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > MAX_BODY_BYTES:
+                    too_large = True
                     raise _BodyTooLargeError
             return message
 
         async def secured_send(message: Message) -> None:
+            nonlocal answered
+            if too_large:
+                # FastAPI turns an error while reading the body into its own 400, so that reply is swapped for a 413.
+                if message["type"] == "http.response.start" and not answered:
+                    answered = True
+                    await _send_error(send, 413, "payload_too_large", _TOO_LARGE, self._headers)
+                return
+            answered = answered or message["type"] == "http.response.start"
             if message["type"] == "http.response.start":
                 existing = {k.lower() for k, _ in message.get("headers", [])}
                 extra = [(k, v) for k, v in self._headers if k not in existing]
@@ -89,9 +101,8 @@ class RequestGuard:
         try:
             await self.app(scope, counted_receive, secured_send)
         except _BodyTooLargeError:
-            await _send_error(
-                send, 413, "payload_too_large", "That upload is too large. Send fewer files.", self._headers
-            )
+            if not answered:
+                await _send_error(send, 413, "payload_too_large", _TOO_LARGE, self._headers)
 
     def _host_problem(self, scope: Scope, headers: Headers) -> tuple[int, str, str] | None:
         """Refuse unknown Host headers, which blocks DNS rebinding; health checks from the platform are exempt."""
@@ -107,7 +118,7 @@ class RequestGuard:
         """Why a request must be refused before it reaches a route, or `None`."""
         length = headers.get("content-length")
         if length is not None and (not length.isdigit() or int(length) > MAX_BODY_BYTES):
-            return 413, "payload_too_large", "That upload is too large. Send fewer or smaller files."
+            return 413, "payload_too_large", _TOO_LARGE
         path: str = scope["path"]
         method: str = scope["method"]
         if method not in _UNSAFE or not path.startswith("/api/") or path.startswith(_TOKEN_PATHS):

@@ -57,7 +57,6 @@ const KIND_WORD: Record<MapNode["kind"], string> = { external: "external entity"
 export interface MapCanvasProps {
   map: SystemMap;
   layouts: MapLayouts;
-  layoutKey: string;
   threats: readonly Threat[];
   exposure: readonly ExposureOut[];
   crossings: readonly string[];
@@ -73,7 +72,7 @@ function clampZoom(k: number): number {
 }
 
 /** The map canvas with pan, zoom, selection and highlights. */
-export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossings, diff, lit, draft, focus }: MapCanvasProps) {
+export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, lit, draft, focus }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -139,18 +138,28 @@ export function MapCanvas({ map, layouts, layoutKey, threats, exposure, crossing
   }, [fitView, focus, layout, size]);
 
   // Reset the view on a new structure, a new direction or a resize, unless the user has already moved it themselves.
+  // Structure means which parts and flows exist and where they sit, so renaming a part keeps the user's view.
+  const structure = useMemo(
+    () =>
+      JSON.stringify([
+        map.boundaries.map((b) => b.id),
+        map.nodes.map((n) => [n.id, n.boundary]),
+        map.flows.map((f) => [f.id, f.source, f.target]),
+      ]),
+    [map],
+  );
   const fittedKey = useRef<string | null>(null);
   useLayoutEffect(() => {
     if (direction === null) return;
-    if (fittedKey.current !== layoutKey || !moved.current) {
+    if (fittedKey.current !== structure || !moved.current) {
       const next = openingView();
       if (next) {
         setView(next);
-        fittedKey.current = layoutKey;
+        fittedKey.current = structure;
         moved.current = false;
       }
     }
-  }, [direction, layoutKey, openingView]);
+  }, [direction, structure, openingView]);
 
   const turn = () => {
     turned.current = true;

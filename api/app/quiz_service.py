@@ -1,7 +1,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.boards.service import Boards, model_error, read_analysis, read_map
+from app.boards.service import Boards, current_analysis, model_error, read_map
 from app.db import Database
 from app.domain.models import GradeVerdict
 from app.domain.quiz import QuizQuestion, Result, build_quiz, grade_choice, mastery
@@ -55,11 +55,13 @@ class Quiz:
             question = next((q for q in _questions(row) if q.id == body.question_id), None)
             if question is None:
                 raise not_found("That question is out of date because the board changed. Reload the quiz.")
-            system, analysis, version = read_map(row), read_analysis(row), row.analysis_version
-            if question.kind == "open":
-                if not (body.text and body.text.strip()):
-                    raise bad_request("Type or say an answer in your own words first.")
-                chosen = self._analysts.for_user(user_id)
+            system, analysis, version = read_map(row), current_analysis(row), row.analysis_version
+            if question.kind == "open" and not (body.text and body.text.strip()):
+                raise bad_request("Type or say an answer in your own words first.")
+        if question.kind == "open":
+            # Outside any session: a saved provider's host is resolved here, and a slow lookup must not hold one.
+            chosen = self._analysts.for_user(user_id)
+            with self._db.session() as session:
                 self._budget.spend(session, user_id, "model", "grade", own_key=chosen.own_key)
 
         if question.kind == "open":
@@ -87,6 +89,10 @@ class Quiz:
             )
 
         with self._db.session() as session:
+            # Grading an open answer takes seconds; if the board moved on meanwhile, nothing is saved.
+            now = self._boards.get(session, user_id, board_id)
+            if now.analysis_version != version or current_analysis(now) is None:
+                raise conflict("The board changed while grading. Reload the quiz.")
             session.add(
                 QuizAttemptRow(
                     user_id=user_id,
@@ -113,6 +119,10 @@ class Quiz:
             delete(QuizAttemptRow).where(QuizAttemptRow.user_id == user_id, QuizAttemptRow.board_id == row.id)
         )
 
+    def questions(self, session: Session, user_id: str, board_id: str) -> list[QuizQuestion]:
+        """The current questions with their keys, for tools that speak them."""
+        return _questions(self._boards.get(session, user_id, board_id))
+
     def question(self, session: Session, user_id: str, board_id: str, question_id: str) -> QuizQuestion:
         """One current question with its key, for tools that speak it."""
         row = self._boards.get(session, user_id, board_id)
@@ -123,9 +133,10 @@ class Quiz:
 
 
 def _questions(row: BoardRow) -> list[QuizQuestion]:
-    """The questions for a board's current map and analysis."""
-    system = read_map(row)
-    return build_quiz(system, read_analysis(row)) if system is not None else []
+    """The questions for a ready board's map and analysis; none before its threats are found."""
+    system, analysis = read_map(row), current_analysis(row)
+    # Attempts are kept per analysis version, so a map changed since then must not be quizzed on them.
+    return build_quiz(system, analysis) if system is not None and analysis is not None else []
 
 
 def _latest(session: Session, user_id: str, row: BoardRow) -> dict[str, QuizAttemptRow]:

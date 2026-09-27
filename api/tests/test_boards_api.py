@@ -1,10 +1,18 @@
+import time
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select, update
 
+from app.analysis.analyst import DemoAnalyst
+from app.boards.ingest import Material
+from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.llm.base import LlmError
+from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow
 from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
@@ -200,3 +208,85 @@ def test_github_urls_are_validated(signed_in: TestClient) -> None:
     board = new_board(signed_in)
     bad = signed_in.post(f"/api/boards/{board['id']}/github", json={"url": "https://evil.example/owner/repo"})
     assert bad.status_code == 400
+
+
+def test_a_stale_session_or_new_token_does_not_lock_sqlite(make_client: ClientFactory, tmp_path: Path) -> None:
+    # A file database has one writer at a time, unlike the shared in-memory connection other tests use.
+    client = make_client(database_url=f"sqlite:///{tmp_path / 'app.db'}")
+    sign_up(client)
+    board = new_board(client)
+    db = client.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        session.execute(update(LoginSessionRow).values(last_seen_at=utcnow() - timedelta(minutes=10)))
+    started = time.monotonic()
+    assert client.post(f"/api/boards/{board['id']}/sources", json=example_material()).status_code == 202
+    token = client.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    change = {"summary": "Added a cache", "diff": "diff --git a/a.py b/a.py\n+import redis\n", "files": ["a.py"]}
+    confirm = client.post(f"/api/boards/{board['id']}/confirm")
+    assert confirm.status_code == 202
+    response = client.post(
+        f"/api/agent/boards/{board['id']}/changes", json=change, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 202, response.text
+    assert time.monotonic() - started < 4
+
+
+def test_threats_for_an_older_map_are_not_quizzed_or_reported(signed_in: TestClient) -> None:
+    board_id = signed_in.get("/api/boards").json()[0]["id"]
+    right = {"question_id": "stride:T2", "choice_ids": ["I"]}
+    assert signed_in.post(f"/api/boards/{board_id}/quiz/answers", json=right).json()["attempt"]["result"] == "correct"
+    edited = signed_in.get(f"/api/boards/{board_id}").json()["map"]
+    edited["nodes"] = [n for n in edited["nodes"] if n["id"] != "logs"]
+    assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+
+    quiz = signed_in.get(f"/api/boards/{board_id}/quiz").json()
+    assert quiz["questions"] == []
+    assert quiz["results"] == {}
+    assert signed_in.post(f"/api/boards/{board_id}/quiz/answers", json=right).status_code == 404
+    assert signed_in.post(f"/api/boards/{board_id}/ask", json={"question": "What first?"}).status_code == 409
+    assert "T1" not in signed_in.get(f"/api/boards/{board_id}/report.md").text
+
+    assert signed_in.post(f"/api/boards/{board_id}/confirm").status_code == 202
+    fresh = signed_in.get(f"/api/boards/{board_id}/quiz").json()
+    assert fresh["questions"]
+    assert fresh["mastery"]["answered"] == 0
+
+
+def test_a_repository_with_nothing_readable_fails_without_a_model_call(signed_in: TestClient) -> None:
+    board = new_board(signed_in)
+    user_id = signed_in.get("/api/auth/me").json()["user"]["id"]
+    boards = signed_in.app.state.services.boards  # type: ignore[attr-defined]
+    boards.add_from_fetch(user_id, board["id"], lambda: Material("", [], 0), "Reading owner/repo from GitHub.")
+    failed = signed_in.get(f"/api/boards/{board['id']}").json()
+    assert failed["status"] == "empty"
+    assert "Nothing readable was found" in failed["error"]
+
+
+def test_confirming_twice_finds_threats_once(signed_in: TestClient) -> None:
+    board = new_board(signed_in)
+    signed_in.post(f"/api/boards/{board['id']}/sources", json=example_material())
+    assert signed_in.post(f"/api/boards/{board['id']}/confirm").status_code == 202
+    assert signed_in.post(f"/api/boards/{board['id']}/confirm").status_code == 409
+    assert signed_in.get(f"/api/boards/{board['id']}").json()["analysis_version"] == 1
+
+
+def test_an_answer_graded_while_the_board_changed_is_not_saved(make_client: ClientFactory) -> None:
+    holder: dict[str, TestClient] = {}
+
+    class Interrupted(DemoAnalyst):
+        def grade(
+            self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str
+        ) -> OpenGrade:
+            # A coding agent's change lands while the model grades.
+            with holder["client"].app.state.services.db.session() as session:  # type: ignore[attr-defined]
+                session.execute(update(BoardRow).values(status="mapping"))
+            return super().grade(system, analysis, question, text)
+
+    client = holder["client"] = make_client(analyst=Interrupted())
+    sign_up(client)
+    board_id = client.get("/api/boards").json()[0]["id"]
+    body = {"question_id": "fix:T1", "text": "Turn off auto send and confirm every email"}
+    assert client.post(f"/api/boards/{board_id}/quiz/answers", json=body).status_code == 409
+    db = client.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        assert session.scalar(select(func.count()).select_from(QuizAttemptRow)) == 0

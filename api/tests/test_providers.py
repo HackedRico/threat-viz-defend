@@ -1,4 +1,7 @@
 import json
+import socket
+import time
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any
 
@@ -12,7 +15,7 @@ from app.domain.quiz import build_quiz
 from app.errors import AppError
 from app.llm.backboard import BackboardLlm
 from app.llm.base import LlmError, LlmRequest
-from app.providers import service
+from app.providers import netguard, service
 from app.providers.netguard import check_base_url
 from app.providers.secrets_box import SecretBox
 from tests.conftest import ClientFactory, sign_up
@@ -272,3 +275,48 @@ def test_each_user_gets_one_provider_call_at_a_time() -> None:
             slot.__exit__(None, None, None)
     with provider_slot("one-more"):
         pass
+
+
+@pytest.mark.parametrize("address", ["64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "fec0::1"])
+def test_private_addresses_inside_ipv6_are_refused(address: str) -> None:
+    with pytest.raises(AppError):
+        check_base_url("https://api.example.com/v1", allow_private=False, resolver=lambda host, port: [address])
+
+
+def test_malformed_urls_and_names_are_400_not_500() -> None:
+    with pytest.raises(AppError) as bracket:
+        check_base_url("https://[::1/v1", allow_private=False, resolver=public_dns)
+    assert bracket.value.status == 400
+
+    def idna_refuses(host: str, port: int) -> list[str]:
+        raise UnicodeError("label too long")
+
+    with pytest.raises(AppError) as label:
+        check_base_url(f"https://{'a' * 70}.example/v1", allow_private=False, resolver=idna_refuses)
+    assert label.value.status == 400
+
+
+def test_a_slow_lookup_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    def stall(*args: object, **kwargs: object) -> list[object]:
+        time.sleep(1)
+        return []
+
+    monkeypatch.setattr(socket, "getaddrinfo", stall)
+    monkeypatch.setattr(netguard, "DNS_TIMEOUT_S", 0.1)
+    with pytest.raises(OSError, match="took too long"):
+        netguard.resolve("slow.example", 443)
+
+
+def test_parallel_lookups_of_one_host_share_one_thread(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def slow(host: str, *args: object, **kwargs: object) -> list[tuple[Any, ...]]:
+        calls.append(host)
+        time.sleep(0.3)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", slow)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        answers = list(pool.map(lambda _: netguard.resolve("shared.example", 443), range(6)))
+    assert answers == [["93.184.216.34"]] * 6
+    assert calls == ["shared.example"]

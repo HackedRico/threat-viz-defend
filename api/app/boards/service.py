@@ -121,6 +121,11 @@ class Boards:
     # Drawing and editing the map
     # -----------------------------------------------------------------
 
+    def check_idle(self, session: Session, user_id: str, board_id: str) -> None:
+        """Raise 404 for a board the user does not own and 409 for a busy one, before any work or pace is spent."""
+        if self.get(session, user_id, board_id).status in BUSY:
+            raise conflict("The board is already working. Wait for it to finish, then try again.")
+
     def add_material(self, user_id: str, board_id: str, material: Material) -> None:
         """Record new material and start drawing, or updating, the map from it."""
         if not material.text.strip():
@@ -142,6 +147,8 @@ class Boards:
 
         def load() -> str:
             material = fetch()
+            if not material.text.strip():
+                raise ValueError("Nothing readable was found in the repository: every file was empty or skipped.")
             with self._db.session() as session:
                 target = session.get(BoardRow, board_id)
                 if target is not None:
@@ -170,16 +177,18 @@ class Boards:
 
     def confirm(self, user_id: str, board_id: str) -> None:
         """Accept the drafted map and start finding threats on it."""
-        with self._db.session() as session:
-            current = self.get(session, user_id, board_id)
-            if current.status != "review" or current.map is None:
+
+        def in_review(row: BoardRow) -> None:
+            if row.status != "review" or row.map is None:
                 raise conflict("Only a drafted map waiting for review can be confirmed.")
+
         system, _, analyst = self._begin(
             user_id,
             board_id,
             "find_threats",
             "analyzing",
             lambda row, session: _event(session, row.id, "confirmed", "Map confirmed. Finding threats."),
+            require=in_review,
         )
         if system is None:
             self._fail(board_id, "review", "The stored map no longer loads. Edit and save it, then confirm again.")
@@ -217,10 +226,12 @@ class Boards:
         """Answer a question about a finished board."""
         with self._db.session() as session:
             row = self.get(session, user_id, board_id)
-            system, analysis = read_map(row), read_analysis(row)
+            system, analysis = read_map(row), current_analysis(row)
             if system is None or analysis is None:
                 raise conflict("Confirm the map and wait for the threats before asking about them.")
-            chosen = self._analysts.for_user(user_id)
+        # Outside any session: a saved provider's host is resolved here, and a slow lookup must not hold a connection.
+        chosen = self._analysts.for_user(user_id)
+        with self._db.session() as session:
             self._budget.spend(session, user_id, "model", "answer", own_key=chosen.own_key)
         try:
             return chosen.analyst.answer(system, analysis, question.strip(), focus)
@@ -256,15 +267,19 @@ class Boards:
         task: str,
         status: str,
         record: Callable[[BoardRow, Session], None],
+        require: Callable[[BoardRow], None] | None = None,
     ) -> tuple[SystemMap | None, str, Analyst]:
-        """Check the board is idle, pick the analyst, spend one model call, and commit before any job starts."""
-        chosen = self._analysts.for_user(user_id)
+        """Check the board is idle and passes `require`, pick the analyst, spend one call, and commit before a job."""
+        chosen = self._analysts.for_user(user_id)  # before the session, since it may resolve a host
         # The commit has to land first: a job that writes the board inside this transaction would
         # deadlock on SQLite and race everywhere else.
         with self._db.session() as session:
             row = self.get(session, user_id, board_id)
             if row.status in BUSY:
                 raise conflict("The board is already working. Wait for it to finish, then try again.")
+            # Checked in this transaction, so two confirms that race cannot both spend and start a job.
+            if require is not None:
+                require(row)
             self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             restore = _stable_status(row)
             current = read_map(row)
@@ -357,6 +372,13 @@ def read_analysis(row: BoardRow) -> ThreatAnalysis | None:
     return _validated(row.analysis, ThreatAnalysis, row.id)
 
 
+def current_analysis(row: BoardRow) -> ThreatAnalysis | None:
+    """The analysis only while it describes the board's map: on a `ready` board, else `None`."""
+    # An edit or a new draft keeps the old threats stored until the next confirm, but they name parts of
+    # the map before it, so quiz keys, answers, briefs and reports must not read them.
+    return read_analysis(row) if row.status == "ready" else None
+
+
 def read_previous_map(row: BoardRow) -> SystemMap | None:
     """The map before the latest update, if any."""
     return _validated(row.previous_map, SystemMap, row.id)
@@ -377,6 +399,9 @@ def _stable_status(row: BoardRow) -> str:
     """The status a board returns to when a job fails, from what it holds."""
     if row.status not in BUSY:
         return row.status
+    if row.status == "analyzing":
+        # Threats are found only from review, and the stored ones, if any, are for an older map.
+        return "review"
     if row.analysis is not None and row.map is not None:
         return "ready"
     return "review" if row.map is not None else "empty"

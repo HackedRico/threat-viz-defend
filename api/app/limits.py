@@ -37,6 +37,8 @@ class RateLimiter:
         self._clock = clock
         self._hits: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
+        # Pruning by the caller's window would drop keys with longer windows, such as a login lockout.
+        self._longest_window_s = 0.0
 
     def hit(self, key: str, limit: int, window_s: float, message: str) -> None:
         """Count one hit on `key`, raising 429 with `message` once `limit` hits land inside `window_s`."""
@@ -48,14 +50,22 @@ class RateLimiter:
             if len(hits) >= limit:
                 raise too_many(message, math.ceil(hits[0] + window_s - now))
             hits.append(now)
+            self._longest_window_s = max(self._longest_window_s, window_s)
             if len(self._hits) > _MAX_KEYS:
-                self._prune(now, window_s)
+                self._prune(now, self._longest_window_s)
 
     def count(self, key: str, window_s: float) -> int:
         """How many hits `key` has inside the window, without adding one."""
         now = self._clock()
         with self._lock:
             return sum(1 for t in self._hits.get(key, ()) if t > now - window_s)
+
+    def undo(self, key: str) -> None:
+        """Take back the latest hit on `key`, for a slot reserved before an outcome that turned out fine."""
+        with self._lock:
+            hits = self._hits.get(key)
+            if hits:
+                hits.pop()
 
     def reset(self, key: str) -> None:
         """Forget every hit on `key`, as after a successful login."""
@@ -82,6 +92,11 @@ class Budget:
         Calls on the user's own provider key cost the server nothing, so only the per-minute limit applies.
         """
         per_user, overall = self._limits(kind)
+        if kind == "voice":
+            # The count below cannot see spends still uncommitted in parallel requests, so a burst is capped here.
+            self._limiter.hit(
+                f"voice-minute:{user_id}", 2, 60, "Voice sessions are starting very quickly. Wait a minute."
+            )
         if kind == "model":
             self._limiter.hit(
                 f"model-minute:{user_id}",
