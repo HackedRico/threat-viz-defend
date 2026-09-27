@@ -3,9 +3,15 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, event, func, select
 
+from app.analysis.analyst import DemoAnalyst
+from app.boards.ingest import Material
 from app.boards.versions import MAX_VERSIONS
+from app.domain.models import SystemMap
+from app.llm.base import LlmError
 from app.tables import MapVersionRow
 from tests.conftest import PASSWORD, ClientFactory, example_material, sign_up
+from tests.factories import inbox
+from tests.test_mcp_tools import agent_token, call_tool
 
 # =============================================================================
 # Module Overview
@@ -44,7 +50,7 @@ def test_each_map_change_is_a_version_and_confirm_pins_threats(signed_in: TestCl
     signed_in.post(f"/api/boards/{board_id}/sources", json=example_material())
     [drawn] = board(signed_in, board_id)["versions"]
     assert drawn["source"] == "upload"
-    assert drawn["label"].startswith("Added notes.md")
+    assert drawn["label"] == "Added notes.md"
     assert drawn["counts"] is None
 
     signed_in.post(f"/api/boards/{board_id}/confirm")
@@ -136,3 +142,45 @@ def test_polling_a_board_never_reads_the_stored_maps(signed_in: TestClient) -> N
     listing = [s for s in seen if "FROM map_versions" in s]
     assert listing
     assert not any("map_versions.map" in s or "map_versions.analysis" in s for s in listing)
+
+
+def test_a_github_import_is_a_version_named_by_what_was_read(signed_in: TestClient) -> None:
+    board_id = signed_in.post("/api/boards", json={"title": "Repo"}).json()["id"]
+    user_id = signed_in.get("/api/auth/me").json()["user"]["id"]
+    source = {"id": "s1", "name": "owner/repo", "kind": "github", "bytes": 10, "added_at": "2026-09-27T00:00:00+00:00"}
+    fetched = Material(inbox().material, [source], 3)
+    boards = signed_in.app.state.services.boards  # type: ignore[attr-defined]
+    boards.add_from_fetch(user_id, board_id, lambda: fetched, "Reading owner/repo from GitHub.")
+    [version] = board(signed_in, board_id)["versions"]
+    assert (version["source"], version["label"]) == ("github", "Added owner/repo")
+
+
+def test_an_mcp_change_is_an_agent_version(signed_in: TestClient) -> None:
+    token = agent_token(signed_in)
+    board_id = signed_in.post("/api/boards", json={"title": "MCP"}).json()["id"]
+    arguments = {"board_id": board_id, "summary": inbox().material, "diff": "", "files": []}
+    failed, _ = call_tool(signed_in, token, "report_change", arguments)
+    assert not failed
+    [version] = board(signed_in, board_id)["versions"]
+    assert version["source"] == "agent"
+    assert version["label"].startswith("Coding agent: ")
+
+
+def test_a_failed_draft_keeps_no_version(make_client: ClientFactory) -> None:
+    class Broken(DemoAnalyst):
+        def draft_map(self, material: str, current: SystemMap | None) -> SystemMap:
+            raise LlmError("timeout", "The model took too long.")
+
+    client = make_client(analyst=Broken())
+    sign_up(client)
+    board_id = client.post("/api/boards", json={"title": "Broken"}).json()["id"]
+    client.post(f"/api/boards/{board_id}/sources", json=example_material())
+    failed = board(client, board_id)
+    assert failed["error"] == "The model took too long."
+    assert failed["versions"] == []
+
+
+def test_a_restored_example_starts_its_own_history(signed_in: TestClient) -> None:
+    restored = signed_in.post("/api/boards/example").json()
+    assert [(v["number"], v["source"]) for v in restored["versions"]] == [(1, "example")]
+    assert signed_in.get(f"/api/boards/{restored['id']}/versions/1").json()["analysis"]["threats"]

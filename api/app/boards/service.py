@@ -145,7 +145,7 @@ class Boards:
         kind = str(material.sources[0]["kind"]) if material.sources else "sources"
         # An agent change is named by the agent and its summary; anything else by what was added.
         source: VersionSource = "agent" if kind == "agent" else "upload"
-        label = str(material.sources[0]["name"]) if source == "agent" and material.sources else material.summary()
+        label = str(material.sources[0]["name"]) if source == "agent" and material.sources else _headline(material)
 
         def record(row: BoardRow, session: Session) -> None:
             row.sources = [*row.sources, *material.sources][-MAX_SOURCES:]
@@ -166,7 +166,7 @@ class Boards:
             material = fetch()
             if not material.text.strip():
                 raise ValueError("Nothing readable was found in the repository: every file was empty or skipped.")
-            fetched.append(material.summary())
+            fetched.append(_headline(material))
             with self._db.session() as session:
                 target = session.get(BoardRow, board_id)
                 if target is not None:
@@ -467,6 +467,11 @@ def _stable_status(row: BoardRow) -> str:
     if row.analysis is not None and row.map is not None:
         return "ready"
     return "review" if row.map is not None else "empty"
+
+
+def _headline(material: Material) -> str:
+    """What was added, for a version's label: the summary's first sentence, without the masking and skip counts."""
+    return material.summary().split(". ")[0].rstrip(".")
 
 
 def _analysis_json(row: BoardRow, status: str | None = None) -> dict[str, Any] | None:
