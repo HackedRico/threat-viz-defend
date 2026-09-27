@@ -1,0 +1,90 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The version chips under the panel toggle in the canvas's top right corner.
+   It must stay inside the 154px gutter the brief note leaves on the right
+   (`.brief` in Workspace.css): at most three chips and the history button. */
+
+.version-bar {
+  position: absolute;
+  top: 56px;
+  right: 14px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  max-width: 140px;
+  padding: 2px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  animation: version-bar-in var(--dur-med) var(--ease-out);
+}
+
+.version-history,
+.version-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.version-history:hover,
+.version-chip:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.version-history:focus-visible,
+.version-chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* The current map reads by weight and a filled chip, not by color alone. */
+.version-chip.is-current {
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 700;
+}
+
+.version-chip.is-current:hover {
+  background: var(--primary-hover);
+  color: var(--primary-ink);
+}
+
+.version-more {
+  font-size: 0.6875rem;
+}
+
+@keyframes version-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .version-bar {
+    animation: none;
+  }
+  .version-history,
+  .version-chip {
+    transition: none;
+  }
+}

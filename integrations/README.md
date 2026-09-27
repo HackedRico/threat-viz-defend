@@ -130,6 +130,7 @@ it reports.
 | `kept: the token was rejected` | The token was revoked. Create a new one in Settings and export it. |
 | `kept: board not found` | Wrong board id. Run `init` again. |
 | `error: could not reach ...` | Check `THREATVIZ_API_URL` and that the API is up. |
+| `answered with a web page, not the API` | `--api-url` points at the web app. On a deploy where the web app and API have their own hosts, pass the API origin; the Connect a coding agent screen shows the full `init` command. |
 | `API url must use https` | Plain `http` is only allowed for localhost, since the token travels with every request. |
 | The same change appears twice | Both Claude Code and Cursor hooks are configured for the repo. Remove one. |
 | `locked: yes` for a long time | A run was killed. The lock expires after 5 minutes, or delete `.git/threatviz/lock`. |

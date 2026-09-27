@@ -85,6 +85,8 @@ export const api = {
     unwrap(http.POST("/api/boards/{board_id}/github", { ...path(id), body: { url } })),
   saveMap: (id: string, map: SystemMap) => unwrap(http.PUT("/api/boards/{board_id}/map", { ...path(id), body: { map } })),
   confirm: (id: string) => unwrap(http.POST("/api/boards/{board_id}/confirm", path(id))),
+  version: (id: string, number: number) =>
+    unwrap(http.GET("/api/boards/{board_id}/versions/{number}", { params: { path: { board_id: id, number } } })),
   ask: (id: string, question: string, focus: string | null) =>
     unwrap(http.POST("/api/boards/{board_id}/ask", { ...path(id), body: { question, focus } })),
   report: (id: string) => downloadText(apiUrl(`/api/boards/${encodeURIComponent(id)}/report.md`)),

@@ -140,6 +140,12 @@ The map key sits in the bottom left corner of the board. Fold it to its title wh
 
 On an updated map, elements carry a `new` or `edited` tag. An update keeps the direction the map is laid out in, so a change from a coding agent never turns the board around.
 
+### Versions
+
+Every time the map changes, from new material, a GitHub import, a coding agent's change or your own saved edit, the board keeps a version. Once there are two, chips such as `v4 v5 v6` appear under Hide panel in the top right corner of the canvas, the current one filled. Only the newest three show; the clock button before them opens the rest, and shows how many are folded away, such as `+3`.
+
+Click a chip to compare it with the current map, or the current chip to compare it with the version before. The compare window draws both maps side by side, marks what is `new` or `edited` on the later one, and says below how many parts are new, edited or gone and how the threats moved by severity. Set either side to any kept version from its menu, and open Show every change for the full list. Escape or the close button returns to the board. The newest 30 versions are kept.
+
 ### The inspector
 
 Selecting a node or flow shows its details in the side panel, over the panel's lists, so the whole map stays in view. The details give the element's id and kind and always show the **Evidence** the model cited. A node also shows **How it works**, a few points naming the library, algorithm, protocol or method it uses, and **In the code**, the files and lines that implement it with the function or route there. Copy a location with the button beside it to open it in your editor. Both come from your material, so a part the material says little about shows fewer points, and a board drawn from notes rather than code may have no code locations. The bar at the top of the panel, where the tabs were, leads back: **Threat model** on a finished board, **Review** while you check the map. Escape, a click on empty canvas, or a second click on the element also goes back. The lists wait underneath unchanged, so the tab you were on, where you had scrolled and a quiz in progress are all still there. If the panel is hidden, selecting shows it for the details and hides it again when you go back. Evidence that starts with `inferred:` is shown under "Inferred, not quoted", which means the material did not say it outright.

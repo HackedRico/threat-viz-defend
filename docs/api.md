@@ -113,7 +113,7 @@ Cookie. Revokes the token at once. `204`. Error: `404`.
 
 ## Boards
 
-`BoardSummary` holds `id`, `title`, `status`, `example`, `updated_at`, `revision` and `counts` per severity. `BoardOut` adds `sources` (name, kind, bytes and time, never content), `map`, `previous_map`, `analysis`, `analysis_version`, `analyzed_by`, `error`, `created_at`, the newest 40 `events`, and two things the rules work out: `exposure` (per AI node: `private_data`, `untrusted`, `outbound`, `lethal`) and `crossings` (ids of flows that cross a trust boundary). Statuses are `empty`, `mapping`, `review`, `analyzing` and `ready`; [architecture.md](architecture.md#the-board-lifecycle) explains them.
+`BoardSummary` holds `id`, `title`, `status`, `example`, `updated_at`, `revision` and `counts` per severity. `BoardOut` adds `sources` (name, kind, bytes and time, never content), `map`, `previous_map`, `analysis`, `analysis_version`, `analyzed_by`, `error`, `created_at`, the newest 40 `events`, and two things the rules work out: `exposure` (per AI node: `private_data`, `untrusted`, `outbound`, `lethal`) and `crossings` (ids of flows that cross a trust boundary), and `versions`, the map's history oldest first as `MapVersionSummary`: `number`, `source` (`example`, `upload`, `github`, `agent`, `edit` or `earlier`), `label`, `created_at`, `nodes`, `flows` and `counts`, the threats per severity found on that map or null when it was never confirmed. The last one is the map the board holds. Statuses are `empty`, `mapping`, `review`, `analyzing` and `ready`; [architecture.md](architecture.md#the-board-lifecycle) explains them.
 
 ### `GET /api/boards`
 Cookie. `200` with the user's boards as `BoardSummary`, most recently changed first.
@@ -151,6 +151,9 @@ Cookie. No body. Accepts the drafted map and starts finding threats. `202` with 
 
 ### `POST /api/boards/{board_id}/ask`
 Cookie. Body `AskIn`: `question` (up to 2,000 characters) and optional `focus`, a node or flow id the user selected. `200` with `AskOut`: `answer` (plain text), `highlight` (ids on the board) and `memory`, null while memory is off, else `MemoryUse`: `recalled`, the earlier notes Backboard fed into the prompt, and `kept`, true once a note of this question is queued. Errors: `409` until the board has threats, `429`, `502` or `503` `model_error`.
+
+### `GET /api/boards/{board_id}/versions/{number}`
+Cookie. `200` with `MapVersionOut`: the `MapVersionSummary` fields plus that version's `map`, its `analysis` (null until its threats were found), `exposure` and `crossings`, so the browser can draw it. Every map change keeps a version: new material, a GitHub import, a coding agent's change and a saved hand edit, and a confirm pins the threats it found to the newest one. Only the latest 30 are kept, and numbers keep counting up. A board from before history was kept lists its map as version 1. Error: `404` for a version that is not kept or can no longer be drawn.
 
 ### `GET /api/boards/{board_id}/brief`
 Cookie. `200` with `BriefOut`: `text`, a plain spoken walkthrough of the system, its boundaries, AI exposure and top threats. Threats appear only on a `ready` board, since stored threats for an edited map name parts it may no longer have. Error: `409` without a map.

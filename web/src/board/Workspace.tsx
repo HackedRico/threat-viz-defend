@@ -18,6 +18,9 @@ import { ReviewPanel } from "./ReviewPanel.tsx";
 import { rankThreats } from "./severity.ts";
 import { useBoardUi, type HighlightSource } from "./store.ts";
 import { useMapLayout } from "./useMapLayout.ts";
+import { VersionBar } from "./VersionBar.tsx";
+import { VersionCompare } from "./VersionCompare.tsx";
+import { comparePair } from "./versions.ts";
 import "./Panel.css";
 import "./Workspace.css";
 
@@ -64,6 +67,8 @@ export function Workspace({
   const serverMapJson = useMemo(() => JSON.stringify(serverMap), [serverMap]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [askSignal, setAskSignal] = useState(0);
+  // The two versions the compare dialog shows, or `null` while it is closed.
+  const [comparing, setComparing] = useState<{ before: number; after: number } | null>(null);
   const [storedWidth, setPanelWidth] = useStoredWidth(PANEL_WIDTH_KEY, PANEL_DEFAULT, PANEL_BOUNDS);
   // The panel may take most of the window but always leaves some map to look at. The cap
   // applies only on screen, so a narrow window never overwrites the width the user chose.
@@ -195,10 +200,16 @@ export function Workspace({
           >
             <SidebarIcon /> {panelShown ? "Hide panel" : "Show panel"}
           </button>
+
+          <VersionBar versions={board.versions} onOpen={(clicked) => setComparing(comparePair(board.versions, clicked))} />
         </div>
 
         {asking && <AskDock board={board} map={map} focusSignal={askSignal} />}
       </div>
+
+      {comparing && (
+        <VersionCompare boardId={board.id} versions={board.versions} initial={comparing} onClose={() => setComparing(null)} />
+      )}
 
       {panelShown && (
         <aside id="workspace-panel" className="workspace-panel" aria-label={review ? "Review the map" : "Threat model"}>

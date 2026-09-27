@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, UtcDateTime, utcnow
@@ -89,6 +89,29 @@ class BoardEventRow(Base):
     board_id: Mapped[str] = mapped_column(ForeignKey("boards.id", ondelete=_CASCADE), index=True)
     kind: Mapped[str] = mapped_column(String(24))
     text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class MapVersionRow(Base):
+    """One map a board has held, kept so a person can compare how the design changed. Newest `number` is current."""
+
+    __tablename__ = "map_versions"
+    __table_args__ = (UniqueConstraint("board_id", "number"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id", ondelete=_CASCADE), index=True)
+    number: Mapped[int] = mapped_column(Integer)
+    # What made it: example, upload, github, agent, edit, or earlier for a map saved before history was kept.
+    source: Mapped[str] = mapped_column(String(16))
+    label: Mapped[str] = mapped_column(String(200))
+    # Deferred: the board is polled every few seconds and lists its versions, but opens one map at a time.
+    map: Mapped[dict[str, Any]] = mapped_column(JSON, deferred=True)
+    # The threats found on this map, set when a confirm finishes; `None` until then.
+    analysis: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True, deferred=True)
+    # Kept beside the JSON so listing versions never reads a map: part counts, and threats per severity.
+    node_count: Mapped[int] = mapped_column(Integer)
+    flow_count: Mapped[int] = mapped_column(Integer)
+    counts: Mapped[dict[str, int] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 

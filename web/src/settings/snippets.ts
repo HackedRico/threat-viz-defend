@@ -18,6 +18,11 @@ export function claudeCommand(origin: string): string {
   return `claude mcp add --transport http threatviz ${mcpUrl(origin)} --header "Authorization: Bearer \${THREATVIZ_TOKEN:?run the export line first}"`;
 }
 
+/** The hook's one-time setup command for a board, run in the project after copying the script to `.threatviz/`. */
+export function hookInit(boardId: string, origin: string): string {
+  return `python3 .threatviz/threatviz_hook.py init --board ${boardId} --api-url ${origin.replace(/\/+$/, "")}`;
+}
+
 /** The `.cursor/mcp.json` file, reading the token from the `THREATVIZ_TOKEN` environment variable. */
 export function cursorConfig(origin: string): string {
   const config = {

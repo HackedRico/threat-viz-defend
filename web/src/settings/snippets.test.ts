@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { claudeCommand, cursorConfig, envLine, mcpUrl } from "./snippets.ts";
+import { claudeCommand, cursorConfig, envLine, hookInit, mcpUrl } from "./snippets.ts";
 
 // =============================================================================
 // Module Overview
@@ -22,4 +22,11 @@ test("builds the Cursor config with an env reference, not the token", () => {
   });
   assert.equal(mcpUrl("https://a.b//"), "https://a.b/mcp");
   assert.equal(envLine("tvd_x"), "export THREATVIZ_TOKEN=tvd_x");
+});
+
+test("the hook setup command names the board and the API origin, never the page's", () => {
+  assert.equal(
+    hookInit("b-1", "https://api.example.com/"),
+    "python3 .threatviz/threatviz_hook.py init --board b-1 --api-url https://api.example.com",
+  );
 });

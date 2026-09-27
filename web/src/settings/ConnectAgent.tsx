@@ -7,7 +7,7 @@ import { useBoardList } from "../shell/boards.tsx";
 import { CheckIcon, CopyIcon, TrashIcon } from "../shell/icons.tsx";
 import { navigate } from "../shell/useRoute.ts";
 import { apiOrigin } from "../api/base.ts";
-import { claudeCommand, cursorConfig, envLine, mcpUrl, TOKEN_PLACEHOLDER } from "./snippets.ts";
+import { claudeCommand, cursorConfig, envLine, hookInit, mcpUrl, TOKEN_PLACEHOLDER } from "./snippets.ts";
 import "./ConnectAgent.css";
 
 // =============================================================================
@@ -198,7 +198,7 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
           <Snippet title="Cursor: .cursor/mcp.json" value={cursorConfig(origin)} label="the Cursor config" />
           <p className="field-hint">
             The MCP endpoint is <code>{mcpUrl(origin)}</code>. A Claude Code hook that sends each change to your board
-            is in the <code>integrations/</code> folder of this repository.
+            is in the <code>integrations/</code> folder of this repository; step 3 gives its setup command.
           </p>
         </section>
 
@@ -226,6 +226,13 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
                 ))}
               </select>
               {board && <Snippet title="Board id" value={board.id} label="the board id" />}
+              {board && (
+                <Snippet
+                  title="Hook: in your project, after copying integrations/hook/threatviz_hook.py to .threatviz/"
+                  value={hookInit(board.id, origin)}
+                  label="the hook setup command"
+                />
+              )}
             </>
           )}
         </section>

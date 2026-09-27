@@ -17,6 +17,7 @@ from app.voice import AudioType
 
 BoardStatus = Literal["empty", "mapping", "review", "analyzing", "ready"]
 SourceKind = Literal["text", "file", "code", "agent", "github", "example"]
+VersionSource = Literal["example", "upload", "github", "agent", "edit", "earlier"]
 
 
 class RequestBody(BaseModel):
@@ -192,6 +193,30 @@ class BoardOut(BaseModel):
     exposure: list[ExposureOut]
     crossings: list[str]
     counts: SeverityCounts
+    # The map's history, oldest first; the last one is the map above.
+    versions: list["MapVersionSummary"]
+
+
+class MapVersionSummary(BaseModel):
+    """One map a board has held, without the map itself."""
+
+    number: int
+    source: VersionSource
+    label: str
+    created_at: datetime
+    nodes: int
+    flows: int
+    # Threats found on this map, or `None` when it was never confirmed.
+    counts: SeverityCounts | None
+
+
+class MapVersionOut(MapVersionSummary):
+    """One version with its map, its threats, and what the rules find in it, so it can be drawn."""
+
+    map: SystemMap
+    analysis: ThreatAnalysis | None
+    exposure: list[ExposureOut]
+    crossings: list[str]
 
 
 class BoardCreate(RequestBody):
