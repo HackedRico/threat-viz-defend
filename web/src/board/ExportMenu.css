@@ -1,0 +1,76 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The Export button in the board header, the menu of formats that drops from
+   it, and the hidden stage an image is drawn on before it becomes a file. */
+
+.export-menu {
+  position: relative;
+}
+
+.export-menu .btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+/* Drops over the canvas from the button's left edge, or from its right edge when the
+   window has no room to the right; `MENU_WIDTH` in ExportMenu.tsx matches the width. */
+.export-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(310px, calc(100vw - 32px));
+  padding: var(--space-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+}
+
+.export-pop.is-end {
+  left: auto;
+  right: 0;
+}
+
+.export-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-item:hover,
+.export-item:focus-visible {
+  background: var(--surface-2);
+}
+
+.export-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.export-item-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.export-item-hint {
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--ink-faint);
+}
+
+/* An image is drawn here, never shown: its computed styles are what the file copies. */
+.export-stage {
+  display: none;
+}

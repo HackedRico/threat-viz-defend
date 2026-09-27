@@ -210,6 +210,11 @@
   }
 }
 
+/* A printed or saved picture holds one moment, so its ring rests rather than catching the pulse mid beat. */
+.map-picture .trifecta-ring {
+  animation: none;
+}
+
 /* ---------- flows ---------- */
 
 .map-flow {
