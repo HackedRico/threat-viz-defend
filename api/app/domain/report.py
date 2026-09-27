@@ -1,7 +1,16 @@
 import re
 
 from app.domain.models import SystemMap, ThreatAnalysis
-from app.domain.rules import STRIDE, ai_exposure, crosses_boundary, flow_label, label_of, node_index, severity_counts
+from app.domain.rules import (
+    STRIDE,
+    ai_exposure,
+    code_ref_label,
+    crosses_boundary,
+    flow_label,
+    label_of,
+    node_index,
+    severity_counts,
+)
 
 # =============================================================================
 # Module Overview
@@ -37,6 +46,16 @@ def render_report(title: str, system: SystemMap, analysis: ThreatAnalysis | None
         zone = zones.get(node.boundary or "", "outside")
         cells = [_md(node.label), node.kind, _md(node.tech or ""), _md(zone), marks, _md(node.evidence)]
         lines.append(f"| {' | '.join(cells)} |")
+
+    detailed = [node for node in system.nodes if node.how or node.code]
+    if detailed:
+        lines += ["", "## How each component works", ""]
+        for node in detailed:
+            lines += [f"### {_md(node.label)}", "", *[f"- {_md(point)}" for point in node.how]]
+            if node.code:
+                lines.append(f"- In the code: {', '.join(_md(code_ref_label(ref)) for ref in node.code)}")
+            lines.append("")
+        lines.pop()
 
     lines += ["", "## Data flows", "", "| Flow | Carries | Crosses a trust boundary |", "|---|---|---|"]
     for flow in system.flows:

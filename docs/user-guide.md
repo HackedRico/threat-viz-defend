@@ -138,7 +138,7 @@ On an updated map, elements carry a `new` or `edited` tag. An update keeps the d
 
 ### The inspector
 
-Selecting a node or flow shows its details in the side panel, over the panel's lists, so the whole map stays in view. The details give the element's id and kind and always show the **Evidence** the model cited. The bar at the top of the panel, where the tabs were, leads back: **Threat model** on a finished board, **Review** while you check the map. Escape, a click on empty canvas, or a second click on the element also goes back. The lists wait underneath unchanged, so the tab you were on, where you had scrolled and a quiz in progress are all still there. If the panel is hidden, selecting shows it for the details and hides it again when you go back. Evidence that starts with `inferred:` is shown under "Inferred, not quoted", which means the material did not say it outright.
+Selecting a node or flow shows its details in the side panel, over the panel's lists, so the whole map stays in view. The details give the element's id and kind and always show the **Evidence** the model cited. A node also shows **How it works**, a few points naming the library, algorithm, protocol or method it uses, and **In the code**, the files and lines that implement it with the function or route there. Copy a location with the button beside it to open it in your editor. Both come from your material, so a part the material says little about shows fewer points, and a board drawn from notes rather than code may have no code locations. The bar at the top of the panel, where the tabs were, leads back: **Threat model** on a finished board, **Review** while you check the map. Escape, a click on empty canvas, or a second click on the element also goes back. The lists wait underneath unchanged, so the tab you were on, where you had scrolled and a quiz in progress are all still there. If the panel is hidden, selecting shows it for the details and hides it again when you go back. Evidence that starts with `inferred:` is shown under "Inferred, not quoted", which means the material did not say it outright.
 
 In review you can edit a node:
 
@@ -204,7 +204,7 @@ The activity log and the list of sources. See [Activity log](#activity-log).
 
 ## Export the report
 
-On a ready board, choose **Export report** in the header. You get a Markdown file with the summary, the verdict, a table of components and flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
+On a ready board, choose **Export report** in the header. You get a Markdown file with the summary, the verdict, a table of components, how each component works and where its code is, the flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
 
 ## Defend what you built
 
@@ -288,7 +288,7 @@ To use your own:
 
 Base URLs must use https and point at a public address. The Ollama preset uses `localhost`, which means the server's own machine, so it only works where the server allows private addresses, such as a local development server.
 
-**What memory does.** With memory on, Backboard keeps what you asked the analyst and how your quiz answers went, and may keep facts from the map and threats they were about, such as component names. It uses them in later answers and grading, across boards. Drawing maps and finding threats only read memory, and answers and grading get your map without its evidence quotes, so your uploaded material is never written into it. Leaving the quotes out means answers and grading cannot use a detail only a quote holds, such as how often a job runs.
+**What memory does.** With memory on, Backboard keeps what you asked the analyst and how your quiz answers went, and may keep facts from the map and threats they were about, such as component names. It uses them in later answers and grading, across boards. Drawing maps and finding threats only read memory, and answers and grading get your map without its evidence quotes, how-it-works notes and code locations, so your uploaded material is never written into it. Leaving the quotes out means answers and grading cannot use a detail only a quote holds, such as how often a job runs.
 
 **Memory with any model.** The **Memory** section below the provider form takes a Backboard key on its own, so a model from another service, such as Featherless, can remember your progress. Paste the key, choose **Test key**, then **Save**. It works only with your own OpenAI-compatible model; with a Backboard provider, use that provider's memory switch instead. Backboard receives the questions you ask and the quiz questions with each verdict, never your uploads, maps or answer text. Model calls spend your model service's credits and memory calls spend your Backboard credits. **Turn off memory** forgets the key; notes already kept stay in your Backboard account.
 

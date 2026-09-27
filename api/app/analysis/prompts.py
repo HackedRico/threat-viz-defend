@@ -81,6 +81,14 @@ phrase of 1 to 3 words, such as `send email` or `save tokens`, and put the detai
 - Set `ai` on anything that is or calls a language model or agent, and `sensitive` on stores that hold credentials, \
 personal, financial or regulated data.
 - Cite evidence for every node and flow: a short quote, a file path, or `inferred:` with the reason.
+- In `how`, explain each process and store the way its author would defend it at a whiteboard: the library, \
+algorithm, protocol or method it uses and what it does with the data, such as `hashes passwords with argon2id`, \
+`signs sessions as HS256 JWTs` or `retries failed jobs 3 times with backoff`. Name versions, settings and limits \
+the material states. Leave out what the material does not show rather than guess.
+- In `code`, point to where each node is implemented: file paths exactly as the material names them, the line \
+where the function, class, route or config starts, and its name. Code files show each line as `<number>| <code>`; \
+the number is not part of the code. Use null for the line when the material gives no line number, and an empty list \
+when it has no code for the node.
 - Given a <current_map>, update it instead of starting over: keep the ids of components and flows that still exist, \
 add what the new material shows, change only what it contradicts, and remove what it shows was deleted. A person may \
 have edited the current map, so keep its names and its marks unless the material contradicts them.
@@ -263,10 +271,12 @@ def grade_content(
 
 
 def _map_json(system: SystemMap, *, evidence: bool) -> str:
-    """The map as JSON, leaving out node and flow evidence, the fields that quote the material, unless `evidence`."""
+    """The map as JSON, leaving out the fields drawn closely from the material, unless `evidence`."""
     if evidence:
         return system.model_dump_json()
-    return system.model_dump_json(exclude={"nodes": {"__all__": {"evidence"}}, "flows": {"__all__": {"evidence"}}})
+    return system.model_dump_json(
+        exclude={"nodes": {"__all__": {"evidence", "how", "code"}}, "flows": {"__all__": {"evidence"}}}
+    )
 
 
 def _notes(notes: Sequence[str]) -> str:

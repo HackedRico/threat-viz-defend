@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import type { SystemMap, ThreatAnalysis } from "../api/types.ts";
-import { expandHighlight, flowLabel, labelOf, pathFlows, splitIds } from "./elements.ts";
+import { codeLocation, codeSpans, expandHighlight, flowLabel, labelOf, pathFlows, splitIds } from "./elements.ts";
 import { diffMaps, hasChanges } from "./mapDiff.ts";
 import { flowsTouching, mapProblem, removeElement, updateFlow, updateNode } from "./mapEdit.ts";
 
@@ -68,4 +68,21 @@ test("refuses blank names", () => {
   assert.equal(mapProblem(map), null);
   assert.match(mapProblem(updateNode(map, "db", { label: " " })) ?? "", /db/);
   assert.match(mapProblem(updateFlow(map, "f1", { label: "" })) ?? "", /f1/);
+});
+
+test("a code reference reads as path:line, or the path when there is no line", () => {
+  assert.equal(codeLocation({ path: "worker/sync.py", line: 42, symbol: "poll_inbox" }), "worker/sync.py:42");
+  assert.equal(codeLocation({ path: "worker/sync.py", line: null, symbol: null }), "worker/sync.py");
+});
+
+test("backticks mark code runs, and an unmatched one stays literal", () => {
+  assert.deepEqual(codeSpans("runs `poll_inbox` every `120` seconds"), [
+    { text: "runs ", code: false },
+    { text: "poll_inbox", code: true },
+    { text: " every ", code: false },
+    { text: "120", code: true },
+    { text: " seconds", code: false },
+  ]);
+  assert.deepEqual(codeSpans("a stray ` tick"), [{ text: "a stray ` tick", code: false }]);
+  assert.deepEqual(codeSpans("`send_email`"), [{ text: "send_email", code: true }]);
 });

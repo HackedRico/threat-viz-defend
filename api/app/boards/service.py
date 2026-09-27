@@ -347,7 +347,24 @@ class Boards:
 
 def read_map(row: BoardRow) -> SystemMap | None:
     """A board's stored map, or `None` when it has none or it no longer validates."""
-    return _validated(row.map, SystemMap, row.id)
+    system = _validated(row.map, SystemMap, row.id)
+    return _with_example_details(system) if row.example and system is not None else system
+
+
+def _with_example_details(system: SystemMap) -> SystemMap:
+    """Fill `how` and `code` on an example board saved before they existed, from the example's node of the same id."""
+    # Accounts made earlier hold a copy of the example without them; this shows them without rewriting stored rows.
+    example = next((e.map for e in load_examples() if e.map.name == system.name), None)
+    if example is None:
+        return system
+    source = {node.id: node for node in example.nodes}
+    nodes = [
+        node.model_copy(update={"how": source[node.id].how, "code": source[node.id].code})
+        if node.id in source and not node.how and not node.code
+        else node
+        for node in system.nodes
+    ]
+    return system.model_copy(update={"nodes": nodes})
 
 
 def read_analysis(row: BoardRow) -> ThreatAnalysis | None:

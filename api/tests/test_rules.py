@@ -1,7 +1,8 @@
-from app.domain.models import AttackPath, Boundary
+from app.domain.models import AttackPath, Boundary, CodeRef, Node
 from app.domain.rules import (
     ai_exposure,
     checklist_text,
+    code_ref_label,
     coverage_checklist,
     crosses_boundary,
     remove_element,
@@ -162,3 +163,33 @@ def test_remove_element_drops_empty_boundaries() -> None:
 def test_severity_counts_lists_every_level() -> None:
     assert severity_counts(inbox().analysis) == {"critical": 1, "high": 3, "medium": 3, "low": 0}
     assert severity_counts(None) == {"critical": 0, "high": 0, "medium": 0, "low": 0}
+
+
+def test_a_node_stored_before_how_and_code_existed_still_validates() -> None:
+    stored = inbox().map.nodes[0].model_dump(exclude={"how", "code"})
+    loaded = Node.model_validate(stored)
+    assert (loaded.how, loaded.code) == ([], [])
+
+
+def test_sanitize_map_cleans_how_and_code() -> None:
+    refs = [
+        CodeRef(path=" `worker/sync.py` ", line=42, symbol="poll\ninbox"),
+        CodeRef(path="worker/sync.py", line=42, symbol="poll inbox"),
+        CodeRef(path="api/app.py", line=0, symbol=None),
+        CodeRef(path="   ", line=3, symbol=None),
+        *[CodeRef(path=f"extra{i}.py", line=i + 1, symbol=None) for i in range(5)],
+    ]
+    how = ["uses\nargon2id", "  ", *[f"point {i}" for i in range(6)]]
+    raw = system([node("a").model_copy(update={"how": how, "code": refs}), node("b")], [])
+    clean = sanitize_map(raw).nodes[0]
+    assert clean.how == ["uses argon2id", "point 0", "point 1", "point 2"]
+    assert clean.code[:2] == [
+        CodeRef(path="worker/sync.py", line=42, symbol="poll inbox"),
+        CodeRef(path="api/app.py", line=None, symbol=None),
+    ]
+    assert len(clean.code) == 4
+
+
+def test_code_ref_label_leaves_out_what_is_missing() -> None:
+    assert code_ref_label(CodeRef(path="a.py", line=7, symbol="main")) == "a.py:7 (main)"
+    assert code_ref_label(CodeRef(path="a.py", line=None, symbol=None)) == "a.py"

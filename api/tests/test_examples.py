@@ -4,8 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from app.boards.service import read_map
 from app.domain.briefing import brief, describe_element
+from app.domain.report import render_report
 from app.examples import EXAMPLES_DIR, find_example, load_examples
+from app.tables import BoardRow
 from tests.factories import inbox
 
 
@@ -52,3 +55,24 @@ def test_describe_element_names_its_threats() -> None:
     assert text.startswith("Triage agent (process")
     assert "T1 (critical)" in text
     assert describe_element(inbox().map, None, "ghost") is None
+
+
+def test_describe_element_says_how_it_works_and_where_the_code_is() -> None:
+    text = describe_element(inbox().map, None, "sync")
+    assert text is not None
+    assert "How it works: `poll_inbox` runs on an APScheduler interval" in text
+    assert "In the code: worker/sync.py:38 (poll_inbox)" in text
+
+
+def test_the_report_explains_each_component() -> None:
+    report = render_report("Inbox", inbox().map, None, None)
+    assert "## How each component works" in report
+    assert "- In the code: worker/sync\\.py:38 \\(poll\\_inbox\\)" in report
+
+
+def test_an_example_board_saved_before_details_existed_shows_them() -> None:
+    old = inbox().map.model_dump(mode="json", exclude={"nodes": {"__all__": {"how", "code"}}})
+    shown = read_map(BoardRow(id="b1", example=True, map=old))
+    assert shown == inbox().map
+    # A board the user drew keeps what is stored, even when it shares the example's name.
+    assert read_map(BoardRow(id="b2", example=False, map=old)) != inbox().map
