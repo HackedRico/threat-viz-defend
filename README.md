@@ -5,7 +5,7 @@ Runtime threat modeling while you vibe code.
 Coding agents let anyone ship an app they cannot explain. ThreatViz Defend reads your code and docs, or watches your coding agent as it works, draws the system as a threat model, and coaches you by text or voice until you can defend it at a whiteboard.
 
 <!-- TODO: point Live app and Demo video at the real URLs before submitting -->
-**[Live app](#)** · **[Demo video](#)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · **[Click to play demo](demo/index.html)** · Built at [hackUMBC 2026](#hackumbc-2026)
+**[Live app](#)** · **[Demo video](#)** · **[Pitch deck](docs/pitch/threatviz-defend-pitch.pdf)** · Built at [hackUMBC 2026](#hackumbc-2026)
 
 ## The problem
 
@@ -238,7 +238,7 @@ Memory is kept this small on purpose: it lives on a third-party service and last
 | DigitalOcean | App Platform, Postgres 16, and Gradient AI serverless inference for the default model. [How it is used](#how-digitalocean-is-used) | Built |
 | GoDaddy Registry | Our domain: `<domain goes here>` | To do |
 | Backboard | A memory store of each developer's progress across boards and sessions. [How it is used](#how-backboard-is-used) | Built |
-| Most Engaging Demo | Watch an agent build an app while its threat model draws, updates and gets defended by voice. [Click to play demo](demo/index.html) | Built |
+| Most Engaging Demo | Watch an agent build an app while its threat model draws, updates and gets defended by voice | Built |
 | Best Overall | Runtime threat modeling end to end: from a prompt to a threat model you can defend | At the demo |
 
 | Submission | Status |
