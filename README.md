@@ -44,6 +44,8 @@ It does not tell you a system is secure. It shows you where to look, and checks 
 
 ## Try it
 
+**Watch it first.** Open [demo/index.html](demo/index.html) in a browser for a 30 second walkthrough: Claude Code builds an app, the hook posts each git diff, and the threat model draws and updates itself. It is a scripted animation with no setup.
+
 **Hosted.** During hackUMBC, open the [live app](#) and create an account with the invite code from the organizers.
 
 **On your machine.** You need Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 24.
@@ -197,6 +199,7 @@ We wrote all of the code during the event. After judging we delete the deploymen
 | [docs/deploy.md](docs/deploy.md) | Deploying to DigitalOcean App Platform |
 | [integrations/README.md](integrations/README.md) | Connecting Claude Code and Cursor: MCP server and hook |
 | [AGENTS.md](AGENTS.md) | Commands, contracts and rules for anyone changing the code |
+| [demo/README.md](demo/README.md) | The click to play pitch demo: controls, recording and how to change the story |
 | [docs/team.md](docs/team.md) | Who owns each area, how the areas attach to the core engine, and how to work in parallel |
 | [docs/conventions.md](docs/conventions.md) | Code style, tests, docs, commits and pull requests |
 
