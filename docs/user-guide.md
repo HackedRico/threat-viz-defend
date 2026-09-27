@@ -57,7 +57,7 @@ Across the top of every board:
 - **Severity badges.** On a ready board, the number of threats at each severity.
 - **Analyzed by.** On a ready board, the model that found the threats.
 - **Add material.** Opens intake to add more to a board that already has some.
-- **Export.** On a ready board, saves the board as a PDF report, the map as a PNG or SVG image, or the report as Markdown. See [Export the board](#export-the-board).
+- **Export.** On a ready board, saves the board as a PDF report, the map as a PNG or SVG image, or the report as Markdown, or sends the threats to your own Snowflake account. See [Export the board](#export-the-board).
 - **Connect an agent.** Opens the coding agents settings with this board picked.
 - **Delete.** The trash icon asks "Delete this board?". **Delete** removes the board, its activity and its quiz answers for good. **Keep** cancels.
 
@@ -220,6 +220,7 @@ On a ready board, choose **Export** in the header, then a format. Each file is n
 - **PNG image.** The map as a picture at twice its size, in your theme, for slides and docs.
 - **SVG image.** The map as a drawing that stays sharp at any size, with its fonts inside, in your theme.
 - **Markdown.** The report as text, for a repo or a ticket: the summary, the verdict, the components and how each works, the flows, the lethal trifecta, every threat with its fixes and evidence, the attack paths and the assumptions. Model text in it is escaped, so it shows as plain text in any Markdown viewer.
+- **Snowflake.** Sends one row per threat to a `threat_findings` table in your own Snowflake account, through its SQL API. Enter your account identifier, warehouse, database, schema and a programmatic access token. Each row holds the threat's title, STRIDE letter, severity, the kind of part it sits on, whether it crosses a trust boundary or touches an AI part or sensitive store, and its catalog refs. Sending again replaces that board's rows. The token is used for that one send and never saved; the browser remembers the other four fields.
 
 The PDF and the images draw the map the way round the canvas shows it. Turn the map with the view controls first to export it the other way.
 
