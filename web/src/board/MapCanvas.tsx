@@ -50,6 +50,8 @@ const PAN_STEP = 60;
 const DRAG_THRESHOLD = 4;
 // Space between the first line of a node's name and its tech line.
 const TECH_GAP = 20;
+// How far a crossing flow's 16px arrowhead reaches back from the tip; its hollow middle stops there.
+const ARROW_LENGTH = 14;
 
 const KIND_WORD: Record<MapNode["kind"], string> = { external: "external entity", process: "process", store: "data store" };
 
@@ -323,13 +325,14 @@ export function MapCanvas({ map, layouts, threats, exposure, crossings, diff, li
       </p>
       <svg className="canvas-svg" width="100%" height="100%">
         <defs>
-          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          {/* Sized in canvas units, not stroke widths: a head scaled by a crossing flow's thick line grows wider than the gap between lanes. */}
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
             <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head" />
           </marker>
-          <marker id="arrow-cross" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <marker id="arrow-cross" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
             <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-crossing" />
           </marker>
-          <marker id="arrow-selected" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <marker id="arrow-selected" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
             <path d="M0,1 L9,5 L0,9 Q2,5 0,1 Z" className="arrow-head is-selected" />
           </marker>
         </defs>
@@ -623,7 +626,7 @@ const FlowShape = memo(function FlowShape({
   onReveal,
 }: FlowShapeProps) {
   const d = useMemo(() => roundedPath(points, 12), [points]);
-  const inner = useMemo(() => (crossing ? roundedPath(trimEnd(points, 9), 12) : null), [crossing, points]);
+  const inner = useMemo(() => (crossing ? roundedPath(trimEnd(points, ARROW_LENGTH), 12) : null), [crossing, points]);
   const marker = selected ? "url(#arrow-selected)" : crossing ? "url(#arrow-cross)" : "url(#arrow)";
   const text = clip(flow.label, FLOW_LABEL_MAX);
   const describe = [
@@ -667,7 +670,8 @@ const FlowShape = memo(function FlowShape({
             {text}
           </text>
           {diffTag && (
-            <text x={label.x + label.width / 2} y={label.y - 4} className={`flow-diff diff-tag-${diffTag}`}>
+            // On the chip's top edge like a legend, so the tag never lands on a neighboring label.
+            <text x={label.x + label.width / 2} y={label.y + 3.5} className={`flow-diff diff-tag-${diffTag}`}>
               {diffTag}
             </text>
           )}
