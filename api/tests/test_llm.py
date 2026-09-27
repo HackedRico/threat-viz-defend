@@ -226,3 +226,17 @@ def test_a_map_with_no_components_is_rejected() -> None:
     llm, _ = scripted(empty.model_dump_json())
     with pytest.raises(LlmError, match="no components"):
         LlmAnalyst(llm).draft_map("hello", None)
+
+
+def test_a_400_about_the_prompt_keeps_structured_output_for_later_calls() -> None:
+    request = httpx.Request("POST", "https://x/v1/chat/completions")
+    too_long = openai.BadRequestError(
+        "This model's maximum context length is 8192 tokens",
+        response=httpx.Response(400, request=request),  # type: ignore[arg-type]
+        body=None,
+    )
+    llm, calls = scripted(too_long, GOOD)
+    with pytest.raises(LlmError):
+        llm.generate(REQUEST)
+    assert llm.generate(REQUEST) == inbox().analysis
+    assert "response_format" in calls.calls[1]

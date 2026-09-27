@@ -56,10 +56,12 @@ class Quiz:
             if question is None:
                 raise not_found("That question is out of date because the board changed. Reload the quiz.")
             system, analysis, version = read_map(row), current_analysis(row), row.analysis_version
-            if question.kind == "open":
-                if not (body.text and body.text.strip()):
-                    raise bad_request("Type or say an answer in your own words first.")
-                chosen = self._analysts.for_user(user_id)
+            if question.kind == "open" and not (body.text and body.text.strip()):
+                raise bad_request("Type or say an answer in your own words first.")
+        if question.kind == "open":
+            # Outside any session: a saved provider's host is resolved here, and a slow lookup must not hold one.
+            chosen = self._analysts.for_user(user_id)
+            with self._db.session() as session:
                 self._budget.spend(session, user_id, "model", "grade", own_key=chosen.own_key)
 
         if question.kind == "open":

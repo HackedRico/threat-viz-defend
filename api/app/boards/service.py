@@ -229,7 +229,9 @@ class Boards:
             system, analysis = read_map(row), current_analysis(row)
             if system is None or analysis is None:
                 raise conflict("Confirm the map and wait for the threats before asking about them.")
-            chosen = self._analysts.for_user(user_id)
+        # Outside any session: a saved provider's host is resolved here, and a slow lookup must not hold a connection.
+        chosen = self._analysts.for_user(user_id)
+        with self._db.session() as session:
             self._budget.spend(session, user_id, "model", "answer", own_key=chosen.own_key)
         try:
             return chosen.analyst.answer(system, analysis, question.strip(), focus)
@@ -268,7 +270,7 @@ class Boards:
         require: Callable[[BoardRow], None] | None = None,
     ) -> tuple[SystemMap | None, str, Analyst]:
         """Check the board is idle and passes `require`, pick the analyst, spend one call, and commit before a job."""
-        chosen = self._analysts.for_user(user_id)
+        chosen = self._analysts.for_user(user_id)  # before the session, since it may resolve a host
         # The commit has to land first: a job that writes the board inside this transaction would
         # deadlock on SQLite and race everywhere else.
         with self._db.session() as session:

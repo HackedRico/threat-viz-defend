@@ -79,7 +79,7 @@ Every model call goes through an `Analyst` ([analysis/analyst.py](../api/app/ana
 - `parse_json` accepts a reply wrapped in code fences or a sentence and validates it against the schema.
 - `repair_message` lists what failed. Each adapter sends it once in the same conversation and gives up with `LlmError("bad_output")` if the second reply also fails.
 
-`OpenAICompatibleLlm` asks for JSON the strongest way the provider allows: `json_schema` with `strict: true` for OpenAI, `json_object`, or the schema written into the system prompt. If a provider rejects `response_format`, it falls back to the prompt for the rest of its life. A reply cut off at the token limit, a refusal and an empty reply each raise `LlmError`.
+`OpenAICompatibleLlm` asks for JSON the strongest way the provider allows: `json_schema` with `strict: true` for OpenAI, `json_object`, or the schema written into the system prompt. If a provider rejects `response_format`, it falls back to the prompt for the rest of its life. Only a 400 that names `response_format`, JSON or a schema does this; any other 400, such as a prompt over the context length, fails that one call and leaves structured output on for the next. A reply cut off at the token limit, a refusal and an empty reply each raise `LlmError`.
 
 **Sanitizers.** [domain/rules.py](../api/app/domain/rules.py) makes model output consistent with the map before anything is stored:
 

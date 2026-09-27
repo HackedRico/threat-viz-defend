@@ -61,6 +61,7 @@ Rate limits count hits in a sliding window, in memory ([limits.py](../api/app/li
 | Model calls | user | 6 per minute, on any provider | `MODEL_CALLS_PER_MINUTE` |
 | Model calls on the server's key | user | 60 per day | `DAILY_MODEL_CALLS` |
 | Model calls on the server's key | everyone | 3000 per day | `GLOBAL_DAILY_MODEL_CALLS` |
+| Voice sessions | user | 2 per minute | fixed |
 | Voice sessions | user | 10 per day | `DAILY_VOICE_SESSIONS` |
 | Dictations | user | 10 per minute | fixed |
 | Dictations | user | 30 per day | `DAILY_DICTATIONS` |
@@ -192,7 +193,7 @@ Cookie. `200` with `ProviderOut`: the user's saved provider, or the server's def
 ### `PUT /api/provider`
 Cookie. Body `ProviderIn`: `kind` (`openai_compatible` or `backboard`), `base_url`, `model` (Backboard models as `provider/model`), `api_key` (null keeps the saved key when the kind and base URL are unchanged, and is refused otherwise; an OpenAI-compatible provider may be saved without one), `memory` (Backboard only).
 
-`200` with `ProviderOut`. Errors: `400` when the base URL is not https (plain http only where private addresses are allowed), holds credentials, a query or a fragment, does not resolve, or resolves to a private or local address; also when a new Backboard provider has no key or the model lacks its `provider/` prefix.
+`200` with `ProviderOut`. Errors: `400` when the base URL is not https (plain http only where private addresses are allowed), holds credentials, a query or a fragment, does not resolve within 3 seconds, or resolves to a private or local address; also when a new Backboard provider has no key or the model lacks its `provider/` prefix.
 
 ### `DELETE /api/provider`
 Cookie. Forgets the provider and key; the server's default takes over. `204`.

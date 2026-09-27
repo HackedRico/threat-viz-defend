@@ -1,6 +1,7 @@
 import ipaddress
 import socket
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 from app.errors import bad_request
@@ -17,16 +18,31 @@ from app.errors import bad_request
 
 Resolver = Callable[[str, int], list[str]]
 
+# A user controls the nameserver for their saved host, so a lookup gets a few seconds, never the resolver's own
+# minutes, and at most a few lookups hold threads at once; the rest wait their turn and time out the same way.
+DNS_TIMEOUT_S = 3.0
+_lookups = ThreadPoolExecutor(max_workers=4, thread_name_prefix="dns")
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")
+_SITE_LOCAL = ipaddress.ip_network("fec0::/10")
+
 
 def resolve(host: str, port: int) -> list[str]:
-    """Every IP address `host` resolves to."""
-    infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    """Every IP address `host` resolves to; `OSError` when it does not resolve within `DNS_TIMEOUT_S`."""
+    future = _lookups.submit(socket.getaddrinfo, host, port, proto=socket.IPPROTO_TCP)
+    try:
+        infos = future.result(timeout=DNS_TIMEOUT_S)
+    except TimeoutError as exc:
+        future.cancel()
+        raise OSError(f"Looking up {host} took too long.") from exc
     return sorted({str(info[4][0]) for info in infos})
 
 
 def check_base_url(url: str, *, allow_private: bool, resolver: Resolver = resolve) -> str:
     """Validate a provider base URL and return it without a trailing slash, or raise 400 saying why."""
-    parsed = urlparse(url.strip())
+    try:
+        parsed = urlparse(url.strip())
+    except ValueError as exc:
+        raise bad_request("The base URL is not a valid URL, such as https://api.openai.com/v1.") from exc
     if parsed.scheme not in ("https", "http"):
         raise bad_request("The base URL must start with https://.")
     if parsed.scheme == "http" and not allow_private:
@@ -42,7 +58,8 @@ def check_base_url(url: str, *, allow_private: bool, resolver: Resolver = resolv
     if not allow_private:
         try:
             addresses = resolver(parsed.hostname, port)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
+            # `ValueError` covers names the IDNA codec refuses, such as a label over 63 characters.
             raise bad_request(f"The host {parsed.hostname} does not resolve. Check the URL.") from exc
         if not addresses or any(not _public(a) for a in addresses):
             raise bad_request("The base URL points at a private or local address, which this server does not allow.")
@@ -52,4 +69,10 @@ def check_base_url(url: str, *, allow_private: bool, resolver: Resolver = resolv
 def _public(address: str) -> bool:
     """True when `address` is a globally routable IP."""
     ip = ipaddress.ip_address(address)
+    if isinstance(ip, ipaddress.IPv6Address):
+        # NAT64 carries an IPv4 address in its last 32 bits; site-local is deprecated but still routed privately.
+        if ip in _NAT64:
+            return _public(str(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)))
+        if ip in _SITE_LOCAL:
+            return False
     return ip.is_global and not ip.is_multicast
