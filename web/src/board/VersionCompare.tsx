@@ -53,6 +53,13 @@ export function VersionCompare({
     return () => opener?.focus();
   }, []);
 
+  // A new change can prune the version a side shows; that side moves to one still kept rather than a blank menu.
+  useEffect(() => {
+    const kept = new Set(versions.map((v) => v.number));
+    if (!kept.has(after)) setAfter(current);
+    if (!kept.has(before)) setBefore(versions.find((v) => v.number !== current)?.number ?? current);
+  }, [versions, before, after, current]);
+
   // A version's threats can arrive after it was loaded, when a confirm finishes, so its counts are in the key.
   const keyOf = (number: number) => `${number}:${JSON.stringify(versions.find((v) => v.number === number)?.counts ?? null)}`;
   const beforeKey = keyOf(before);
@@ -64,7 +71,9 @@ export function VersionCompare({
       [before, beforeKey],
       [after, afterKey],
     ] as const) {
-      if (loaded[key]) continue;
+      // Only a drawn version is kept; a failed fetch, such as a dropped connection, is tried again when picked.
+      const had = loaded[key];
+      if (had && "version" in had) continue;
       api
         .version(boardId, number)
         .then(async (version) => ({ version, layouts: await layOutBoth(version.map) }))

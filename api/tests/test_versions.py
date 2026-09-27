@@ -1,14 +1,16 @@
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, event, func, select
+from sqlalchemy import delete, event, func, select, update
 
 from app.analysis.analyst import DemoAnalyst
 from app.boards.ingest import Material
 from app.boards.versions import MAX_VERSIONS
 from app.domain.models import SystemMap
+from app.errors import AppError
 from app.llm.base import LlmError
-from app.tables import MapVersionRow
+from app.tables import BoardRow, MapVersionRow
 from tests.conftest import PASSWORD, ClientFactory, example_material, sign_up
 from tests.factories import inbox
 from tests.test_mcp_tools import agent_token, call_tool
@@ -184,3 +186,49 @@ def test_a_restored_example_starts_its_own_history(signed_in: TestClient) -> Non
     restored = signed_in.post("/api/boards/example").json()
     assert [(v["number"], v["source"]) for v in restored["versions"]] == [(1, "example")]
     assert signed_in.get(f"/api/boards/{restored['id']}/versions/1").json()["analysis"]["threats"]
+
+
+def test_an_edit_read_before_a_confirm_started_cannot_save_under_it(signed_in: TestClient) -> None:
+    board_id = signed_in.post("/api/boards", json={"title": "Race"}).json()["id"]
+    signed_in.post(f"/api/boards/{board_id}/sources", json=example_material())
+    user_id = signed_in.get("/api/auth/me").json()["user"]["id"]
+    services = signed_in.app.state.services  # type: ignore[attr-defined]
+    with services.db.session() as session:
+        row = services.boards.get(session, user_id, board_id)
+        edited = SystemMap.model_validate(row.map)
+        # A confirm in another request claims the board after this one read it as `review`.
+        session.execute(
+            update(BoardRow)
+            .where(BoardRow.id == board_id)
+            .values(status="analyzing")
+            .execution_options(synchronize_session=False)
+        )
+        assert row.status == "review"
+        with pytest.raises(AppError) as busy:
+            services.boards.save_map(session, user_id, board_id, edited)
+    assert busy.value.status == 409
+
+
+def test_confirm_pins_threats_to_the_map_it_started_on(signed_in: TestClient) -> None:
+    board_id = example_id(signed_in)
+    db = signed_in.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        session.execute(delete(MapVersionRow))
+    edit(signed_in, board_id, "Browser app")
+    assert signed_in.post(f"/api/boards/{board_id}/confirm").status_code == 202
+    first, second = board(signed_in, board_id)["versions"]
+    assert second["counts"]["critical"] == 1
+    assert first["counts"]["critical"] == 1
+
+
+def test_version_1_of_an_older_board_keeps_its_name_and_time_once_written(signed_in: TestClient) -> None:
+    board_id = example_id(signed_in)
+    db = signed_in.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        session.execute(delete(MapVersionRow))
+    [listed] = board(signed_in, board_id)["versions"]
+    edit(signed_in, board_id, "Browser app")
+    written = board(signed_in, board_id)["versions"][0]
+    assert {k: written[k] for k in ("number", "source", "label", "created_at")} == {
+        k: listed[k] for k in ("number", "source", "label", "created_at")
+    }

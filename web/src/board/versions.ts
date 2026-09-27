@@ -11,6 +11,8 @@ import { SEVERITIES } from "./severity.ts";
 
 /** How many version chips the canvas shows; older ones wait behind the history button. */
 export const VISIBLE_CHIPS = 3;
+// From v100 on a chip is wider, so one fewer keeps the bar inside the corner the brief note leaves.
+const WIDE_NUMBER = 100;
 
 /** What the canvas shows: the newest few versions, and how many older ones are folded away. */
 export interface VersionBar {
@@ -22,8 +24,9 @@ export interface VersionBar {
 /** The chips for `versions` (oldest first), or `null` when there is only one map and nothing to compare. */
 export function versionBar(versions: readonly MapVersionSummary[], visible = VISIBLE_CHIPS): VersionBar | null {
   if (versions.length < 2) return null;
-  const chips = versions.slice(-visible);
-  return { chips, hidden: versions.length - chips.length, current: versions[versions.length - 1]!.number };
+  const current = versions[versions.length - 1]!.number;
+  const chips = versions.slice(-(current >= WIDE_NUMBER ? Math.min(visible, 2) : visible));
+  return { chips, hidden: versions.length - chips.length, current };
 }
 
 /** The two versions a click compares: a past version against the current map, or the current one against the one before. */

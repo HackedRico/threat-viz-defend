@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.analyst import Analyst
 from app.boards.ingest import Material
-from app.boards.versions import attach_analysis, record_change
+from app.boards.versions import attach_analysis, ensure_version, record_change
 from app.db import Database, utcnow
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.notes import question_note
@@ -184,6 +184,12 @@ class Boards:
         clean = sanitize_map(system)
         if not clean.nodes:
             raise bad_request("A map needs at least one component.")
+        # Claimed with one conditional write, as `_begin` does, so a confirm that started since this row was read
+        # cannot find threats on one map while this edit saves another under it.
+        claim = update(BoardRow).where(BoardRow.id == row.id, BoardRow.status.not_in(BUSY))
+        claimed = session.execute(claim.values(status="review").execution_options(synchronize_session=False))
+        if cast(CursorResult[tuple[()]], claimed).rowcount != 1:
+            raise conflict("The board is busy. Wait for it to finish, then save your edits.")
         # Keep the map before the edit so review marks what the person changed.
         before, before_analysis = row.map, _analysis_json(row)
         row.previous_map = row.map
@@ -204,14 +210,14 @@ class Boards:
             if row.status != "review" or row.map is None:
                 raise conflict("Only a drafted map waiting for review can be confirmed.")
 
-        system, _, analyst = self._begin(
-            user_id,
-            board_id,
-            "find_threats",
-            "analyzing",
-            lambda row, session: _event(session, row.id, "confirmed", "Map confirmed. Finding threats."),
-            require=in_review,
-        )
+        # The version this confirm finds threats on, pinned now so its threats never land on a later map.
+        confirmed: list[int] = []
+
+        def record(row: BoardRow, session: Session) -> None:
+            _event(session, row.id, "confirmed", "Map confirmed. Finding threats.")
+            confirmed.append(ensure_version(session, row))
+
+        system, _, analyst = self._begin(user_id, board_id, "find_threats", "analyzing", record, require=in_review)
         if system is None:
             self._fail(board_id, "review", "The stored map no longer loads. Edit and save it, then confirm again.")
             return
@@ -232,7 +238,7 @@ class Boards:
                     if target is None:
                         return
                     target.analysis = analysis.model_dump(mode="json")
-                    attach_analysis(session, board_id, target.analysis)
+                    attach_analysis(session, board_id, target.analysis, confirmed[0])
                     target.analysis_version += 1
                     target.analyzed_by = analyst.label
                     target.status = "ready"

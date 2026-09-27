@@ -62,21 +62,34 @@ def record_change(
         return
     newest = _newest_number(session, row.id)
     if newest == 0 and before is not None:
-        session.add(_row(row.id, 1, "earlier", "Map before version history", before, before_analysis))
+        # Written exactly as it was listed before, so version 1 keeps its name, source and time.
+        first = _first(row)
+        session.add(_row(row.id, 1, first.source, first.label, before, before_analysis, created_at=first.created_at))
         newest = 1
     session.add(_row(row.id, newest + 1, source, label, row.map, analysis))
     session.flush()
     _prune(session, row.id)
 
 
-def attach_analysis(session: Session, board_id: str, analysis: dict[str, Any]) -> None:
-    """Pin threats found by a confirm to the newest version, the map they were found on."""
-    newest = session.scalar(
-        select(MapVersionRow).where(MapVersionRow.board_id == board_id).order_by(MapVersionRow.number.desc()).limit(1)
+def ensure_version(session: Session, row: BoardRow) -> int:
+    """The number of the version holding the board's current map, writing it first when history has not started."""
+    newest = _newest_number(session, row.id)
+    if newest == 0 and row.map is not None:
+        first = _first(row)
+        session.add(_row(row.id, 1, first.source, first.label, row.map, None, created_at=first.created_at))
+        session.flush()
+        newest = 1
+    return newest
+
+
+def attach_analysis(session: Session, board_id: str, analysis: dict[str, Any], number: int) -> None:
+    """Pin threats found by a confirm to version `number`, the map they were found on, if it is still kept."""
+    found = session.scalar(
+        select(MapVersionRow).where(MapVersionRow.board_id == board_id, MapVersionRow.number == number)
     )
-    if newest is not None:
-        newest.analysis = analysis
-        newest.counts = severity_counts(analysis)
+    if found is not None:
+        found.analysis = analysis
+        found.counts = severity_counts(analysis)
 
 
 def list_versions(session: Session, row: BoardRow, analysis: dict[str, Any] | None) -> list[Version]:
@@ -116,18 +129,31 @@ def severity_counts(analysis: dict[str, Any] | None) -> dict[str, int] | None:
     return counts
 
 
+@dataclass(frozen=True)
+class _FirstMeta:
+    source: VersionSource
+    label: str
+    created_at: datetime
+
+
+def _first(row: BoardRow) -> _FirstMeta:
+    """How version 1 of a board made before history was kept reads, listed or written."""
+    return _FirstMeta("earlier", "Map before version history", row.created_at)
+
+
 def _unsaved_first(row: BoardRow, analysis: dict[str, Any] | None) -> OpenedVersion | None:
     """The map a board holds, as version 1 of a history that has not been written yet."""
     if row.map is None:
         return None
+    first = _first(row)
     version = Version(
         number=1,
-        source="example" if row.example else "earlier",
-        label="Built-in example" if row.example else "Current map",
+        source=first.source,
+        label=first.label,
         node_count=len(row.map.get("nodes", [])),
         flow_count=len(row.map.get("flows", [])),
         counts=severity_counts(analysis),
-        created_at=row.created_at,
+        created_at=first.created_at,
     )
     return OpenedVersion(version, row.map, analysis)
 
@@ -145,9 +171,12 @@ def _row(
     label: str,
     system: dict[str, Any],
     analysis: dict[str, Any] | None,
+    created_at: datetime | None = None,
 ) -> MapVersionRow:
     """A version row for one map, with its part and threat counts worked out once."""
+    extra = {"created_at": created_at} if created_at is not None else {}
     return MapVersionRow(
+        **extra,
         board_id=board_id,
         number=number,
         source=source,

@@ -43,6 +43,16 @@ test("the bar shows the newest three and folds the rest away", () => {
   assert.equal(versionBar(many.slice(0, 2))!.hidden, 0);
 });
 
+test("three digit numbers show two chips, so the bar keeps its width", () => {
+  const long = [98, 99, 100, 101].map((n) => version(n));
+  const bar = versionBar(long)!;
+  assert.deepEqual(
+    bar.chips.map((v) => v.number),
+    [100, 101],
+  );
+  assert.equal(bar.hidden, 2);
+});
+
 test("a past version compares with the current map, and the current one with the version before", () => {
   assert.deepEqual(comparePair(many, 4), { before: 4, after: 8 });
   assert.deepEqual(comparePair(many, 8), { before: 7, after: 8 });
