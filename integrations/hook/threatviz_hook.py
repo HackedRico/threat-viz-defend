@@ -976,6 +976,12 @@ def cmd_init(board_id: str, api_url: str | None) -> int:
         raise SystemExit(f"threatviz: could not reach {chosen}: {exc}") from exc
     if reply.status == 401:
         raise SystemExit("threatviz: the token was rejected. Create a new one in the web app.")
+    if reply.status == 200 and not isinstance(reply.body, list):
+        # A split deploy serves the web app on its own host, whose catchall answers any path with a page.
+        raise SystemExit(
+            f"threatviz: {chosen} answered with a web page, not the API. Pass the API origin as --api-url; "
+            "the web app's Connect a coding agent screen shows it."
+        )
     if reply.status != 200 or not isinstance(reply.body, list):
         raise SystemExit(f"threatviz: listing boards failed: {_error_message(reply)}")
     boards = {item.get("id"): item.get("title", "") for item in reply.body if isinstance(item, dict)}

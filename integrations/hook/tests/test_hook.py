@@ -794,3 +794,31 @@ def _without_commands(config: dict[str, Any]) -> dict[str, Any]:
         event: [{"hooks": [{**entry, "command": ""} for entry in group["hooks"]]} for group in groups]
         for event, groups in config["hooks"].items()
     }
+
+
+class _WebAppHandler(BaseHTTPRequestHandler):
+    """Answers every path with the web app's page, as a static host's catchall does."""
+
+    def do_GET(self) -> None:
+        raw = b"<!doctype html><title>ThreatViz Defend</title>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def log_message(self, format: str, *args: object) -> None:
+        """Keep test output quiet."""
+
+
+def test_init_against_the_web_app_says_to_use_the_api_origin(repo: Path) -> None:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _WebAppHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        proc = run_init(repo, f"http://127.0.0.1:{server.server_address[1]}")
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert proc.returncode != 0
+    assert "answered with a web page, not the API" in proc.stderr
