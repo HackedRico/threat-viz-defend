@@ -29,8 +29,9 @@ from app.tables import MemoryPrefsRow, MemoryRow
 
 log = logging.getLogger(__name__)
 
-# Memory is a side call around the real work, so it gets far less time than a model.
-_TIMEOUT_S = 15.0
+# Memory is a side call around the real work, and a recall runs while a person waits on an answer, so a
+# Backboard that hangs costs each answer at most this long before the answer goes on without memory.
+_TIMEOUT_S = 8.0
 # The sealed key's owner string differs from a provider key's, so one cannot be swapped in for the other.
 _SEAL_SCOPE = "memory:"
 
