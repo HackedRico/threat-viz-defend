@@ -1,12 +1,15 @@
 import { create } from "zustand";
 
+import type { Direction } from "./layout.ts";
+
 // =============================================================================
 // Module Overview
 // =============================================================================
 // What the user is pointing at on the open board: the selected element, the ids
 // lit by an answer, a quiz result, the voice coach or an attack path, and the
-// threat in focus. It is a store rather than props because the voice coach's
-// tools light the map from outside React's render.
+// threat in focus, and which way round the canvas draws the map. It is a store
+// rather than props because the voice coach's tools light the map from outside
+// React's render, and an export in the header draws the map the canvas's way.
 
 /** Where the current highlight came from, shown beside the map so it is never a mystery. */
 export type HighlightSource = "ask" | "quiz" | "voice" | "weak" | "threat";
@@ -19,6 +22,8 @@ interface BoardUi {
   pinnedPath: string | null;
   /** The threat the list opens and scrolls to: a new object per request, so asking for the same threat twice works. */
   focusThreat: { id: string } | null;
+  /** The way round the canvas draws the map, so an export draws it the same; `null` until the canvas picks one. */
+  direction: Direction | null;
   select: (id: string | null) => void;
   setHighlight: (ids: string[], source: HighlightSource) => void;
   clearHighlight: () => void;
@@ -26,6 +31,7 @@ interface BoardUi {
   togglePinnedPath: (id: string) => void;
   showThreat: (id: string | null) => void;
   openThreat: (id: string) => void;
+  showDirection: (direction: Direction | null) => void;
   reset: () => void;
 }
 
@@ -36,6 +42,7 @@ const EMPTY = {
   hoverPath: null,
   pinnedPath: null,
   focusThreat: null,
+  direction: null,
 } as const;
 
 /** The open board's pointing state. */
@@ -58,5 +65,6 @@ export const useBoardUi = create<BoardUi>()((set) => ({
   // The threat opens in the list, which the details would cover, so the selection steps aside
   // and the threat lights its pin and element instead.
   openThreat: (id) => set({ selected: null, focusThreat: { id }, highlight: [id], highlightSource: "threat", pinnedPath: null }),
+  showDirection: (direction) => set({ direction }),
   reset: () => set({ ...EMPTY, highlight: [] }),
 }));
