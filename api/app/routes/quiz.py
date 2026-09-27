@@ -49,10 +49,11 @@ def start_voice(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Voic
     if system is None:
         raise conflict("Add material and draw a map before starting the voice coach.")
     analysis = current_analysis(row)
+    # Before the spend, so no write lock is held while Backboard answers.
+    focus = svc.quiz.focus(user.id, board_id)
     svc.budget.spend(session, user.id, "voice", "conversation")
     token = svc.voice.conversation_token()
     questions = build_quiz(system, analysis)
-    focus = svc.quiz.focus(user.id, board_id)
     # The coach already speaks from the brief, so memory reaches it there, ahead of anything the cap would cut.
     remembered = (
         f"From memory: in earlier sessions they found {', '.join(TOPIC_NAMES[t] for t in focus.topics)} hard, "

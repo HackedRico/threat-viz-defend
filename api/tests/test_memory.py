@@ -305,3 +305,20 @@ def test_a_backboard_outage_on_the_memory_page_is_explained(make_client: ClientF
     response = client.get("/api/memory/notes")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "memory_error"
+
+
+class FakeVoice:
+    def conversation_token(self) -> str:
+        return "one-time-token"
+
+
+def test_the_voice_coach_hears_what_memory_says_to_ask_first(make_client: ClientFactory) -> None:
+    fake = FakeBackboard()
+    client = with_memory(make_client, fake, voice=FakeVoice())
+    first = example_board(client)
+    trifecta = question("trifecta")
+    body = {"question_id": trifecta.id, "choice_ids": [wrong_choice(trifecta)]}
+    client.post(f"/api/boards/{first}/quiz/answers", json=body)
+    second = client.post("/api/boards/example").json()["id"]
+    brief = client.post(f"/api/boards/{second}/voice").json()["dynamic_variables"]["board_brief"]
+    assert brief.startswith("From memory: in earlier sessions they found the lethal trifecta hard")
