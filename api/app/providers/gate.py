@@ -57,7 +57,3 @@ class GatedLlm:
         """Call the wrapped provider inside the user's slot."""
         with provider_slot(self._user_id):
             return self._inner.generate(request)
-
-    def remembers(self, task: str) -> bool:
-        """Whether the wrapped provider keeps `task` calls as memory."""
-        return self._inner.remembers(task)

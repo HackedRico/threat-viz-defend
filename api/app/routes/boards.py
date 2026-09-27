@@ -7,10 +7,20 @@ from app.boards.views import board_out, board_summary
 from app.context import CurrentUser, Db, Svc
 from app.db import utcnow
 from app.domain.briefing import brief
-from app.domain.models import Answer
 from app.domain.report import render_report
 from app.errors import conflict
-from app.schemas import AskIn, BoardCreate, BoardOut, BoardPatch, BoardSummary, BriefOut, GithubIn, MapIn, SourcesIn
+from app.schemas import (
+    AskIn,
+    AskOut,
+    BoardCreate,
+    BoardOut,
+    BoardPatch,
+    BoardSummary,
+    BriefOut,
+    GithubIn,
+    MapIn,
+    SourcesIn,
+)
 
 # =============================================================================
 # Module Overview
@@ -96,8 +106,8 @@ def confirm_map(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Boar
 
 
 @router.post("/{board_id}/ask")
-def ask(board_id: str, body: AskIn, user: CurrentUser, svc: Svc) -> Answer:
-    """Answer a question about a finished board, with the ids to highlight."""
+def ask(board_id: str, body: AskIn, user: CurrentUser, svc: Svc) -> AskOut:
+    """Answer a question about a finished board, with the ids to highlight and what memory recalled."""
     return svc.boards.ask(user.id, board_id, body.question, body.focus)
 
 

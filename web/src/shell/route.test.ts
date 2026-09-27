@@ -15,6 +15,7 @@ test("reads and writes each route", () => {
     { name: "settings" as const, section: "agents" as const, boardId: "abc" },
     { name: "settings" as const, section: "agents" as const, boardId: null },
     { name: "settings" as const, section: "provider" as const, boardId: "abc" },
+    { name: "settings" as const, section: "memory" as const, boardId: null },
   ]) {
     const path = routePath(route);
     const [pathname, search] = path.split("?");

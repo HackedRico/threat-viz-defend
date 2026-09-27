@@ -1,19 +1,20 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
-import type { ProviderKind, ProviderTestOut } from "../api/types.ts";
+import type { ProviderTestOut } from "../api/types.ts";
 import { formatTime } from "../board/ActivityLog.tsx";
-import { applyPreset, BACKBOARD_URL, formProblem, initialForm, PRESETS, toProviderIn, type ProviderForm } from "./providerForm.ts";
+import { applyPreset, formProblem, initialForm, PRESETS, toProviderIn, type ProviderForm } from "./providerForm.ts";
 import { useProvider } from "./provider.ts";
 import "./ProviderSettings.css";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
-// Lets a user run their analyses on their own model: an OpenAI compatible
-// service or Backboard. The form tests a connection before saving, offers the
-// models the service lists, and never shows a saved key; leaving the key empty
-// keeps it. Removing the provider goes back to the server's default.
+// Lets a user run their analyses on their own model, any OpenAI compatible
+// service. The form tests a connection before saving, offers the models the
+// service lists, and never shows a saved key; leaving the key empty keeps it.
+// Removing the provider goes back to the server's default. Memory is not a
+// model: Backboard remembers around whichever model runs, on its own page.
 
 const SOURCE_TEXT = {
   custom: "Your own model",
@@ -95,9 +96,6 @@ export function ProviderSettings() {
     void run("save");
   };
 
-  const setKind = (kind: ProviderKind) =>
-    edit(kind === "backboard" ? { kind, baseUrl: form.baseUrl || BACKBOARD_URL } : { kind, memory: false });
-
   return (
     <>
       <header>
@@ -140,22 +138,9 @@ export function ProviderSettings() {
           {provider?.source === "custom" ? "Change your model" : "Use your own model"}
         </h3>
 
-        <fieldset className="provider-kinds">
-          <legend className="field-label">Kind</legend>
-          <label className={`provider-kind ${form.kind === "openai_compatible" ? "is-on" : ""}`}>
-            <input type="radio" name={`${ids}-kind`} checked={form.kind === "openai_compatible"} onChange={() => setKind("openai_compatible")} />
-            <span className="provider-kind-name">OpenAI compatible</span>
-            <span className="field-hint">OpenAI, Featherless, OpenRouter, Ollama and others</span>
-          </label>
-          <label className={`provider-kind ${form.kind === "backboard" ? "is-on" : ""}`}>
-            <input type="radio" name={`${ids}-kind`} checked={form.kind === "backboard"} onChange={() => setKind("backboard")} />
-            <span className="provider-kind-name">Backboard</span>
-            <span className="field-hint">Any model through one key, with optional memory</span>
-          </label>
-        </fieldset>
-
+        <p className="field-hint">Any service that speaks the OpenAI Chat Completions API.</p>
         <div className="provider-presets" role="group" aria-label="Fill in a known service">
-          {PRESETS.filter((preset) => preset.kind === form.kind).map((preset) => (
+          {PRESETS.map((preset) => (
             <button key={preset.id} type="button" className="chip provider-preset" onClick={() => edit(applyPreset(form, preset))}>
               {preset.label}
             </button>
@@ -174,7 +159,7 @@ export function ProviderSettings() {
             className="input mono"
             type="url"
             inputMode="url"
-            placeholder={form.kind === "backboard" ? BACKBOARD_URL : "https://api.openai.com/v1"}
+            placeholder="https://inference.do-ai.run/v1"
             value={form.baseUrl}
             maxLength={300}
             onChange={(e) => edit({ baseUrl: e.target.value })}
@@ -189,7 +174,7 @@ export function ProviderSettings() {
             id={`${ids}-model`}
             className="input mono"
             list={`${ids}-models`}
-            placeholder={form.kind === "backboard" ? "openai/gpt-4o" : "gpt-4o-mini"}
+            placeholder="openai-gpt-oss-120b"
             value={form.model}
             maxLength={200}
             autoCapitalize="none"
@@ -223,13 +208,6 @@ export function ProviderSettings() {
             Stored on the server and never shown again. Local services such as Ollama may need none.
           </span>
         </div>
-
-        {form.kind === "backboard" && (
-          <label className="toggle">
-            <input type="checkbox" checked={form.memory} onChange={(e) => edit({ memory: e.target.checked })} />
-            <span>Remember my progress across boards</span>
-          </label>
-        )}
 
         {result && (
           <div className={`banner ${result.ok ? "" : "banner-error"}`} role="status">

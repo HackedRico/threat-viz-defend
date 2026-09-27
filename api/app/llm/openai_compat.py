@@ -98,10 +98,6 @@ class OpenAICompatibleLlm:
                 "bad_output", f"{self._label} returned data in the wrong shape twice. Try again, or use another model."
             ) from second
 
-    def remembers(self, task: str) -> bool:
-        """Never: each Chat Completions call stands alone."""
-        return False
-
     def _system_prompt(self, request: LlmRequest[Any]) -> str:
         """The system prompt, plus the schema in words when the provider will not enforce it."""
         if self._json_mode == "json_schema":

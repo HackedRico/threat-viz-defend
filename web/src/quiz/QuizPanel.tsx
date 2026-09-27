@@ -1,8 +1,9 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { errorMessage } from "../api/client.ts";
-import type { AttemptOut, QuestionOut } from "../api/types.ts";
+import type { AttemptOut, MemoryUse, QuestionOut } from "../api/types.ts";
 import { useBoardUi } from "../board/store.ts";
+import { MemoryTrace } from "../settings/MemoryTrace.tsx";
 import { CheckIcon, CloseIcon } from "../shell/icons.tsx";
 import { Mascot } from "../shell/Mascot.tsx";
 import { optionLetter } from "../voice/letters.ts";
@@ -15,7 +16,8 @@ import type { QuizState } from "./useQuiz.ts";
 // The text quiz, one question at a time. A strip of numbered stops shows every
 // question and how it went; the current card takes letters or words, then shows
 // the grade stamp (with Dawg reacting in the hackUMBC theme), feedback, the
-// explanation and evidence quotes, and lights the answer on the map.
+// explanation and evidence quotes, what Backboard memory did, and lights the
+// answer on the map.
 
 const DAWG_SAYS: Record<AttemptOut["result"], string> = {
   correct: "Good human.",
@@ -142,7 +144,14 @@ function QuestionCard({
       </h3>
 
       {showResult ? (
-        <Result attempt={attempt} question={question} onRetry={() => setRetrying(true)} onNext={onNext} isLast={isLast} />
+        <Result
+          attempt={attempt}
+          question={question}
+          memory={state.memory[question.id] ?? null}
+          onRetry={() => setRetrying(true)}
+          onNext={onNext}
+          isLast={isLast}
+        />
       ) : (
         <form onSubmit={submit} className="question-form">
           {question.kind === "open" ? (
@@ -206,12 +215,14 @@ function QuestionCard({
 function Result({
   attempt,
   question,
+  memory,
   onRetry,
   onNext,
   isLast,
 }: {
   attempt: AttemptOut;
   question: QuestionOut;
+  memory: MemoryUse | null;
   onRetry: () => void;
   onNext: () => void;
   isLast: boolean;
@@ -260,6 +271,7 @@ function Result({
 
       <p className="result-feedback">{attempt.feedback}</p>
       <p className="result-explanation">{attempt.explanation}</p>
+      {memory && <MemoryTrace memory={memory} what="grade" />}
 
       {attempt.evidence.length > 0 && (
         <div className="result-evidence">

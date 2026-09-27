@@ -44,6 +44,8 @@ class Settings:
     app_secret: str = _DEV_SECRET
     allow_private_provider_urls: bool = True
     backboard_base_url: str = "https://app.backboard.io/api"
+    # The server's Backboard key: memory for every user who has not turned it off or brought their own key.
+    backboard_api_key: str | None = None
     session_days: int = 7
     invite_codes: tuple[str, ...] = (_DEV_INVITE,)
     max_users: int = 300
@@ -180,6 +182,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         app_secret=app_secret,
         allow_private_provider_urls=_flag(env, "ALLOW_PRIVATE_PROVIDER_URLS", default=not production),
         backboard_base_url=(_text(env, "BACKBOARD_BASE_URL") or Settings.backboard_base_url).rstrip("/"),
+        backboard_api_key=_text(env, "BACKBOARD_API_KEY"),
         session_days=_int(env, "SESSION_DAYS", 7, low=1, high=30),
         invite_codes=invites,
         max_users=_int(env, "MAX_USERS", 300, low=1, high=100_000),

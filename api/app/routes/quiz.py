@@ -3,6 +3,7 @@ from fastapi import APIRouter, status
 from app.boards.service import current_analysis, read_map
 from app.context import CurrentUser, Db, Svc
 from app.domain.briefing import brief
+from app.domain.notes import TOPIC_NAMES
 from app.domain.quiz import build_quiz
 from app.errors import AppError, conflict
 from app.schemas import AnsweredOut, AnswerIn, QuizOut, VoiceSessionOut
@@ -11,7 +12,8 @@ from app.schemas import AnsweredOut, AnswerIn, QuizOut, VoiceSessionOut
 # Module Overview
 # =============================================================================
 # The whiteboard defense: the text quiz and the voice coach. The quiz is built
-# from the board's current map and threats; the voice route mints a private
+# from the board's current map and threats, with the topics Backboard memory
+# says the developer found hard asked first; the voice route mints a private
 # ElevenLabs conversation token and the context the coach speaks from.
 
 router = APIRouter(prefix="/api/boards", tags=["quiz"])
@@ -19,8 +21,9 @@ router = APIRouter(prefix="/api/boards", tags=["quiz"])
 
 @router.get("/{board_id}/quiz")
 def get_quiz(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> QuizOut:
-    """The questions for the board as it stands, and the latest result for each."""
-    return svc.quiz.state(session, user.id, board_id)
+    """The questions for the board as it stands, weak topics from memory first, and the latest result for each."""
+    focus = svc.quiz.focus(user.id, board_id)
+    return svc.quiz.state(session, user.id, board_id, focus)
 
 
 @router.post("/{board_id}/quiz/answers")
@@ -49,12 +52,20 @@ def start_voice(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Voic
     svc.budget.spend(session, user.id, "voice", "conversation")
     token = svc.voice.conversation_token()
     questions = build_quiz(system, analysis)
+    focus = svc.quiz.focus(user.id, board_id)
+    # The coach already speaks from the brief, so memory reaches it there, ahead of anything the cap would cut.
+    remembered = (
+        f"From memory: in earlier sessions they found {', '.join(TOPIC_NAMES[t] for t in focus.topics)} hard, "
+        "so those questions come first. "
+        if focus
+        else ""
+    )
     return VoiceSessionOut(
         conversation_token=token,
         dynamic_variables={
             "user_name": user.username,
             "system_name": system.name,
-            "board_brief": brief(system, analysis, max_threats=2)[:1500],
+            "board_brief": (remembered + brief(system, analysis, max_threats=2))[:1500],
             "question_count": str(len(questions)),
         },
     )

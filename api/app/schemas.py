@@ -239,6 +239,21 @@ class AskIn(RequestBody):
     focus: str | None = Field(default=None, max_length=80)
 
 
+class MemoryUse(BaseModel):
+    """What Backboard memory did around one model call: the notes it fed in, and whether it keeps a new one."""
+
+    recalled: list[str]
+    kept: bool
+
+
+class AskOut(BaseModel):
+    """The answer to a question, the ids to highlight, and how memory took part. `memory` is null when it is off."""
+
+    answer: str
+    highlight: list[str]
+    memory: MemoryUse | None
+
+
 # =============================================================================
 # Quiz
 # =============================================================================
@@ -269,6 +284,13 @@ class AttemptOut(BaseModel):
     your_text: str | None
 
 
+class QuizFocus(BaseModel):
+    """Topics Backboard memory says the developer found hard before, which the quiz asks first, and why."""
+
+    topics: list[QuestionTopic]
+    notes: list[str]
+
+
 class QuizOut(BaseModel):
     """The quiz for a board's current analysis, and the latest result per question."""
 
@@ -276,6 +298,8 @@ class QuizOut(BaseModel):
     questions: list[QuestionOut]
     results: dict[str, AttemptOut]
     mastery: Mastery
+    # Null when memory is off or remembers no weak topic that this quiz covers.
+    focus: QuizFocus | None
 
 
 class AnswerIn(RequestBody):
@@ -287,10 +311,11 @@ class AnswerIn(RequestBody):
 
 
 class AnsweredOut(BaseModel):
-    """The graded attempt, and the mastery that follows from it."""
+    """The graded attempt, the mastery that follows from it, and how memory took part. `memory` is null when off."""
 
     attempt: AttemptOut
     mastery: Mastery
+    memory: MemoryUse | None
 
 
 # =============================================================================
@@ -374,17 +399,17 @@ class AgentChangeOut(BaseModel):
 # Model provider
 # =============================================================================
 
-ProviderKind = Literal["openai_compatible", "backboard"]
+# The model is always a Chat Completions endpoint; Backboard is memory, set under `/api/memory`, never the model.
+ProviderKind = Literal["openai_compatible"]
 
 
 class ProviderIn(RequestBody):
     """A user's own model provider. `api_key` null keeps the saved key."""
 
-    kind: ProviderKind
+    kind: ProviderKind = "openai_compatible"
     base_url: str = Field(min_length=8, max_length=300)
     model: str = Field(min_length=1, max_length=120)
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
-    memory: bool = False
 
 
 class ProviderOut(BaseModel):
@@ -395,7 +420,6 @@ class ProviderOut(BaseModel):
     base_url: str | None
     model: str | None
     key_preview: str | None
-    memory: bool
     label: str
     updated_at: datetime | None
 
@@ -414,20 +438,48 @@ class ProviderTestOut(BaseModel):
 # =============================================================================
 
 
+MemorySource = Literal["own", "server", "none"]
+
+
 class MemoryIn(RequestBody):
-    """A user's Backboard key for memory. `api_key` null keeps the saved key."""
+    """A user's own Backboard key for memory, used in place of the server's. `api_key` null keeps the saved key."""
 
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
 
 
-class MemoryOut(BaseModel):
-    """Whether memory is saved and whether it applies to the user's analyses now. Never the key."""
+class MemorySwitchIn(RequestBody):
+    """Turn memory on or off for this user."""
 
-    saved: bool
+    enabled: bool
+
+
+class MemoryOut(BaseModel):
+    """The user's memory: switched on or not, whether it works now, and whose Backboard account holds it. No key."""
+
+    enabled: bool
     active: bool
+    # `own` is the user's saved key, `server` is `BACKBOARD_API_KEY`, `none` means no key anywhere.
+    source: MemorySource
+    saved: bool
     key_preview: str | None
     message: str
     updated_at: datetime | None
+
+
+class MemoryNoteOut(BaseModel):
+    """One note Backboard holds about the user."""
+
+    id: str
+    content: str
+    # As Backboard sent it, an ISO timestamp when it sent one.
+    created_at: str | None
+
+
+class MemoryNotesOut(BaseModel):
+    """What Backboard remembers about the user, newest first."""
+
+    source: MemorySource
+    notes: list[MemoryNoteOut]
 
 
 class MemoryTestOut(BaseModel):

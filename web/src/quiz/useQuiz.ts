@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
-import type { AttemptOut, QuizOut } from "../api/types.ts";
+import type { AttemptOut, MemoryUse, QuizOut } from "../api/types.ts";
 import { useBoardUi, type HighlightSource } from "../board/store.ts";
 import { useSession } from "../shell/session.tsx";
 
@@ -11,7 +11,8 @@ import { useSession } from "../shell/session.tsx";
 // The quiz for one board, shared by the text quiz and the voice coach so both
 // see the same answers. `latest` reads the newest state synchronously, which
 // the voice coach needs when the agent asks for the next question straight
-// after submitting one.
+// after submitting one. `memory` holds what Backboard memory did around each
+// answer given in this sitting.
 
 /** The quiz, its loading state and the actions on it. */
 export interface QuizState {
@@ -19,6 +20,8 @@ export interface QuizState {
   loading: boolean;
   error: string | null;
   pending: string | null;
+  /** What memory recalled and kept for each question answered since the quiz loaded. */
+  memory: Record<string, MemoryUse>;
   latest: () => QuizOut | null;
   submit: (questionId: string, choiceIds: string[], text: string | null, source: HighlightSource) => Promise<AttemptOut>;
   reset: () => Promise<void>;
@@ -32,6 +35,7 @@ export function useQuiz(boardId: string, analysisVersion: number): QuizState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [memory, setMemory] = useState<Record<string, MemoryUse>>({});
   const ref = useRef<QuizOut | null>(null);
 
   const store = useCallback((next: QuizOut) => {
@@ -59,9 +63,12 @@ export function useQuiz(boardId: string, analysisVersion: number): QuizState {
     async (questionId, choiceIds, text, source) => {
       setPending(questionId);
       try {
-        const { attempt, mastery } = await api.answer(boardId, { question_id: questionId, choice_ids: choiceIds, text });
+        const answered = await api.answer(boardId, { question_id: questionId, choice_ids: choiceIds, text });
+        const { attempt, mastery } = answered;
         const current = ref.current;
         if (current) store({ ...current, results: { ...current.results, [questionId]: attempt }, mastery });
+        const use = answered.memory;
+        if (use) setMemory((before) => ({ ...before, [questionId]: use }));
         useBoardUi.getState().setHighlight(attempt.highlight, source);
         // Open answers are graded by a model and count against today's usage.
         refreshMe();
@@ -81,5 +88,5 @@ export function useQuiz(boardId: string, analysisVersion: number): QuizState {
 
   const latest = useCallback(() => ref.current, []);
 
-  return { quiz, loading, error, pending, latest, submit, reset, reload };
+  return { quiz, loading, error, pending, memory, latest, submit, reset, reload };
 }

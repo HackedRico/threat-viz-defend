@@ -1,4 +1,5 @@
 import time
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -139,11 +140,23 @@ def test_a_failed_model_call_restores_the_board_and_reports_why(make_client: Cli
         def find_threats(self, system: SystemMap) -> ThreatAnalysis:
             raise AssertionError("not called")
 
-        def answer(self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None) -> Answer:
+        def answer(
+            self,
+            system: SystemMap,
+            analysis: ThreatAnalysis,
+            question: str,
+            focus: str | None,
+            notes: Sequence[str] = (),
+        ) -> Answer:
             raise AssertionError("not called")
 
         def grade(
-            self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str
+            self,
+            system: SystemMap,
+            analysis: ThreatAnalysis | None,
+            question: QuizQuestion,
+            text: str,
+            notes: Sequence[str] = (),
         ) -> OpenGrade:
             raise AssertionError("not called")
 
@@ -275,12 +288,17 @@ def test_an_answer_graded_while_the_board_changed_is_not_saved(make_client: Clie
 
     class Interrupted(DemoAnalyst):
         def grade(
-            self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str
+            self,
+            system: SystemMap,
+            analysis: ThreatAnalysis | None,
+            question: QuizQuestion,
+            text: str,
+            notes: Sequence[str] = (),
         ) -> OpenGrade:
             # A coding agent's change lands while the model grades.
             with holder["client"].app.state.services.db.session() as session:  # type: ignore[attr-defined]
                 session.execute(update(BoardRow).values(status="mapping"))
-            return super().grade(system, analysis, question, text)
+            return super().grade(system, analysis, question, text, notes)
 
     client = holder["client"] = make_client(analyst=Interrupted())
     sign_up(client)

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, errorMessage, onSignedOut } from "./api/client.ts";
 import type { ConfigOut, MeOut } from "./api/types.ts";
 import { AuthScreen } from "./auth/AuthScreen.tsx";
+import { useMemory } from "./settings/memory.ts";
 import { useProvider } from "./settings/provider.ts";
 import { SessionContext, FALLBACK_APP_NAME, type Session } from "./shell/session.tsx";
 import { Mascot } from "./shell/Mascot.tsx";
@@ -52,7 +53,10 @@ export function App() {
 
   // Signing out, deliberately or by an expired session, forgets per-account state kept outside React.
   useEffect(() => {
-    if (me === null) useProvider.getState().reset();
+    if (me === null) {
+      useProvider.getState().reset();
+      useMemory.getState().reset();
+    }
   }, [me]);
 
   const refreshMe = useCallback(() => {

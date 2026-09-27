@@ -21,6 +21,7 @@ ErrorCode = Literal[
     "budget_exhausted",
     "payload_too_large",
     "model_error",
+    "memory_error",
     "voice_error",
     "not_configured",
     "internal_error",

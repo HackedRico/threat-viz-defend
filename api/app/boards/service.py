@@ -10,14 +10,17 @@ from sqlalchemy.orm import Session
 from app.analysis.analyst import Analyst
 from app.boards.ingest import Material
 from app.db import Database, utcnow
-from app.domain.models import Answer, SystemMap, ThreatAnalysis
+from app.domain.models import SystemMap, ThreatAnalysis
+from app.domain.notes import question_note
 from app.domain.rules import sanitize_map
 from app.errors import bad_request, conflict, not_found
 from app.examples import load_examples
 from app.jobs import Jobs
 from app.limits import Budget
 from app.llm.base import LlmError
+from app.memory import Memory, MemorySource, NoMemory
 from app.providers.service import AnalystSource
+from app.schemas import AskOut, MemoryUse
 from app.tables import BoardEventRow, BoardRow
 
 # =============================================================================
@@ -27,7 +30,8 @@ from app.tables import BoardEventRow, BoardRow
 # goes in and the map is drawn (`mapping` then `review`), a person confirms the
 # map and threats are found (`analyzing` then `ready`). Model calls run as jobs
 # outside any database transaction; a failed job puts the board back where it
-# was and records the error for the user.
+# was and records the error for the user. Questions go through Backboard memory
+# when it is on: earlier notes feed the prompt and the question is kept after.
 
 log = logging.getLogger(__name__)
 
@@ -40,11 +44,14 @@ MAX_EVENTS = 40
 class Boards:
     """Board storage and the jobs that analyze them."""
 
-    def __init__(self, db: Database, analysts: AnalystSource, budget: Budget, jobs: Jobs) -> None:
+    def __init__(
+        self, db: Database, analysts: AnalystSource, budget: Budget, jobs: Jobs, memory: MemorySource | None = None
+    ) -> None:
         self._db = db
         self._analysts = analysts
         self._budget = budget
         self._jobs = jobs
+        self._memory = memory or NoMemory()
 
     # -----------------------------------------------------------------
     # Reading and simple edits
@@ -222,21 +229,32 @@ class Boards:
     # Questions
     # -----------------------------------------------------------------
 
-    def ask(self, user_id: str, board_id: str, question: str, focus: str | None) -> Answer:
-        """Answer a question about a finished board."""
+    def ask(self, user_id: str, board_id: str, question: str, focus: str | None) -> AskOut:
+        """Answer a question about a finished board, through memory when it is on."""
         with self._db.session() as session:
             row = self.get(session, user_id, board_id)
-            system, analysis = read_map(row), current_analysis(row)
+            system, analysis, title = read_map(row), current_analysis(row), row.title
             if system is None or analysis is None:
                 raise conflict("Confirm the map and wait for the threats before asking about them.")
         # Outside any session: a saved provider's host is resolved here, and a slow lookup must not hold a connection.
         chosen = self._analysts.for_user(user_id)
         with self._db.session() as session:
             self._budget.spend(session, user_id, "model", "answer", own_key=chosen.own_key)
+        text = question.strip()
+        memory = self._memory.for_user(user_id)
+        notes = memory.recall(text) if memory is not None else []
         try:
-            return chosen.analyst.answer(system, analysis, question.strip(), focus)
+            reply = chosen.analyst.answer(system, analysis, text, focus, notes)
         except LlmError as exc:
             raise model_error(exc) from exc
+        if memory is not None:
+            self.remember(memory, question_note(title, text))
+        use = MemoryUse(recalled=notes, kept=True) if memory is not None else None
+        return AskOut(answer=reply.answer, highlight=reply.highlight, memory=use)
+
+    def remember(self, memory: Memory, note: str) -> None:
+        """Keep a note in the background, so Backboard never slows the answer the person is waiting for."""
+        self._jobs.submit(lambda: memory.keep(note), "memory keep")
 
     # -----------------------------------------------------------------
     # Upkeep

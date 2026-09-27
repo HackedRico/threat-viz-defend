@@ -1,0 +1,200 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   Backboard memory, drawn in the teal the app keeps for memory: the trace under
+   answers and grades, the focus note above the quiz, the sidebar status, and
+   the memory page's steps and list of notes. */
+
+.memory-mark {
+  flex: none;
+  color: var(--marker-teal);
+}
+
+/* ---------- trace under an answer or a grade ---------- */
+
+.memory-trace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed color-mix(in srgb, var(--marker-teal) 55%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--marker-teal-wash);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.memory-trace .memory-mark {
+  margin-top: 1px;
+}
+
+.memory-recalled {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.memory-recalled summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.memory-recalled ul {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memory-none {
+  flex: 1;
+}
+
+.memory-kept {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--marker-teal);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* ---------- focus above the quiz ---------- */
+
+.memory-focus {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid color-mix(in srgb, var(--marker-teal) 60%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--marker-teal-wash);
+  font-size: var(--text-sm);
+}
+
+.memory-focus-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.memory-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.memory-topic {
+  border-color: var(--marker-teal);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------- sidebar status ---------- */
+
+.memory-state {
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.memory-state.is-on {
+  background: var(--marker-teal-wash);
+  color: var(--marker-teal);
+  font-weight: 650;
+}
+
+/* ---------- memory page ---------- */
+
+.memory-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: memory-step;
+}
+
+.memory-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.memory-step strong {
+  color: var(--ink);
+}
+
+.memory-step strong::before {
+  counter-increment: memory-step;
+  content: counter(memory-step) ". ";
+  color: var(--marker-teal);
+}
+
+.memory-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 600;
+}
+
+.memory-switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--marker-teal);
+}
+
+.memory-status {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.memory-status.is-on {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.memory-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 420px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.memory-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--marker-teal);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+
+.memory-note time {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .memory-steps {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { BoardSummary } from "../api/types.ts";
 import { topSeverity, totalThreats } from "../board/severity.ts";
+import { memoryStatus, useMemory } from "../settings/memory.ts";
+import "../settings/Memory.css";
 import { useBoardList } from "./boards.tsx";
-import { BookIcon, PlugIcon, PlusIcon, SidebarIcon } from "./icons.tsx";
+import { BookIcon, MemoryIcon, PlugIcon, PlusIcon, SidebarIcon } from "./icons.tsx";
 import { Mascot } from "./Mascot.tsx";
 import { useSession } from "./session.tsx";
 import { SeverityShape } from "./SeverityBadge.tsx";
@@ -17,11 +19,13 @@ import "./Sidebar.css";
 // Module Overview
 // =============================================================================
 // The collapsible left rail: every board with its status and worst severity,
-// a quick way to start a new board or bring back the example, and the account
-// menu. Collapsed, it keeps one letter per board so boards stay one click away.
+// a quick way to start a new board or bring back the example, whether Backboard
+// memory is on, and the account menu. Collapsed, it keeps one letter per board
+// so boards stay one click away.
 
 function BoardItem({ board, active, collapsed }: { board: BoardSummary; active: boolean; collapsed: boolean }) {
-  const worst = topSeverity(board.counts);
+  // Counts come from the last analysis, which describes an older map while the board is mapping or in review.
+  const worst = board.status === "ready" ? topSeverity(board.counts) : null;
   const total = totalThreats(board.counts);
   const status = STATUS_LABEL[board.status];
   const threatText = worst ? `, ${total} threat${total === 1 ? "" : "s"}, worst ${worst}` : "";
@@ -225,8 +229,30 @@ export function Sidebar({
         >
           <PlugIcon /> {!collapsed && "Connect a coding agent"}
         </button>
+        <MemoryLink collapsed={collapsed} boardId={activeBoardId} />
         <UserMenu collapsed={collapsed} boardId={activeBoardId} />
       </div>
     </nav>
+  );
+}
+
+/** A link to the memory page that says whether Backboard memory is on. */
+function MemoryLink({ collapsed, boardId }: { collapsed: boolean; boardId: string | null }) {
+  const { memory, load } = useMemory();
+  useEffect(() => {
+    if (memory === null) void load();
+  }, [memory, load]);
+  const status = memory ? memoryStatus(memory) : null;
+  return (
+    <button
+      type="button"
+      className={`btn btn-ghost sidebar-link ${collapsed ? "btn-icon" : ""}`}
+      onClick={() => navigate({ name: "settings", section: "memory", boardId })}
+      aria-label={collapsed ? `Backboard memory${status ? `, ${status}` : ""}` : undefined}
+    >
+      <MemoryIcon className="memory-mark" />
+      {!collapsed && "Backboard memory"}
+      {!collapsed && status && <span className={`memory-state ${status === "on" ? "is-on" : ""}`}>{status}</span>}
+    </button>
   );
 }
