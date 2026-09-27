@@ -24,6 +24,9 @@ export type Boundary = Schemas["Boundary"];
 /** An external entity, process or data store on the map. */
 export type MapNode = Schemas["Node"];
 
+/** A place in the material's code where a node is implemented. */
+export type CodeRef = Schemas["CodeRef"];
+
 /** Data moving from one node to another. */
 export type Flow = Schemas["Flow"];
 

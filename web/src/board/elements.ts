@@ -1,4 +1,4 @@
-import type { AttackPath, Flow, MapNode, SystemMap, Threat, ThreatAnalysis } from "../api/types.ts";
+import type { AttackPath, CodeRef, Flow, MapNode, SystemMap, Threat, ThreatAnalysis } from "../api/types.ts";
 
 // =============================================================================
 // Module Overview
@@ -31,6 +31,19 @@ export function findElement(id: string, map: SystemMap | null, analysis: ThreatA
 /** True when evidence says the model inferred an element rather than quoting the material. */
 export function isInferred(evidence: string | null): boolean {
   return evidence?.startsWith("inferred:") ?? false;
+}
+
+/** Where a code reference points, as `path:line`, or the path alone when the model gave no line. */
+export function codeLocation(ref: CodeRef): string {
+  return ref.line === null ? ref.path : `${ref.path}:${ref.line}`;
+}
+
+/** Split model text on backticks into plain and code runs, so names like `poll_inbox` render in mono as text. */
+export function codeSpans(text: string): { text: string; code: boolean }[] {
+  // An unmatched backtick stays as a literal character rather than turning the rest of the line into code.
+  const parts = text.split("`");
+  if (parts.length % 2 === 0) return [{ text, code: false }];
+  return parts.map((part, index) => ({ text: part, code: index % 2 === 1 })).filter((part) => part.text !== "");
 }
 
 /** Name a flow by its ends and label, as in `Browser to API: sign in`. */

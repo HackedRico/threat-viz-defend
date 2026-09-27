@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # =============================================================================
 # Module Overview
@@ -36,6 +36,18 @@ class Boundary(ModelOutput):
     label: str = Field(description="Name of the zone, 1 to 4 words")
 
 
+class CodeRef(ModelOutput):
+    """A place in the material's code where a node is implemented."""
+
+    path: str = Field(description="The file path exactly as the material names it, such as `api/app/sync.py`")
+    line: int | None = Field(
+        description="The line number shown before the line where it starts, or null when the material shows none"
+    )
+    symbol: str | None = Field(
+        description="The function, class, route or config key there, such as `poll_inbox` or `POST /login`, or null"
+    )
+
+
 class Node(ModelOutput):
     """An element of the map: an external entity, a process or a data store."""
 
@@ -54,6 +66,24 @@ class Node(ModelOutput):
     evidence: str = Field(
         description="A quote of 12 words or fewer from the material, a file path, or `inferred: <reason>`"
     )
+    how: list[str] = Field(
+        description="2 to 4 short bullets on how it works, naming the library, algorithm, protocol or method, "
+        "such as `hashes passwords with argon2id` or `polls Gmail every 2 minutes with OAuth refresh tokens`. "
+        "Only what the material shows; an empty list when it shows nothing"
+    )
+    code: list[CodeRef] = Field(
+        description="Up to 4 places in the material's code that implement it, most important first; "
+        "an empty list when the material has no code for it"
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_details(cls, data: Any) -> Any:
+        """Give maps stored before `how` and `code` existed empty lists, so old boards keep their map."""
+        # A default on the field would split the web types into input and output shapes, so fill here instead.
+        if isinstance(data, dict):
+            data = {"how": [], "code": [], **data}
+        return data
 
 
 class Flow(ModelOutput):

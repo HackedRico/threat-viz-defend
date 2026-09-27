@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-import type { ElementKind, ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
-import { BackIcon, TrashIcon } from "../shell/icons.tsx";
+import type { CodeRef, ElementKind, ExposureOut, Flow, MapNode, SystemMap, Threat } from "../api/types.ts";
+import { BackIcon, CheckIcon, CopyIcon, TrashIcon } from "../shell/icons.tsx";
 import { SeverityBadge } from "../shell/SeverityBadge.tsx";
-import { flowLabel, isInferred } from "./elements.ts";
+import { codeLocation, codeSpans, flowLabel, isInferred } from "./elements.ts";
 import { flowsTouching, removeElement, updateFlow, updateNode } from "./mapEdit.ts";
 import { rankThreats, STRIDE } from "./severity.ts";
 import { useBoardUi } from "./store.ts";
@@ -16,7 +16,9 @@ import "./Inspector.css";
 // so nothing covers the map. A bar where the tabs were leads back to them. It
 // always shows the evidence the map was drawn from; in review it also edits the
 // element, and on a finished board it lists the threats pinned there and what
-// an AI part is exposed to.
+// an AI part is exposed to. A node also says how it works, down to the library
+// or algorithm, and where it lives in the code, so a developer can defend it at
+// a whiteboard without asking a follow-up question first.
 
 const KINDS: { value: ElementKind; label: string }[] = [
   { value: "external", label: "External person or vendor" },
@@ -243,6 +245,30 @@ function NodeDetails({
 
       <Evidence text={node.evidence} />
 
+      {node.how.length > 0 && (
+        <section className="inspector-section">
+          <h3 className="inspector-label">How it works</h3>
+          <ul className="inspector-how">
+            {node.how.map((point, index) => (
+              <li key={index}>
+                <CodeText text={point} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {node.code.length > 0 && (
+        <section className="inspector-section">
+          <h3 className="inspector-label">In the code</h3>
+          <ul className="inspector-code">
+            {node.code.map((ref, index) => (
+              <CodeLine key={index} codeRef={ref} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       {exposure && (
         <section className="inspector-section">
           <h3 className="inspector-label">{exposure.lethal ? "Lethal trifecta" : "What this AI part touches"}</h3>
@@ -333,6 +359,40 @@ function Evidence({ text }: { text: string | null }) {
         {inferred ? text.slice("inferred:".length).trim() : text}
       </blockquote>
     </section>
+  );
+}
+
+// Backticked names in model text show in mono; every run is still a React text node, never HTML.
+function CodeText({ text }: { text: string }) {
+  return (
+    <>
+      {codeSpans(text).map((span, index) => (span.code ? <code key={index}>{span.text}</code> : span.text))}
+    </>
+  );
+}
+
+function CodeLine({ codeRef }: { codeRef: CodeRef }) {
+  const location = codeLocation(codeRef);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(location);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard access can be refused; the location stays selectable beside the button.
+    }
+  };
+  return (
+    <li className="inspector-code-line">
+      <span className="inspector-code-where">
+        <code className="inspector-code-path">{location}</code>
+        {codeRef.symbol && <span className="inspector-code-symbol">{codeRef.symbol}</span>}
+      </span>
+      <button type="button" className="inspector-copy" onClick={() => void copy()} aria-label={`Copy ${location}`} title="Copy path">
+        {copied ? <CheckIcon width={14} height={14} /> : <CopyIcon width={14} height={14} />}
+      </button>
+    </li>
   );
 }
 
