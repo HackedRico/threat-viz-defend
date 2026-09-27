@@ -191,7 +191,7 @@
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
   font-family: var(--font-body);
-  font-size: 9px;
+  font-size: 10.5px;
   text-align: center;
 }
 
@@ -295,7 +295,7 @@
 
 .demo-caption {
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: 11.5px;
 }
 
 @keyframes demo-in {

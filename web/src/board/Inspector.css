@@ -102,7 +102,7 @@
 }
 
 .chip-sensitive {
-  color: var(--sev-high);
+  color: var(--sev-high-text);
   border-color: var(--sev-high);
 }
 
