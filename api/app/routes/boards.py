@@ -3,7 +3,7 @@ from fastapi import APIRouter, Response, status
 from app.boards.github import fetch_repo, parse_repo_url
 from app.boards.ingest import SourceItem, build_material
 from app.boards.service import current_analysis, read_map
-from app.boards.views import board_out, board_summary
+from app.boards.views import board_out, board_summary, version_out
 from app.context import CurrentUser, Db, Svc
 from app.db import utcnow
 from app.domain.briefing import brief
@@ -19,6 +19,7 @@ from app.schemas import (
     BriefOut,
     GithubIn,
     MapIn,
+    MapVersionOut,
     SourcesIn,
 )
 
@@ -109,6 +110,12 @@ def confirm_map(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Boar
 def ask(board_id: str, body: AskIn, user: CurrentUser, svc: Svc) -> AskOut:
     """Answer a question about a finished board, with the ids to highlight and what memory recalled."""
     return svc.boards.ask(user.id, board_id, body.question, body.focus)
+
+
+@router.get("/{board_id}/versions/{number}")
+def get_version(board_id: str, number: int, user: CurrentUser, svc: Svc, session: Db) -> MapVersionOut:
+    """One kept version of the board's map, with its threats, to compare with another."""
+    return version_out(session, svc.boards.get(session, user.id, board_id), number)
 
 
 @router.get("/{board_id}/brief")

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.analyst import Analyst
 from app.boards.ingest import Material
+from app.boards.versions import attach_analysis, record_change
 from app.db import Database, utcnow
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.notes import question_note
@@ -20,7 +21,7 @@ from app.limits import Budget
 from app.llm.base import LlmError
 from app.memory import Memory, MemorySource, NoMemory
 from app.providers.service import AnalystSource
-from app.schemas import AskOut, MemoryUse
+from app.schemas import AskOut, MemoryUse, VersionSource
 from app.tables import BoardEventRow, BoardRow
 
 # =============================================================================
@@ -122,6 +123,10 @@ class Boards:
             }
         ]
         _event(session, row.id, "example", "Loaded the built-in example. Open Defend to try the quiz.")
+        record_change(
+            session, row, before=None, before_analysis=None, source="example", label="Built-in example",
+            analysis=row.analysis,
+        )  # fmt: skip
         return row
 
     # -----------------------------------------------------------------
@@ -138,13 +143,16 @@ class Boards:
         if not material.text.strip():
             raise bad_request("Nothing readable was sent: every file was empty or skipped.")
         kind = str(material.sources[0]["kind"]) if material.sources else "sources"
+        # An agent change is named by the agent and its summary; anything else by what was added.
+        source: VersionSource = "agent" if kind == "agent" else "upload"
+        label = str(material.sources[0]["name"]) if source == "agent" and material.sources else material.summary()
 
         def record(row: BoardRow, session: Session) -> None:
             row.sources = [*row.sources, *material.sources][-MAX_SOURCES:]
             _event(session, row.id, kind, material.summary())
 
         current, restore, analyst = self._begin(user_id, board_id, "draft_map", "mapping", record)
-        self._queue_draft(board_id, current, restore, analyst, lambda: material.text)
+        self._queue_draft(board_id, current, restore, analyst, lambda: material.text, source, lambda: label)
 
     def add_from_fetch(self, user_id: str, board_id: str, fetch: Callable[[], Material], note: str) -> None:
         """Start drawing the map from material a job must fetch first, such as a GitHub repository."""
@@ -152,10 +160,13 @@ class Boards:
             user_id, board_id, "draft_map", "mapping", lambda row, session: _event(session, row.id, "github", note)
         )
 
+        fetched: list[str] = []
+
         def load() -> str:
             material = fetch()
             if not material.text.strip():
                 raise ValueError("Nothing readable was found in the repository: every file was empty or skipped.")
+            fetched.append(material.summary())
             with self._db.session() as session:
                 target = session.get(BoardRow, board_id)
                 if target is not None:
@@ -163,7 +174,7 @@ class Boards:
                     _event(session, board_id, "github", material.summary())
             return material.text
 
-        self._queue_draft(board_id, current, restore, analyst, load)
+        self._queue_draft(board_id, current, restore, analyst, load, "github", lambda: fetched[-1] if fetched else note)
 
     def save_map(self, session: Session, user_id: str, board_id: str, system: SystemMap) -> BoardRow:
         """Save a map edited by hand; threats found on the old map need a fresh confirm."""
@@ -174,11 +185,15 @@ class Boards:
         if not clean.nodes:
             raise bad_request("A map needs at least one component.")
         # Keep the map before the edit so review marks what the person changed.
+        before, before_analysis = row.map, _analysis_json(row)
         row.previous_map = row.map
         row.map = clean.model_dump(mode="json")
         row.status = "review"
         row.error = None
         _event(session, row.id, "edited", "Map edited by hand. Confirm it to refresh the threats.")
+        record_change(
+            session, row, before=before, before_analysis=before_analysis, source="edit", label="Edited by hand"
+        )
         _touch(row)
         return row
 
@@ -217,6 +232,7 @@ class Boards:
                     if target is None:
                         return
                     target.analysis = analysis.model_dump(mode="json")
+                    attach_analysis(session, board_id, target.analysis)
                     target.analysis_version += 1
                     target.analyzed_by = analyst.label
                     target.status = "ready"
@@ -320,9 +336,16 @@ class Boards:
         return current, restore, chosen.analyst
 
     def _queue_draft(
-        self, board_id: str, current: SystemMap | None, restore: str, analyst: Analyst, material: Callable[[], str]
+        self,
+        board_id: str,
+        current: SystemMap | None,
+        restore: str,
+        analyst: Analyst,
+        material: Callable[[], str],
+        source: VersionSource,
+        label: Callable[[], str],
     ) -> None:
-        """Queue the job that draws the map from `material`, refining `current`."""
+        """Queue the job that draws the map from `material`, refining `current`, and keep it as a new version."""
 
         def work() -> None:
             try:
@@ -343,6 +366,7 @@ class Boards:
                     target = session.get(BoardRow, board_id)
                     if target is None:
                         return
+                    before, before_analysis = target.map, _analysis_json(target, restore)
                     target.previous_map = current.model_dump(mode="json") if current else None
                     target.map = drawn.model_dump(mode="json")
                     target.status = "review"
@@ -350,6 +374,9 @@ class Boards:
                     verb = "Updated" if current else "Drew"
                     parts = f"{len(drawn.nodes)} parts and {len(drawn.flows)} flows"
                     _event(session, board_id, "mapped", f"{verb} the map: {parts}. Check it, then confirm.")
+                    record_change(
+                        session, target, before=before, before_analysis=before_analysis, source=source, label=label()
+                    )
                     _touch(target)
             except Exception:
                 # A failed save must still end the busy status, or the board spins until the next restart.
@@ -440,6 +467,11 @@ def _stable_status(row: BoardRow) -> str:
     if row.analysis is not None and row.map is not None:
         return "ready"
     return "review" if row.map is not None else "empty"
+
+
+def _analysis_json(row: BoardRow, status: str | None = None) -> dict[str, Any] | None:
+    """The stored threats while they describe the stored map: on a board that is, or was before a job, `ready`."""
+    return row.analysis if (status or row.status) == "ready" else None
 
 
 def _event(session: Session, board_id: str, kind: str, text: str) -> None:

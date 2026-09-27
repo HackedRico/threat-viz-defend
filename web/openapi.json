@@ -473,6 +473,13 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/MapVersionSummary"
+            },
+            "title": "Versions",
+            "type": "array"
           }
         },
         "required": [
@@ -493,7 +500,8 @@
           "events",
           "exposure",
           "crossings",
-          "counts"
+          "counts",
+          "versions"
         ],
         "title": "BoardOut",
         "type": "object"
@@ -1071,6 +1079,155 @@
           "map"
         ],
         "title": "MapIn",
+        "type": "object"
+      },
+      "MapVersionOut": {
+        "description": "One version with its map, its threats, and what the rules find in it, so it can be drawn.",
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThreatAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeverityCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "crossings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Crossings",
+            "type": "array"
+          },
+          "exposure": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureOut"
+            },
+            "title": "Exposure",
+            "type": "array"
+          },
+          "flows": {
+            "title": "Flows",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "map": {
+            "$ref": "#/components/schemas/SystemMap"
+          },
+          "nodes": {
+            "title": "Nodes",
+            "type": "integer"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "example",
+              "upload",
+              "github",
+              "agent",
+              "edit",
+              "earlier"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "source",
+          "label",
+          "created_at",
+          "nodes",
+          "flows",
+          "counts",
+          "map",
+          "analysis",
+          "exposure",
+          "crossings"
+        ],
+        "title": "MapVersionOut",
+        "type": "object"
+      },
+      "MapVersionSummary": {
+        "description": "One map a board has held, without the map itself.",
+        "properties": {
+          "counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeverityCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "flows": {
+            "title": "Flows",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "nodes": {
+            "title": "Nodes",
+            "type": "integer"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "example",
+              "upload",
+              "github",
+              "agent",
+              "edit",
+              "earlier"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "source",
+          "label",
+          "created_at",
+          "nodes",
+          "flows",
+          "counts"
+        ],
+        "title": "MapVersionSummary",
         "type": "object"
       },
       "Mastery": {
@@ -5400,6 +5557,158 @@
           }
         },
         "summary": "Add Sources",
+        "tags": [
+          "boards"
+        ]
+      }
+    },
+    "/api/boards/{board_id}/versions/{number}": {
+      "get": {
+        "description": "One kept version of the board's map, with its threats, to compare with another.",
+        "operationId": "get_version_api_boards__board_id__versions__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapVersionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Version",
         "tags": [
           "boards"
         ]

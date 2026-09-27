@@ -380,6 +380,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/boards/{board_id}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Version
+         * @description One kept version of the board's map, with its threats, to compare with another.
+         */
+        get: operations["get_version_api_boards__board_id__versions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/boards/{board_id}/voice": {
         parameters: {
             query?: never;
@@ -845,6 +865,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Versions */
+            versions: components["schemas"]["MapVersionSummary"][];
         };
         /**
          * BoardPatch
@@ -1115,6 +1137,62 @@ export interface components {
          */
         MapIn: {
             map: components["schemas"]["SystemMap"];
+        };
+        /**
+         * MapVersionOut
+         * @description One version with its map, its threats, and what the rules find in it, so it can be drawn.
+         */
+        MapVersionOut: {
+            analysis: components["schemas"]["ThreatAnalysis"] | null;
+            counts: components["schemas"]["SeverityCounts"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Crossings */
+            crossings: string[];
+            /** Exposure */
+            exposure: components["schemas"]["ExposureOut"][];
+            /** Flows */
+            flows: number;
+            /** Label */
+            label: string;
+            map: components["schemas"]["SystemMap"];
+            /** Nodes */
+            nodes: number;
+            /** Number */
+            number: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "example" | "upload" | "github" | "agent" | "edit" | "earlier";
+        };
+        /**
+         * MapVersionSummary
+         * @description One map a board has held, without the map itself.
+         */
+        MapVersionSummary: {
+            counts: components["schemas"]["SeverityCounts"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Flows */
+            flows: number;
+            /** Label */
+            label: string;
+            /** Nodes */
+            nodes: number;
+            /** Number */
+            number: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "example" | "upload" | "github" | "agent" | "edit" | "earlier";
         };
         /**
          * Mastery
@@ -4252,6 +4330,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BoardOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_version_api_boards__board_id__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapVersionOut"];
                 };
             };
             /** @description Bad Request */
