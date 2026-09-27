@@ -124,7 +124,7 @@ After changing `api/app/schemas.py` or a route, run `npm run gen:api` in `web/` 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
-  <img alt="The browser and coding agents reach the web app and API on DigitalOcean App Platform. The API stores boards in Postgres and calls ElevenLabs, the model and GitHub." src="docs/images/architecture-light.svg" width="100%">
+  <img alt="The browser and coding agents reach the web app and API on DigitalOcean App Platform. The API stores boards in Postgres and calls ElevenLabs, the model, Backboard memory and GitHub." src="docs/images/architecture-light.svg" width="100%">
 </picture>
 
 The API owns every rule, every model call and all storage. The browser draws what the API returns, so editing the page cannot change a threat or a grade.
@@ -134,6 +134,7 @@ The API owns every rule, every model call and all storage. The browser draws wha
 - **ElevenLabs.** For each voice session, the API asks ElevenLabs for a one-time token. The browser then talks to the private agent over WebRTC, and the agent's tools call the API for each question and grade. Dictation sends a recorded question through the API, so the ElevenLabs key never leaves the server.
 - **Coding agents.** Claude Code and Cursor connect to `/mcp` with a personal token, or send diffs from a hook.
 - **GitHub.** Importing a public repository downloads one archive from GitHub.
+- **Backboard.** An optional memory layer that remembers what each developer missed, across boards and sessions. [How Backboard is used](#how-backboard-is-used).
 
 [docs/architecture.md](docs/architecture.md) walks through every component, the board lifecycle and each model call.
 
