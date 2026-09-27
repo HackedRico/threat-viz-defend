@@ -65,8 +65,13 @@ export async function fromDrop(transfer: DataTransfer, policy: FilePolicy): Prom
     walked += 1;
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isFile) {
-      const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
-      files.push({ file, size: file.size, path });
+      // One broken link or unreadable file must not throw away the whole drop.
+      try {
+        const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
+        files.push({ file, size: file.size, path });
+      } catch {
+        skipped.push({ path, reason: "could not be read" });
+      }
       return;
     }
     if (policy.ignoredDirs.includes(entry.name)) {

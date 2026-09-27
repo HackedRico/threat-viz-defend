@@ -48,8 +48,9 @@ export function planUpload<T extends PickedFile>(files: readonly T[], policy: Fi
   const accepted: T[] = [];
   const skipped: Skipped[] = [];
   let totalBytes = 0;
-  // Sort by path so the same folder always keeps the same files when a cap cuts it short.
-  const ordered = [...files].sort((a, b) => a.path.localeCompare(b.path));
+  // Entry points and manifests first, tests and docs last, then by path, so a cap cuts what matters least
+  // and the same folder always keeps the same files.
+  const ordered = [...files].sort((a, b) => uploadPriority(a.path) - uploadPriority(b.path) || a.path.localeCompare(b.path));
   for (const file of ordered) {
     const reason = skipReason(file.path, policy);
     if (reason !== null) {
@@ -68,6 +69,17 @@ export function planUpload<T extends PickedFile>(files: readonly T[], policy: Fi
     }
   }
   return { accepted, skipped, totalBytes };
+}
+
+// The server ranks what it reads the same way (`_PRIORITY` in api/app/boards/ingest.py).
+const HIGH_VALUE =
+  /(^|\/)(readme[^/]*|package\.json|pyproject\.toml|requirements[^/]*\.txt|go\.mod|cargo\.toml|dockerfile[^/]*|[^/]*compose[^/]*\.ya?ml|\.env\.(example|sample|template)|(main|app|server|index|wsgi|asgi|manage|settings|config)\.[a-z]+)$/i;
+const LOW_VALUE =
+  /(^|\/)(tests?|__tests__|spec|e2e|fixtures?|testdata|examples?|samples?|mocks?|__mocks__|docs?)\/|\.(test|spec|stories)\.[cm]?[jt]sx?$|(^|\/)test_[^/]*\.py$|\.d\.ts$/i;
+
+function uploadPriority(path: string): number {
+  if (HIGH_VALUE.test(path)) return 0;
+  return LOW_VALUE.test(path) ? 2 : 1;
 }
 
 /** The source kind for a file: documents are `file`, everything else is `code`. */

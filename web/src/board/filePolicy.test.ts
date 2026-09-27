@@ -75,3 +75,18 @@ test("tells documents from code and spots binary text", () => {
   assert.equal(looksBinary("plain text"), false);
   assert.equal(formatBytes(1_500_000), "1.5 MB");
 });
+
+test("a cap keeps entry points and manifests and drops tests and docs first", () => {
+  const files = ["app/tests/test_api.py", "app/docs/guide.md", "app/main.py", "app/README.md", "app/pyproject.toml"].map(
+    (path) => ({ path, size: 10 }),
+  );
+  const plan = planUpload(files, policy);
+  assert.deepEqual(
+    plan.accepted.map((f) => f.path),
+    ["app/main.py", "app/pyproject.toml", "app/README.md"],
+  );
+  assert.deepEqual(
+    plan.skipped.map((s) => s.path),
+    ["app/docs/guide.md", "app/tests/test_api.py"],
+  );
+});

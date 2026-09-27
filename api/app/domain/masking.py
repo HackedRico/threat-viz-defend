@@ -75,6 +75,10 @@ _IGNORED_DIRS = frozenset(
         ".gradle",
         "Pods",
         "DerivedData",
+        # Any virtualenv, whatever its folder is called.
+        "site-packages",
+        # Git worktrees that tools such as Claude Code keep inside a checkout, full copies of the repository.
+        "worktrees",
     }
 )
 _LOCKFILES = frozenset(
