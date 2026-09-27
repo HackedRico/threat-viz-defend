@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import httpx
 
@@ -22,6 +23,8 @@ _CREATE = (
 )
 _CLEAR = "DELETE FROM threat_findings WHERE board_id = ?"
 _INSERT = "INSERT INTO threat_findings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+# Every value binds as text and Snowflake casts it to the column's type on insert, which accepts
+# `true`/`false` and ISO 8601 timestamps; typed timestamp bindings want an epoch format instead.
 _COLUMNS: tuple[tuple[str, str], ...] = (
     ("board_id", "TEXT"),
     ("threat_id", "TEXT"),
@@ -29,11 +32,11 @@ _COLUMNS: tuple[tuple[str, str], ...] = (
     ("stride", "TEXT"),
     ("severity", "TEXT"),
     ("element_kind", "TEXT"),
-    ("crosses_boundary", "BOOLEAN"),
-    ("touches_ai", "BOOLEAN"),
-    ("touches_sensitive", "BOOLEAN"),
+    ("crosses_boundary", "TEXT"),
+    ("touches_ai", "TEXT"),
+    ("touches_sensitive", "TEXT"),
     ("refs", "TEXT"),
-    ("analyzed_at", "TIMESTAMP_TZ"),
+    ("analyzed_at", "TEXT"),
 )
 
 
@@ -74,8 +77,10 @@ def _bind(value: object) -> str:
     """Render one value the way the SQL API takes bindings: always as a string."""
     if isinstance(value, bool):
         return "true" if value else "false"
-    isoformat = getattr(value, "isoformat", None)
-    return str(isoformat()) if callable(isoformat) else str(value)
+    if isinstance(value, datetime):
+        # Stored times are UTC; say so, or Snowflake reads a bare time in the session's zone.
+        return (value if value.tzinfo else value.replace(tzinfo=UTC)).isoformat()
+    return str(value)
 
 
 def _run(target: SnowflakeTarget, client: httpx.Client, statement: str, bindings: dict[str, object] | None) -> None:
