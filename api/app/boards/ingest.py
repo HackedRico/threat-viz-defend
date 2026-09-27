@@ -19,6 +19,8 @@ from app.domain.masking import MAX_FILES, mask_secrets, skip_reason
 
 MATERIAL_CHARS = 150_000
 PER_FILE_CHARS = 24_000
+# The changed file list of one agent change, so a long list cannot crowd out the diff or the budget.
+FILE_LIST_CHARS = 20_000
 TREE_LINES = 300
 
 # Lower rank is read first. Checked in order against the lowercase path.
@@ -142,12 +144,12 @@ def agent_material(agent: str, summary: str, diff: str, files: Sequence[str], no
     """Material for one coding agent change: what the agent said it did, the files and the diff."""
     safe_summary = mask_secrets(" ".join(summary.split())).text
     safe_diff = mask_secrets(_drop_secret_hunks(diff))
-    listed = [f for f in files if not skip_reason(f)][:200]
+    listed = [f[:300] for f in files if not skip_reason(f)][:200]
     text = "\n".join(
         [
             f"### coding agent change: {agent}",
             f"What the agent was asked or says it did: {safe_summary or 'not reported'}",
-            f"Changed files: {', '.join(listed) if listed else 'not listed'}",
+            f"Changed files: {', '.join(listed)[:FILE_LIST_CHARS] if listed else 'not listed'}",
             "",
             safe_diff.text[:MATERIAL_CHARS],
         ]
@@ -202,20 +204,87 @@ def _collapse_code(sources: list[dict[str, Any]], now: datetime) -> list[dict[st
     return [s for s in sources if s["kind"] != "code"] + [folder]
 
 
-_DIFF_FILE = re.compile(r"^diff --git a/(\S+) b/(\S+)", re.MULTILINE)
+_DIFF_HEADER = re.compile(r"^diff --git [^\n]*$", re.MULTILINE)
+# Lines between a section's header and its first hunk that name the file on either side.
+_PATH_LINES = ("--- ", "+++ ", "rename from ", "rename to ", "copy from ", "copy to ")
+_C_ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, "\\": 92}
 
 
 def _drop_secret_hunks(diff: str) -> str:
-    """Remove whole file sections of a unified diff for files that should never be read."""
-    sections = _DIFF_FILE.split(diff)
+    """Remove whole file sections of a unified diff for files that should never be read, or cannot be named."""
+    sections = _DIFF_HEADER.split(diff)
     if len(sections) == 1:
         return diff
+    headers = _DIFF_HEADER.findall(diff)
     kept = [sections[0]]
-    # `split` with two groups yields: preamble, then (a_path, b_path, body) triples.
-    for index in range(1, len(sections), 3):
-        a_path, b_path, body = sections[index], sections[index + 1], sections[index + 2]
-        if skip_reason(b_path) or skip_reason(a_path):
-            kept.append(f"diff --git a/{a_path} b/{b_path}\n[left out: {skip_reason(b_path) or skip_reason(a_path)}]\n")
+    for header, body in zip(headers, sections[1:], strict=True):
+        paths = _section_paths(header, body)
+        reasons = [reason for path in paths if (reason := skip_reason(path))]
+        if not paths:
+            # A header this parser cannot read might hide a secret file, so it is dropped rather than trusted.
+            kept.append(f"{header}\n[left out: the file name could not be read]\n")
+        elif reasons:
+            kept.append(f"{header}\n[left out: {reasons[0]}]\n")
         else:
-            kept.append(f"diff --git a/{a_path} b/{b_path}{body}")
+            kept.append(f"{header}{body}")
     return "".join(kept)
+
+
+def _section_paths(header: str, body: str) -> list[str]:
+    """Every path one diff section names: from its header, its `---` and `+++` lines, and any rename or copy."""
+    paths = _header_paths(header.removeprefix("diff --git "))
+    for line in body.split("\n")[1:40]:
+        if line.startswith("@@"):
+            break
+        for prefix in _PATH_LINES:
+            if line.startswith(prefix):
+                name = _unquote(line.removeprefix(prefix).split("\t")[0])
+                if prefix in ("--- ", "+++ "):
+                    name = name[2:] if name[:2] in ("a/", "b/") else name
+                if name and name != "/dev/null":
+                    paths.append(name)
+    return paths
+
+
+def _header_paths(rest: str) -> list[str]:
+    """The two paths of a `diff --git` header, quoted or not; empty when they cannot be told apart."""
+    if rest.startswith('"'):
+        first, _, after = _split_quoted(rest)
+        second = _unquote(after.strip())
+        return [p[2:] for p in (first, second) if p[:2] in ("a/", "b/")]
+    # Unquoted paths may hold spaces, so `a/P b/P` is only readable when both sides are the same path.
+    half = (len(rest) - 5) // 2
+    if rest.startswith("a/") and rest[2 + half : 5 + half] == " b/" and rest[2 : 2 + half] == rest[5 + half :]:
+        return [rest[2 : 2 + half]]
+    return []
+
+
+def _split_quoted(text: str) -> tuple[str, str, str]:
+    """Split a leading C-quoted string off `text`: (unquoted value, quoted source, rest)."""
+    index = 1
+    while index < len(text) and text[index] != '"':
+        index += 2 if text[index] == "\\" else 1
+    return _unquote(text[: index + 1]), text[: index + 1], text[index + 1 :]
+
+
+def _unquote(name: str) -> str:
+    """Undo git's C-style quoting of a path with special or non-ASCII characters."""
+    if len(name) < 2 or not (name.startswith('"') and name.endswith('"')):
+        return name
+    raw = bytearray()
+    body, index = name[1:-1], 0
+    while index < len(body):
+        char = body[index]
+        if char == "\\" and index + 1 < len(body):
+            escaped = body[index + 1]
+            if escaped in "01234567":
+                digits = body[index + 1 : index + 4]
+                raw.append(int(digits, 8) & 0xFF)
+                index += 1 + len(digits)
+                continue
+            raw.append(_C_ESCAPES.get(escaped, ord(escaped) & 0xFF))
+            index += 2
+            continue
+        raw.extend(char.encode())
+        index += 1
+    return raw.decode(errors="replace")
