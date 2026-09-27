@@ -90,6 +90,14 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
   const [asked, setAsked] = useState(false);
   const { dock, shown, size, bounds, setHeight } = useDockHeight();
   const input = useRef<HTMLTextAreaElement>(null);
+  // An answer can land after the reader moved to another board; it must not light that board's map.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const id = useId();
   const analysis = board.analysis;
   const starters = useMemo(
@@ -109,6 +117,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
     setError(null);
     try {
       const reply = await api.ask(board.id, text, selected);
+      if (!alive.current) return;
       setAnswer({ question: text, reply });
       setAsked(true);
       setHighlight(reply.highlight, "ask");

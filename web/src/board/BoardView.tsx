@@ -63,7 +63,8 @@ export function BoardView({ boardId }: { boardId: string }) {
     );
   }
 
-  const showIntake = board.status === "empty" || adding;
+  // A board whose stored map no longer loads has nothing to draw, so it takes material again rather than waiting.
+  const showIntake = board.status === "empty" || adding || (board.map === null && !isBusy(board.status));
   const top = (
     <>
       <BoardHeader board={board} onApply={apply} onAddMaterial={() => setAdding(true)} adding={adding} />
@@ -131,6 +132,7 @@ function BoardHeader({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(board.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,6 +155,8 @@ function BoardHeader({
   };
 
   const remove = async () => {
+    if (deleting) return;
+    setDeleting(true);
     try {
       await api.deleteBoard(board.id);
       await refresh();
@@ -160,6 +164,8 @@ function BoardHeader({
     } catch (caught) {
       setError(errorMessage(caught));
       setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -258,8 +264,8 @@ function BoardHeader({
         {confirmDelete ? (
           <span className="board-delete-confirm" role="group" aria-label="Confirm delete">
             <span>Delete this board?</span>
-            <button type="button" className="btn btn-sm btn-danger" onClick={() => void remove()}>
-              Delete
+            <button type="button" className="btn btn-sm btn-danger" onClick={() => void remove()} disabled={deleting}>
+              {deleting && <span className="spinner" aria-hidden="true" />} Delete
             </button>
             <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmDelete(false)}>
               Keep
@@ -282,7 +288,9 @@ function BoardHeader({
 
 function ErrorBanner({ board }: { board: BoardOut }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
-  if (!board.error || dismissed === board.error) return null;
+  // A retry can fail with the very same message, so a dismissal belongs to one failure event, not to its text.
+  const failure = `${board.events.find((event) => event.kind === "failed")?.id ?? ""}:${board.error ?? ""}`;
+  if (!board.error || dismissed === failure) return null;
   return (
     <div className="banner banner-error board-banner" role="alert">
       <div className="banner-body">
@@ -292,7 +300,7 @@ function ErrorBanner({ board }: { board: BoardOut }) {
         type="button"
         className="btn btn-ghost btn-sm btn-icon"
         aria-label="Dismiss the error"
-        onClick={() => setDismissed(board.error)}
+        onClick={() => setDismissed(failure)}
       >
         <CloseIcon />
       </button>

@@ -97,8 +97,20 @@ export function Workspace({
   const lit = useMemo(() => {
     const ids = activePath ? [activePath] : highlight;
     if (ids.length === 0) return null;
-    return new Set(expandHighlight(ids, map, analysis));
+    // Threat and path ids expand to nothing once the board leaves ready, and an empty set would dim the whole map.
+    const shown = expandHighlight(ids, map, analysis);
+    return shown.length > 0 ? new Set(shown) : null;
   }, [activePath, highlight, map, analysis]);
+
+  // Leaving ready, say for a coding agent's change, ends what was lit: those ids belong to the threats just retired.
+  const ready = board.status === "ready";
+  useEffect(() => {
+    if (ready) return;
+    const ui = useBoardUi.getState();
+    ui.clearHighlight();
+    ui.setHoverPath(null);
+    ui.showThreat(null);
+  }, [ready]);
 
   const edit = (next: SystemMap) => {
     if (!dirty) setEditBase(serverMapJson);
@@ -150,7 +162,7 @@ export function Workspace({
 
           {analysis && <Brief board={board} map={map} analysis={analysis} />}
 
-          {source && !activePath && highlight.length > 0 && (
+          {source && !activePath && lit !== null && (
             <div className="lit-chip" role="status">
               <span className="lit-swatch" aria-hidden="true" />
               <span>

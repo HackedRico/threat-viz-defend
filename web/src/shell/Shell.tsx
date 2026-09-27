@@ -5,6 +5,7 @@ import type { BoardSummary } from "../api/types.ts";
 import { BoardView } from "../board/BoardView.tsx";
 import { SettingsView } from "../settings/SettingsView.tsx";
 import { BoardListContext, type BoardList } from "./boards.tsx";
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { ResizeHandle, useStoredWidth } from "./ResizeHandle.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { usePolling } from "./usePolling.ts";
@@ -93,8 +94,16 @@ export function Shell() {
           />
         )}
         <main className="shell-main">
-          {route.name === "board" && <BoardView key={route.boardId} boardId={route.boardId} />}
-          {route.name === "settings" && <SettingsView section={route.section} boardId={route.boardId} />}
+          {route.name === "board" && (
+            <ErrorBoundary key={route.boardId} what="board">
+              <BoardView boardId={route.boardId} />
+            </ErrorBoundary>
+          )}
+          {route.name === "settings" && (
+            <ErrorBoundary key={route.section} what="page">
+              <SettingsView section={route.section} boardId={route.boardId} />
+            </ErrorBoundary>
+          )}
           {route.name === "home" && (loaded && latest === null ? <Welcome /> : <div className="shell-blank" />)}
         </main>
       </div>

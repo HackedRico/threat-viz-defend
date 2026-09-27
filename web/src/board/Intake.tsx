@@ -19,6 +19,8 @@ import "./Intake.css";
 type Staged = SourceIn & { bytes: number };
 
 const MAX_TEXT_CHARS = 200_000;
+// Enough to see why files were left out; thousands of rows would slow every keystroke on the page.
+const SKIPPED_SHOWN = 300;
 
 /** The intake screen; `onCancel` is null when the board has nothing else to show. */
 export function Intake({
@@ -214,7 +216,10 @@ export function Intake({
                 hidden
                 aria-label="Choose files"
                 onChange={(e) => {
-                  if (e.target.files) void take(fromFileList(e.target.files));
+                  if (e.target.files) {
+                    const { files, skipped: folders } = fromFileList(e.target.files, policy);
+                    void take(files, folders);
+                  }
                   e.target.value = "";
                 }}
               />
@@ -226,7 +231,10 @@ export function Intake({
                 aria-label="Choose a code folder"
                 {...{ webkitdirectory: "" }}
                 onChange={(e) => {
-                  if (e.target.files) void take(fromFileList(e.target.files));
+                  if (e.target.files) {
+                    const { files, skipped: folders } = fromFileList(e.target.files, policy);
+                    void take(files, folders);
+                  }
                   e.target.value = "";
                 }}
               />
@@ -274,12 +282,13 @@ export function Intake({
                   {skipped.length} skipped, never read or sent
                 </summary>
                 <ul>
-                  {skipped.map((item, i) => (
+                  {skipped.slice(0, SKIPPED_SHOWN).map((item, i) => (
                     <li key={`${item.path}:${i}`}>
                       <span className="mono">{item.path}</span>
                       <span className="skipped-reason">{item.reason}</span>
                     </li>
                   ))}
+                  {skipped.length > SKIPPED_SHOWN && <li className="muted">and {skipped.length - SKIPPED_SHOWN} more</li>}
                 </ul>
               </details>
             )}

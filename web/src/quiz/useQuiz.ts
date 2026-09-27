@@ -37,6 +37,14 @@ export function useQuiz(boardId: string, analysisVersion: number): QuizState {
   const [pending, setPending] = useState<string | null>(null);
   const [memory, setMemory] = useState<Record<string, MemoryUse>>({});
   const ref = useRef<QuizOut | null>(null);
+  // A grade can land after the reader moved to another board; it must not light that board's map.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const store = useCallback((next: QuizOut) => {
     ref.current = next;
@@ -69,7 +77,7 @@ export function useQuiz(boardId: string, analysisVersion: number): QuizState {
         if (current) store({ ...current, results: { ...current.results, [questionId]: attempt }, mastery });
         const use = answered.memory;
         if (use) setMemory((before) => ({ ...before, [questionId]: use }));
-        useBoardUi.getState().setHighlight(attempt.highlight, source);
+        if (alive.current) useBoardUi.getState().setHighlight(attempt.highlight, source);
         // Open answers are graded by a model and count against today's usage.
         refreshMe();
         return attempt;
