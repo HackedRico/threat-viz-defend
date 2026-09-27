@@ -579,6 +579,10 @@ def test_secret_files_never_leave_the_machine(repo: Path, hook_env: dict[str, st
     assert post["auth"] == f"Bearer {TOKEN}"
     snapshot_files = git(repo, "ls-tree", "-r", "--name-only", hook.PENDING_REF).split()
     assert snapshot_files == ["README.md", "app.py"]
+    # Skipped files are never hashed into the object store either, not even as loose objects.
+    for path in (".env", "certs/server.pem", "config/secrets.yaml"):
+        blob = git(repo, "hash-object", path).strip()
+        assert subprocess.run(["git", "cat-file", "-e", blob], cwd=repo, check=False).returncode != 0  # noqa: S603, S607
 
 
 def test_diff_headers_ignore_user_diff_config(repo: Path, hook_env: dict[str, str], api: StubApi) -> None:
@@ -657,6 +661,34 @@ def test_non_architectural_changes_are_skipped(repo: Path, hook_env: dict[str, s
     assert api.posts() == []
     assert last_outcome(repo)["outcome"] == "skipped"
     assert ref(repo, hook.BASE_REF) == ref(repo, hook.PENDING_REF)
+
+
+def test_prompts_behind_a_skipped_change_are_not_sent_later(repo: Path, hook_env: dict[str, str], api: StubApi) -> None:
+    run_hook(claude_payload("UserPromptSubmit", repo, "fix a typo in the readme"), repo, hook_env)
+    write(repo, "README.md", "# Shop\n\nA small shop.\n")
+    run_hook(claude_payload("Stop", repo), repo, hook_env)
+    assert last_outcome(repo)["outcome"] == "skipped"
+
+    write(repo, "app.py", ROUTE_CHANGE)
+    run_hook(claude_payload("Stop", repo), repo, hook_env)
+
+    [post] = api.posts()
+    assert "typo" not in post["body"]["summary"]
+
+
+def test_each_worktree_diffs_against_its_own_base(repo: Path, hook_env: dict[str, str], api: StubApi) -> None:
+    other = repo.parent / "other"
+    git(repo, "worktree", "add", "-q", "-b", "other", str(other))
+    for n in range(5):
+        write(other, f"services/svc{n}.py", ROUTE_CHANGE)
+    run_hook(claude_payload("Stop", other), other, hook_env)
+    assert api.posts()[0]["body"]["files"] == [f"services/svc{n}.py" for n in range(5)]
+
+    write(repo, "app.py", ROUTE_CHANGE)
+    run_hook(claude_payload("Stop", repo), repo, hook_env)
+
+    assert api.posts()[1]["body"]["files"] == ["app.py"]
+    assert ref(repo, hook.BASE_REF) != ref(other, hook.BASE_REF)
 
 
 def test_manifest_changes_count_as_architectural() -> None:

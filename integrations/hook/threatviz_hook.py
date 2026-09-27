@@ -25,8 +25,9 @@ from pathlib import Path, PurePosixPath
 
 AGENT_CLAUDE = "Claude Code"
 AGENT_CURSOR = "Cursor"
-BASE_REF = "refs/threatviz/base"
-PENDING_REF = "refs/threatviz/pending"
+# Per-worktree refs (git 2.25+): shared ones would let one worktree's snapshot become another's base.
+BASE_REF = "refs/worktree/threatviz/base"
+PENDING_REF = "refs/worktree/threatviz/pending"
 CONFIG_FILE = ".threatviz.json"
 # Lives in the hook's folder under the git dir, so it is never committed and a pull request cannot change it.
 ORIGIN_FILE = "config.json"
@@ -147,7 +148,9 @@ BUILTIN_POLICY = FilePolicy(
     max_file_bytes=200_000,
 )  # fmt: skip
 
-# The server also treats config files named like secrets as credential stores; these are not in `file_policy`.
+# The server also treats config files named like secrets as credential stores. Its `file_policy` publishes the same
+# lists (`secretWordsPattern`, `configExtensions`, `secretPaths`), but the hook keeps its own copies, so a change to
+# them in `api/app/domain/masking.py` must be made here too.
 _SECRET_WORDS = re.compile(r"secret|credential|service-?account")
 _CONFIG_EXTENSIONS = frozenset({"json", "yaml", "yml", "toml", "txt", "ini", "xml", "cfg", "conf"})
 # Credential stores whose file name is too generic to skip on its own, keyed by their parent folder.
@@ -554,7 +557,21 @@ def take_snapshot(repo: Repo, policy: FilePolicy) -> str:
         if real_index.is_file():
             shutil.copyfile(real_index, index)
         env = {"GIT_INDEX_FILE": str(index)}
-        _git(["add", "-A", "--ignore-errors", "--", ".", *ignored], repo.root, env=env)
+        # Only paths that may be sent are added: `git add` writes each file it sees into the object store,
+        # and a skipped file such as an untracked `.env` must never be hashed there.
+        changed = _nul_paths(
+            _git(["ls-files", "-z", "--others", "--modified", "--deleted", "--exclude-standard", "--", ".", *ignored],
+                 repo.root, env=env)
+        )  # fmt: skip
+        wanted = sorted({path for path in changed if not skip_reason(path, policy)})
+        if wanted:
+            _git(
+                ["--literal-pathspecs", "add", "-A", "--ignore-errors",
+                 "--pathspec-from-file=-", "--pathspec-file-nul"],
+                repo.root,
+                env=env,
+                stdin=b"\0".join(os.fsencode(path) for path in wanted),
+            )  # fmt: skip
         tracked = _nul_paths(_git(["ls-files", "-z", "--cached"], repo.root, env=env))
         left_out = [path for path in tracked if skip_reason(path, policy)]
         if left_out:
@@ -790,15 +807,18 @@ def report_turn(repo: Repo, config: Config, agent: str) -> tuple[str, str]:
     base = resolve_base(repo)
     files = changed_files(repo, base, snapshot, policy)
     diff = build_diff(repo, base, snapshot, files)
+    prompts = load_prompts(repo)
     if not diff.strip():
         # Nothing sendable changed; moving the base is safe because the diff from it is empty.
         _git(["update-ref", BASE_REF, snapshot], repo.root)
+        # The prompts behind a skipped change describe work no later diff will carry, so they go too.
+        drop_prompts(repo, [item["id"] for item in prompts])
         return "skipped", "no changes to report"
     if not is_architectural(files, diff):
         # Judge each change once, so later diffs stay small and only carry new work.
         _git(["update-ref", BASE_REF, snapshot], repo.root)
+        drop_prompts(repo, [item["id"] for item in prompts])
         return "skipped", f"no architectural change in {len(files)} file(s)"
-    prompts = load_prompts(repo)
     summary = build_summary([item["prompt"] for item in prompts], agent)
     try:
         reply = post_change(config, agent, summary, diff, files)
