@@ -1,10 +1,16 @@
+import time
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
+from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.llm.base import LlmError
+from app.tables import LoginSessionRow
 from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
@@ -200,3 +206,24 @@ def test_github_urls_are_validated(signed_in: TestClient) -> None:
     board = new_board(signed_in)
     bad = signed_in.post(f"/api/boards/{board['id']}/github", json={"url": "https://evil.example/owner/repo"})
     assert bad.status_code == 400
+
+
+def test_a_stale_session_or_new_token_does_not_lock_sqlite(make_client: ClientFactory, tmp_path: Path) -> None:
+    # A file database has one writer at a time, unlike the shared in-memory connection other tests use.
+    client = make_client(database_url=f"sqlite:///{tmp_path / 'app.db'}")
+    sign_up(client)
+    board = new_board(client)
+    db = client.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        session.execute(update(LoginSessionRow).values(last_seen_at=utcnow() - timedelta(minutes=10)))
+    started = time.monotonic()
+    assert client.post(f"/api/boards/{board['id']}/sources", json=example_material()).status_code == 202
+    token = client.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    change = {"summary": "Added a cache", "diff": "diff --git a/a.py b/a.py\n+import redis\n", "files": ["a.py"]}
+    confirm = client.post(f"/api/boards/{board['id']}/confirm")
+    assert confirm.status_code == 202
+    response = client.post(
+        f"/api/agent/boards/{board['id']}/changes", json=change, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 202, response.text
+    assert time.monotonic() - started < 4
