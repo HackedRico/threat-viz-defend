@@ -168,7 +168,7 @@ The server's default model does not use Backboard. Boards live in our Postgres, 
 |---|---|---|
 | Cybersecurity Application | A defensive tool that teaches developers the threat model of their own code. [Why it fits](#why-it-is-a-cybersecurity-tool) | Built |
 | ElevenLabs | A voice coach that runs the quiz out loud, and dictation for questions | Built |
-| DigitalOcean | App Platform, Managed Postgres, and serverless inference for the default model | Built |
+| DigitalOcean | App Platform, a Postgres database, and serverless inference for the default model | Built |
 | GoDaddy Registry | Our domain: `<domain goes here>` | To do |
 | Backboard | Memory of each developer's progress across boards and sessions. [How it is used](#how-backboard-is-used) | Built |
 | Most Engaging Demo | A judge talks with the voice coach about how this app can be attacked | At the demo |

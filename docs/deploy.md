@@ -180,7 +180,7 @@ Both run on one ElevenLabs API key, which stays on the API. Dictation, the mic b
 
 1. In ElevenLabs, create an API key. If the dashboard offers scopes, allow Speech to Text for dictation, plus what the agent script and conversation tokens need for the coach.
 2. Set `ELEVENLABS_API_KEY` (encrypted) in the `api` component. After the deploy, `curl -fsS https://api.example.com/api/config` shows `"dictation_enabled": true`.
-3. For the coach, create the agent with `scripts/elevenlabs_agent.py`. The voice teammate owns that script; its header explains how to run it and what it prints. Keep the agent ID it gives you.
+3. For the coach, create the agent with `scripts/elevenlabs_agent.py`. The voice teammate owns that script; run it from `api/` so it has the API's dependencies: `cd api && uv run python ../scripts/elevenlabs_agent.py`. [web/src/voice/AGENTS.md](../web/src/voice/AGENTS.md) says what it sets up. Keep the agent ID it gives you.
 4. Set `ELEVENLABS_AGENT_ID` (plain) in the `api` component. The config now also shows `"voice_enabled": true`.
 
 Dictation needs no CSP or DNS change: the browser records a clip of up to a minute and posts it to the API as JSON, and the API calls ElevenLabs. Browsers only allow the microphone over https, which the custom domains already use. `DAILY_DICTATIONS` caps each user's clips per day; `0` turns dictation off while keeping the coach. `ELEVENLABS_STT_MODEL` picks the model, `scribe_v2` by default. If the API logs "ElevenLabs refused the key", the key lacks the Speech to Text permission.
@@ -241,8 +241,8 @@ The control panel's Settings > App Spec editor does the same thing. Mirror any n
 ## Troubleshooting
 
 - **The first deploy fails with a message about `APP_SECRET`.** Expected until step 3 is done.
-- **The API deploy fails its health check.** Check the runtime logs. If requests to `/api/health` get `400 Invalid host header`, the health checker is sending a Host the API does not allow. Add that host to an `ALLOWED_HOSTS` variable on the `api` component, comma separated, and redeploy.
-- **The static site build fails on a Node version error.** The App Platform Node buildpack picks its Node version from `engines.node` in `web/package.json`. CI builds with Node 24, so `"engines": { "node": "24.x" }` there matches it.
+- **The API deploy fails its health check.** Check the runtime logs. `/api/health` accepts any Host header, so a failing check means the server did not start or did not listen on `PORT`: look for a settings error naming a variable, such as a missing `APP_SECRET` or `INVITE_CODES`, near the top of the log.
+- **The static site build fails on a Node version error.** The App Platform Node buildpack picks its Node version from `engines.node` in `web/package.json`. CI builds with Node 24, and `"engines": { "node": ">=24" }` there asks for at least that. If a newer Node breaks the build, pin it to `"24.x"`.
 - **The site loads but every API call fails.** Check `VITE_API_BASE_URL` on the static site is `https://api.example.com` with no trailing slash, and that `CORS_ORIGINS` on the API is exactly the site's origin. Changing `VITE_API_BASE_URL` needs a rebuild of the static site, because it is baked in at build time.
 - **Sign in works but the next request is signed out.** The cookie is not reaching the API. Both hosts must be subdomains of the same domain for `COOKIE_SAMESITE=lax`.
 

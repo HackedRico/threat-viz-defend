@@ -5,11 +5,12 @@ import react from "@vitejs/plugin-react";
 // Module Overview
 // =============================================================================
 // Vite build and dev server. In development `/api` and `/mcp` go to the backend
-// on port 8000. A production build embeds a Content-Security-Policy meta tag,
+// on port 8000, or `API_PORT` when `scripts/dev.sh` moved it. A production build embeds a Content-Security-Policy meta tag,
 // because a static host serving `dist` cannot be trusted to send our headers;
 // it allows the API origin from `VITE_API_BASE_URL` and the voice hosts.
 
-const BACKEND = "http://127.0.0.1:8000";
+// `scripts/dev.sh` exports `API_PORT` when the API runs on another port.
+const BACKEND = `http://127.0.0.1:${process.env.API_PORT ?? "8000"}`;
 
 // The voice coach talks to LiveKit over WebRTC and to the ElevenLabs API host.
 const VOICE_HOSTS = [
