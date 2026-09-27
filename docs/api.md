@@ -246,7 +246,7 @@ Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to
 
 ## Examples
 
-These run against a local server started as in the [README](../README.md#quick-start). Writes need the JSON content type.
+These run against a local server started as in the [README](../README.md#try-it). Writes need the JSON content type.
 
 Create an account and keep the cookie:
 

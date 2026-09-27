@@ -23,7 +23,7 @@ The core engine is the hub. Every other area is a spoke that touches it at one s
            │                                              │
   Hosting (Jonathan)                               Model providers
 DigitalOcean, GoDaddy,                           OpenAI compatible,
-        credits                                 Backboard, Snowflake
+        credits                                 Backboard
 ```
 
 ## The engine and its seams
@@ -52,7 +52,7 @@ When a spoke needs something the seam does not carry, change the seam, not the o
 | Ricky | Core engine: static and dynamic workflows, the API, integration of every spoke | `api/`, `integrations/`, `web/src/api/`, `web/src/shell/`, `web/src/settings/`, `web/src/quiz/` | [api/AGENTS.md](../api/AGENTS.md) |
 | MD | Diagrams: how the map is drawn by the model and on the canvas | `web/src/board/` | [web/src/board/AGENTS.md](../web/src/board/AGENTS.md) |
 | Eman | Voice agent: the ElevenLabs coach | `web/src/voice/`, `scripts/elevenlabs_agent.py`, `api/app/voice.py` | [web/src/voice/AGENTS.md](../web/src/voice/AGENTS.md) |
-| Jonathan | Hosting and credits: DigitalOcean, the GoDaddy domain, platform accounts, Snowflake | `Dockerfile`, `.do/`, `.github/`, `docker-compose.yml`, `docs/deploy.md` | [.do/AGENTS.md](../.do/AGENTS.md) |
+| Jonathan | Hosting and credits: DigitalOcean, the GoDaddy domain, platform accounts | `Dockerfile`, `.do/`, `.github/`, `docker-compose.yml`, `docs/deploy.md` | [.do/AGENTS.md](../.do/AGENTS.md) |
 
 Shared files sit on a seam, so the engine owner approves them. Change one in your own branch and name the approver in the PR:
 
@@ -66,7 +66,7 @@ Shared files sit on a seam, so the engine owner approves them. Change one in you
 
 ## Adding a new spoke
 
-A new platform or feature, such as a Snowflake integration, attaches the same way:
+A new platform or feature, such as a new model provider, attaches the same way:
 
 1. Decide its seam. A model service is a provider adapter in `api/app/llm/` wired through `api/app/providers/service.py`. A data service is a module under `api/app/` that reads the tables, never uploaded content. A new screen reads existing routes.
 2. Ricky adds or approves the seam: the route, schema field or setting.
@@ -83,4 +83,4 @@ A new platform or feature, such as a Snowflake integration, attaches the same wa
 
 ## Credits and accounts
 
-Jonathan holds the platform accounts and credits: DigitalOcean, the GoDaddy domain, ElevenLabs, Backboard and Snowflake. Keys go into the host's environment settings or a teammate's local `.env`, never into the repository, a PR, an issue or a chat message. Ask Jonathan for a key; he rotates them after the event.
+Jonathan holds the platform accounts and credits: DigitalOcean, the GoDaddy domain, ElevenLabs and Backboard. Keys go into the host's environment settings or a teammate's local `.env`, never into the repository, a PR, an issue or a chat message. Ask Jonathan for a key; he rotates them after the event.
