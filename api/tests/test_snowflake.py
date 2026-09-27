@@ -42,11 +42,12 @@ def test_a_ready_board_replaces_its_rows_in_snowflake(signed_in: TestClient, mon
     out = response.json()
     assert out["rows"] > 0
     assert out["table"] == "THREATVIZ.PUBLIC.threat_findings"
-    assert [str(r.url) for r in seen] == ["https://myorg-myaccount.snowflakecomputing.com/api/v2/statements"] * 3
+    assert [str(r.url) for r in seen] == ["https://myorg-myaccount.snowflakecomputing.com/api/v2/statements"] * 6
     statements: list[dict[str, Any]] = [json.loads(r.content) for r in seen]
     assert statements[0]["statement"].startswith("CREATE TABLE IF NOT EXISTS")
-    assert statements[1]["bindings"]["1"]["value"] == board_id
-    assert len(statements[2]["bindings"]["1"]["value"]) == out["rows"]
+    assert all(s["statement"].startswith("CREATE OR REPLACE VIEW") for s in statements[1:4])
+    assert statements[4]["bindings"]["1"]["value"] == board_id
+    assert len(statements[5]["bindings"]["1"]["value"]) == out["rows"]
     assert seen[0].headers["authorization"] == "Bearer pat-token-for-tests"
     assert all("pat-token-for-tests" not in r.content.decode() for r in seen)
 

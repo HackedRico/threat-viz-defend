@@ -21,6 +21,24 @@ _CREATE = (
     "crosses_boundary BOOLEAN, touches_ai BOOLEAN, touches_sensitive BOOLEAN, refs STRING, "
     "analyzed_at TIMESTAMP_TZ)"
 )
+# Chart-ready views over the table, so a Snowsight dashboard needs no SQL from the user.
+VIEWS: tuple[tuple[str, str], ...] = (
+    (
+        "threats_by_stride",
+        "SELECT stride, severity, COUNT(*) AS threats FROM threat_findings GROUP BY stride, severity",
+    ),
+    (
+        "threats_by_element",
+        "SELECT element_kind, COUNT(*) AS threats, COUNT_IF(crosses_boundary) AS crosses_boundary, "
+        "COUNT_IF(touches_ai) AS touches_ai, COUNT_IF(touches_sensitive) AS touches_sensitive "
+        "FROM threat_findings GROUP BY element_kind",
+    ),
+    (
+        "boards_by_risk",
+        "SELECT board_id, COUNT_IF(severity IN ('critical', 'high')) AS critical_or_high, COUNT(*) AS threats "
+        "FROM threat_findings GROUP BY board_id",
+    ),
+)
 _CLEAR = "DELETE FROM threat_findings WHERE board_id = ?"
 _INSERT = "INSERT INTO threat_findings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 # Every value binds as text and Snowflake casts it to the column's type on insert, which accepts
@@ -63,6 +81,8 @@ class SnowflakeTarget:
 def push_board(target: SnowflakeTarget, board_id: str, rows: Sequence[Finding], client: httpx.Client) -> None:
     """Replace this board's rows in `threat_findings`, creating the table the first time."""
     _run(target, client, _CREATE, None)
+    for name, query in VIEWS:
+        _run(target, client, f"CREATE OR REPLACE VIEW {name} AS {query}", None)
     _run(target, client, _CLEAR, {"1": {"type": "TEXT", "value": board_id}})
     if not rows:
         return

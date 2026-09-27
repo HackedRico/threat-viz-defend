@@ -17,11 +17,18 @@ const REMEMBER_KEY = "threatviz.snowflake";
 
 type Place = Omit<SnowflakeExportIn, "token">;
 
-const EMPTY: Place = { account: "", warehouse: "COMPUTE_WH", database: "", schema_name: "PUBLIC" };
+const EMPTY: Place = {
+  account: "",
+  warehouse: "COMPUTE_WH",
+  database: "",
+  schema_name: "PUBLIC",
+};
 
 function recall(): Place {
   try {
-    const saved = JSON.parse(localStorage.getItem(REMEMBER_KEY) ?? "null") as Partial<Place> | null;
+    const saved = JSON.parse(
+      localStorage.getItem(REMEMBER_KEY) ?? "null",
+    ) as Partial<Place> | null;
     return { ...EMPTY, ...saved };
   } catch {
     return EMPTY;
@@ -36,15 +43,29 @@ function remember(place: Place) {
   }
 }
 
-const FIELDS: readonly { key: keyof Place; label: string; placeholder: string }[] = [
-  { key: "account", label: "Account identifier", placeholder: "myorg-myaccount" },
+const FIELDS: readonly {
+  key: keyof Place;
+  label: string;
+  placeholder: string;
+}[] = [
+  {
+    key: "account",
+    label: "Account identifier",
+    placeholder: "myorg-myaccount",
+  },
   { key: "warehouse", label: "Warehouse", placeholder: "COMPUTE_WH" },
   { key: "database", label: "Database", placeholder: "THREATVIZ" },
   { key: "schema_name", label: "Schema", placeholder: "PUBLIC" },
 ];
 
 /** The Snowflake export dialog for one board; it opens on mount and calls `onClose` when dismissed. */
-export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose: () => void }) {
+export function SnowflakeDialog({
+  boardId,
+  onClose,
+}: {
+  boardId: string;
+  onClose: () => void;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const ids = useId();
   const [place, setPlace] = useState<Place>(recall);
@@ -57,7 +78,9 @@ export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose
     dialog.current?.showModal();
   }, []);
 
-  const ready = FIELDS.every((field) => place[field.key].trim() !== "") && token.trim().length >= 8;
+  const ready =
+    FIELDS.every((field) => place[field.key].trim() !== "") &&
+    token.trim().length >= 8;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -72,7 +95,9 @@ export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose
       schema_name: place.schema_name.trim(),
     };
     try {
-      setSent(await api.snowflake(boardId, { ...trimmed, token: token.trim() }));
+      setSent(
+        await api.snowflake(boardId, { ...trimmed, token: token.trim() }),
+      );
       remember(trimmed);
       setToken("");
     } catch (caught) {
@@ -83,19 +108,33 @@ export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose
   };
 
   return (
-    <dialog ref={dialog} className="snowflake-dialog" aria-labelledby={`${ids}-title`} onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className="snowflake-dialog"
+      aria-labelledby={`${ids}-title`}
+      onClose={onClose}
+    >
       <form onSubmit={(event) => void submit(event)}>
         <header className="sf-head">
           <h2 id={`${ids}-title`} className="sf-title">
             Send to Snowflake
           </h2>
-          <button type="button" className="btn btn-ghost btn-icon" aria-label="Close" title="Close" onClick={() => dialog.current?.close()}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon"
+            aria-label="Close"
+            title="Close"
+            onClick={() => dialog.current?.close()}
+          >
             <CloseIcon />
           </button>
         </header>
         <p className="field-hint sf-lead">
-          Writes one row per threat to a <code>threat_findings</code> table in your own account, replacing this board's rows from any
-          earlier send. Chart it in Snowsight or query it with SQL.
+          Writes one row per threat to a <code>threat_findings</code> table in
+          your own account, replacing this board's rows from any earlier send,
+          and creates three chart-ready views: <code>threats_by_stride</code>,{" "}
+          <code>threats_by_element</code> and <code>boards_by_risk</code>. Open
+          any of them in Snowsight and switch to Chart.
         </p>
 
         <div className="sf-grid">
@@ -112,7 +151,9 @@ export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose
                 maxLength={field.key === "account" ? 120 : 255}
                 autoCapitalize="none"
                 spellCheck={false}
-                onChange={(e) => setPlace({ ...place, [field.key]: e.target.value })}
+                onChange={(e) =>
+                  setPlace({ ...place, [field.key]: e.target.value })
+                }
               />
             </div>
           ))}
@@ -132,7 +173,10 @@ export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose
             maxLength={4000}
             onChange={(e) => setToken(e.target.value)}
           />
-          <p className="field-hint">Used for this send only and never saved. Create one under Settings, Authentication in Snowsight.</p>
+          <p className="field-hint">
+            Used for this send only and never saved. Create one under Settings,
+            Authentication in Snowsight.
+          </p>
         </div>
 
         {error && (
@@ -142,16 +186,26 @@ export function SnowflakeDialog({ boardId, onClose }: { boardId: string; onClose
         )}
         {sent && (
           <p className="sf-note is-ok" role="status">
-            Sent {sent.rows} {sent.rows === 1 ? "threat" : "threats"} to <code>{sent.table}</code>.
+            Sent {sent.rows} {sent.rows === 1 ? "threat" : "threats"} to{" "}
+            <code>{sent.table}</code>.
           </p>
         )}
 
         <footer className="sf-foot">
-          <button type="button" className="btn btn-ghost" onClick={() => dialog.current?.close()}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => dialog.current?.close()}
+          >
             {sent ? "Done" : "Cancel"}
           </button>
-          <button type="submit" className="btn btn-primary" disabled={!ready || busy}>
-            {busy && <span className="spinner" aria-hidden="true" />} Send threats
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={!ready || busy}
+          >
+            {busy && <span className="spinner" aria-hidden="true" />} Send
+            threats
           </button>
         </footer>
       </form>
