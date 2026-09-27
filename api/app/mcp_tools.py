@@ -37,15 +37,19 @@ from app.schemas import AnswerIn, MemoryUse
 # services the web app uses, as the token's owner, on a worker thread, so
 # Backboard memory takes part here as it does in the web app.
 
-# An option letter standing alone in a choice answer, as in `A, C` or `A and C`.
-_LETTER = re.compile(r"\b([A-Z])\b")
+# Separators in a list of option letters, as in `A, C`, `a/c` or `A and C`.
+_LETTER_SEPARATORS = re.compile(r"[\s,;/&+]+|\band\b|\bor\b", re.IGNORECASE)
+# A capital letter standing alone inside a sentence; a lowercase one is more likely the article "a".
+_CAPITAL = re.compile(r"\b([A-Z])\b")
 
 INSTRUCTIONS = (
     "Tools for the developer's threat model boards. Call list_boards to find a board id. After you change how "
     "the system is built (new services, routes, data stores, third party APIs, AI tools), call report_change with "
-    "a summary and the diff so the board's map stays current. Use get_board or ask_board before designing a change "
-    "that touches sensitive data or untrusted input. When the developer asks to be quizzed, use next_quiz_question "
-    "and answer_quiz_question, and never reveal an answer before they try."
+    "a summary and the diff so the board's map stays current, unless the repository has a .threatviz.json: its "
+    "hook already reports every turn's changes, so there call report_change only when the developer asks. Use "
+    "get_board or ask_board before designing a change that touches sensitive data or untrusted input. When the "
+    "developer asks to be quizzed, use next_quiz_question and answer_quiz_question, and never reveal an answer "
+    "before they try."
 )
 
 
@@ -85,7 +89,9 @@ def build_mcp(services: Services) -> tuple[MCPServer, Starlette]:
     app = mcp.streamable_http_app(
         streamable_http_path="/mcp",
         stateless_http=True,
-        json_response=True,
+        # An event stream sends its headers at once. A JSON reply sends nothing until the tool returns, and
+        # Claude Code gives up on a response with no headers after 60 seconds, which a model-backed tool can take.
+        json_response=False,
         transport_security=TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=[]),
     )
     return mcp, app
@@ -165,7 +171,11 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
         diff: Annotated[str, Field(description="The unified diff of the change, if you have it.")] = "",
         files: Annotated[list[str], Field(description="Paths of the files you changed.")] = [],  # noqa: B006
     ) -> str:
-        """Update the board's map from a change you just made; the developer reviews it in the app."""
+        """Update the board's map from a change you just made; the developer reviews it in the app.
+
+        Skip this when the repository has a .threatviz.json: its hook reports each turn's changes on its own, and a
+        second report of the same change redraws the map twice. Call it there only when the developer asks.
+        """
         origin = web_app_origin(ctx.request_context.request, services.settings)
 
         def work(user_id: str) -> str:
@@ -240,9 +250,8 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
             if question.kind == "open":
                 body = AnswerIn(question_id=question_id, text=answer)
             else:
-                # Only standalone letters count, so "A and C" is A and C, not the A and D inside "and".
-                letters = list(dict.fromkeys(_LETTER.findall(answer.upper())))
-                if not letters or any(ord(ch) - 65 >= len(question.options) for ch in letters):
+                letters = _option_letters(answer, len(question.options))
+                if not letters:
                     last = chr(64 + len(question.options))
                     raise ToolError(f"Answer with the option letters from A to {last}, such as `A, C`.")
                 body = AnswerIn(
@@ -269,6 +278,22 @@ def _board_parts(
             "Try again after the developer adds material and confirms the map in the web app."
         )
     return system, current_analysis(row)
+
+
+def _option_letters(answer: str, count: int) -> list[str]:
+    """The option letters in a choice answer, or none when it names a letter out of range or no letter at all."""
+    tokens = [token for token in _LETTER_SEPARATORS.split(answer.strip()) if token]
+    if tokens and all(len(token) == 1 and token.isalpha() for token in tokens):
+        # Letters alone, in either case: `a, c` or `B`.
+        letters = [token.upper() for token in tokens]
+    else:
+        # A sentence such as "B, because it is a boundary": only capitals count, and "I" is the pronoun
+        # unless the question has that many options.
+        letters = [ch for ch in _CAPITAL.findall(answer) if ch != "I" or count >= 9]
+    picked = list(dict.fromkeys(letters))
+    if any(ord(ch) - 65 >= count for ch in picked):
+        return []
+    return picked
 
 
 def _memory_line(memory: MemoryUse | None) -> str:

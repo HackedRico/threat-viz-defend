@@ -11,7 +11,7 @@ import { claudeCommand, cursorConfig, envLine, mcpUrl } from "./snippets.ts";
 test("builds the Claude Code command", () => {
   assert.equal(
     claudeCommand("https://tv.example.com/"),
-    'claude mcp add --transport http threatviz https://tv.example.com/mcp --header "Authorization: Bearer $THREATVIZ_TOKEN"',
+    'claude mcp add --transport http threatviz https://tv.example.com/mcp --header "Authorization: Bearer ${THREATVIZ_TOKEN:?run the export line first}"',
   );
 });
 

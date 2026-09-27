@@ -10,6 +10,7 @@ from mcp.types import CallToolResult, TextContent
 
 from app.analysis.analyst import DemoAnalyst
 from app.domain.models import Answer, SystemMap, ThreatAnalysis
+from app.mcp_tools import _option_letters
 from tests.conftest import ClientFactory, FakeBackboard, example_material, sign_up
 from tests.factories import node, system
 
@@ -195,3 +196,18 @@ def test_agents_see_backboard_memory_take_part(make_client: ClientFactory) -> No
     assert text.endswith(
         "Backboard memory recalled 1 note from earlier sessions and kept a note of this for next time."
     )
+
+
+@pytest.mark.parametrize(
+    ("answer", "letters"),
+    [
+        ("A, C", ["A", "C"]),
+        ("a and c", ["A", "C"]),
+        ("B, because it is a boundary", ["B"]),
+        ("I'd go with A, B and E", ["A", "B", "E"]),
+        ("F", []),
+        ("none of them", []),
+    ],
+)
+def test_choice_answers_read_only_the_letters_meant_as_options(answer: str, letters: list[str]) -> None:
+    assert _option_letters(answer, 5) == letters
