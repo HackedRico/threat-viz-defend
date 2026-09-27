@@ -694,7 +694,7 @@
   }
 
   function syncButtons() {
-    ui.play.textContent = { idle: "▶ Play", playing: "❚❚ Pause", paused: "▶ Resume", done: "↺ Replay" }[state];
+    ui.play.textContent = { idle: "▶ Play", playing: "❚❚ Pause", paused: "▶ Resume", done: "▶ Play" }[state];
   }
 
   function resetStage() {
