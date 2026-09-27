@@ -1,0 +1,163 @@
+<!doctype html>
+<!-- =============================================================================
+     Module Overview
+     =============================================================================
+     A click to play walkthrough of ThreatViz Defend for the pitch: a Claude Code
+     session on the left drives the app on the right through the MCP server and
+     the git diff hook. The markup here is the first frame; demo.js renders the
+     map and plays the script. Nothing talks to a server, so it opens straight
+     from the file system. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ThreatViz Defend demo</title>
+  <link rel="icon" href="assets/logo.png">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <div id="stage" aria-label="ThreatViz Defend demo">
+    <section class="term" aria-label="Claude Code session">
+      <header class="term-bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="term-title">claude · ~/inbox-helper</span>
+      </header>
+      <div class="term-body" id="termBody">
+        <div class="welcome">
+          <div><span class="star">✻</span> Welcome to <b>Claude Code</b></div>
+          <div class="muted">cwd: ~/inbox-helper</div>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+      <div class="prompt-box"><span class="gt">&gt;</span><span class="typed"><span id="promptText"></span><span class="caret"></span></span></div>
+      <div class="term-hint"><span>? for shortcuts</span><span>threatviz · MCP</span></div>
+    </section>
+
+    <section class="app" aria-label="ThreatViz Defend app">
+      <header class="app-bar">
+        <span class="brand">ThreatViz Defend</span>
+        <span class="sep"></span>
+        <span class="board-title">Inbox Helper</span>
+        <span class="status s-empty" id="status">Waiting for a change</span>
+        <span class="spacer"></span>
+        <span class="link"><span class="live"></span>Claude Code connected</span>
+      </header>
+      <div class="app-body">
+        <div class="canvas">
+          <svg id="map" viewBox="0 0 680 640" preserveAspectRatio="xMidYMid meet" aria-label="Threat model map"></svg>
+          <div class="empty" id="empty">No map yet.<br>Connect a coding agent or add material.</div>
+          <div class="toast" id="toast"></div>
+        </div>
+        <aside class="panel">
+          <nav class="tabs">
+            <button class="tab on" id="tabThreats">Threats <span class="count" id="tcount">0</span></button>
+            <button class="tab defend" id="tabDefend">Defend</button>
+          </nav>
+          <div class="views">
+            <div class="view v-idle on">
+              <p class="idle">Threats appear here after you confirm a map.</p>
+            </div>
+
+            <div class="view v-review">
+              <p class="kicker">Review</p>
+              <h3 class="rv-title" id="rvTitle">Drafted from Claude Code's change</h3>
+              <p class="rv-body" id="rvBody">10 parts, 10 flows and 2 trust boundaries. Every part cites the code it came from.</p>
+              <ul class="rv-changes" id="rvChanges">
+                <li class="ev"><span>Evidence</span>worker/sync.py polls Gmail every two minutes with each user's refresh token</li>
+              </ul>
+              <button class="btn" id="confirm">Confirm map</button>
+            </div>
+
+            <div class="view v-threats">
+              <div class="tlist" id="tlist"></div>
+            </div>
+
+            <div class="view v-detail">
+              <p class="back">← All threats</p>
+              <div class="d-head"><span class="pinmark crit">1</span><span class="chip sev crit">Critical</span><span class="chip">Elevation of privilege</span></div>
+              <h3 class="d-title">A malicious email takes over the triage agent</h3>
+              <p class="d-on">on Triage agent</p>
+              <p class="d-body">Anyone can email instructions that the agent follows, like forwarding private mail to the sender.</p>
+              <div class="d-fix"><b>Fix first</b>Turn off auto-send and fence the agent's tools.</div>
+              <div class="d-ev"><b>Evidence</b>"Anyone can email a user, so message bodies are untrusted."</div>
+            </div>
+
+            <div class="view v-defend">
+              <div class="mastery"><b id="mastery">0%</b><span id="masteryText">0 of 7 answered</span></div>
+              <div class="mbar"><i id="mbar"></i></div>
+              <div class="modes"><span class="mode on" id="modeType">Type answers</span><span class="mode" id="modeVoice">Talk it through</span></div>
+              <div class="qblock" id="qblock">
+                <div class="qmeta"><span>Question 1 of 7</span><span>TRUST BOUNDARIES</span></div>
+                <p class="q">Which flows cross a trust boundary, where the receiving side has to check who sent the data?</p>
+                <div class="opts">
+                  <div class="opt" data-k="A"><span class="k">A</span>Gmail API to Mail sync: new mail</div>
+                  <div class="opt" data-k="B"><span class="k">B</span>Mail sync to Job queue: queue triage</div>
+                  <div class="opt" data-k="C"><span class="k">C</span>Triage agent to Any website: fetch_url</div>
+                  <div class="opt" data-k="D"><span class="k">D</span>API to Postgres: summaries</div>
+                </div>
+                <button class="btn" id="submit">Submit answer</button>
+                <p class="result" id="result"><b>Correct.</b> Both carry data across the backend's boundary.</p>
+              </div>
+              <div class="voice" id="voice">
+                <div class="wave" id="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <p class="line coach" id="coachQ"><b>Coach</b>How would you break the lethal trifecta?</p>
+                <p class="line you" id="youLine"><b>You</b><span id="youText"></span></p>
+                <div class="graded" id="graded"><span class="chip ok">Solid</span><span class="chip mem">Backboard memory · 2 notes recalled</span></div>
+                <p class="line coach" id="coachA"><b>Coach</b>Better than last session: you named the way out this time.</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <div class="caption" id="caption" aria-live="polite"><span class="num" id="capNum">1</span><span class="txt" id="capText"></span></div>
+    <div class="packet" id="packet"></div>
+    <div class="cursor" id="cursor" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="30" height="30"><path d="M4 2 L4 20 L9 15.2 L12.6 22 L15.6 20.6 L12.1 14 L19 14 Z" fill="#fbfaf6" stroke="#15191e" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span class="ripple"></span>
+    </div>
+
+    <div class="overlay intro on" id="intro">
+      <div class="ov-card">
+        <img src="assets/logo.png" alt="ThreatViz Defend logo">
+        <div>
+          <p class="ov-kicker">// RUNTIME THREAT MODELING</p>
+          <h1 class="ov-title">ThreatViz <em>Defend</em></h1>
+          <p class="ov-sub">Understand the threat while you vibe code.</p>
+          <button class="play" data-action="play">▶ Play the demo</button>
+          <p class="hint">Space pauses · ← → jump chapters · H hides the controls</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay outro" id="outro">
+      <div class="ov-card">
+        <img src="assets/logo.png" alt="ThreatViz Defend logo">
+        <div>
+          <p class="ov-kicker">// RUNTIME THREAT MODELING</p>
+          <h1 class="ov-title">ThreatViz <em>Defend</em></h1>
+          <ul class="ov-list">
+            <li>Claude Code and Cursor feed it over MCP and a git diff hook</li>
+            <li>Rules decide what to check, a model writes the threats</li>
+            <li>Defend it by text or voice, with Backboard memory</li>
+          </ul>
+          <button class="play" data-action="play">↺ Replay</button>
+          <p class="hint">github.com/HackedRico/threat-viz-defend</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav id="controls" aria-label="Demo controls">
+    <button id="btnPlay">▶ Play</button>
+    <button id="btnRestart" title="Restart (R)">↺</button>
+    <div class="progress"><i id="bar"></i></div>
+    <div class="chapters" id="chapters"></div>
+    <button id="btnSpeed" title="Speed">1x</button>
+    <button id="btnHide" title="Hide controls (H)">Hide</button>
+  </nav>
+
+  <script src="demo.js"></script>
+</body>
+</html>
