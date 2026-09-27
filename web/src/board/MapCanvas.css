@@ -174,8 +174,8 @@
   stroke: var(--highlight);
   stroke-width: 22;
   stroke-linejoin: round;
-  opacity: 0.55;
-  mix-blend-mode: multiply;
+  opacity: calc(0.55 * var(--highlighter-strength));
+  mix-blend-mode: var(--highlighter-blend);
 }
 
 /* ---------- lethal trifecta ---------- */
@@ -266,8 +266,8 @@
   stroke-width: 14;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.6;
-  mix-blend-mode: multiply;
+  opacity: calc(0.6 * var(--highlighter-strength));
+  mix-blend-mode: var(--highlighter-blend);
 }
 
 .arrow-head {
@@ -629,14 +629,6 @@
 .map-legend-foot {
   font-size: var(--text-xs);
   color: var(--ink-faint);
-}
-
-@media (prefers-color-scheme: dark) {
-  .node-highlighter,
-  .flow-highlighter {
-    mix-blend-mode: screen;
-    opacity: 0.35;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

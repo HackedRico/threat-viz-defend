@@ -127,20 +127,20 @@ pre {
 }
 
 .btn-primary {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--ink-inverse);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--ink-soft);
-  border-color: var(--ink-soft);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn-accent {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .btn-accent:hover:not(:disabled) {

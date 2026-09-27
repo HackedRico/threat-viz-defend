@@ -1,0 +1,61 @@
+/* =============================================================================
+   Module Overview
+   =============================================================================
+   The theme picker: a pill of options with the chosen one raised. The focus
+   ring sits on the option, since its radio is hidden. */
+
+.theme-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  min-width: 0;
+}
+
+.theme-option {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.theme-switch.is-compact .theme-option {
+  width: 30px;
+  padding: 0;
+}
+
+.theme-option:hover {
+  color: var(--ink);
+}
+
+.theme-option:has(input:checked) {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow-1);
+}
+
+.theme-option:has(input:focus-visible) {
+  outline: 2.5px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.theme-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}

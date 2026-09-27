@@ -57,6 +57,6 @@ The target is a map a reviewer checks in under five minutes, the review step of 
 npm run typecheck && npm test && npm run build
 ```
 
-Then look at it: `./scripts/dev.sh` from the repo root, sign in with the development account from `.env`, and open "Example: Inbox Helper". It has 12 nodes, 18 flows in four two way pairs, two boundaries, 7 threats and a lethal trifecta, so it exercises every mark. Check it in light and dark, with the side panel open and closed, at a laptop width and wide, turned both ways, and in review mode after a hand edit so the diff marks and inferred outlines show.
+Then look at it: `./scripts/dev.sh` from the repo root, sign in with the development account from `.env`, and open "Example: Inbox Helper". It has 12 nodes, 18 flows in four two way pairs, two boundaries, 7 threats and a lethal trifecta, so it exercises every mark. Check it in the light, dark and hackUMBC themes, with the side panel open and closed, at a laptop width and wide, turned both ways, and in review mode after a hand edit so the diff marks and inferred outlines show.
 
 The example is hand written and a model's board is not, so never tune a change to the example alone. Every overlay and every line of copy has to hold on a board with no AI part, no store, a taller map and a verdict three times as long. The starter questions and the brief read the board's own parts for that reason.

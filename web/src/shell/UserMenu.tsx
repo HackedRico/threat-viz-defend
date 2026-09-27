@@ -4,14 +4,15 @@ import type { UsageOut } from "../api/types.ts";
 import { navigate } from "./useRoute.ts";
 import { LogoutIcon, PlugIcon, SparkIcon } from "./icons.tsx";
 import { useSession } from "./session.tsx";
+import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import "./UserMenu.css";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
 // The account menu at the foot of the sidebar: who is signed in, what they have
-// spent today against their limits, a way to connect a coding agent, and sign
-// out. Usage refreshes each time the menu opens.
+// spent today against their limits, the theme picker, a way to connect a
+// coding agent, and sign out. Usage refreshes each time the menu opens.
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
@@ -74,6 +75,11 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
             Signed in as <strong>{name}</strong>
           </p>
           <UsageMeters usage={me.usage} dictation={config.dictation_enabled} />
+          <div className="user-pop-theme">
+            {/* The switch's own legend names it for screen readers; this label is for sighted users. */}
+            <span aria-hidden="true">Theme</span>
+            <ThemeSwitch compact />
+          </div>
           <button
             type="button"
             className="btn btn-ghost user-pop-item"

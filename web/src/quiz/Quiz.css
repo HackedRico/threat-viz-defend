@@ -272,7 +272,7 @@ label.option:focus-within {
 .option.is-picked .option-letter {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .option-label {
@@ -303,7 +303,7 @@ label.option:focus-within {
 .option.is-wrong .option-letter {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
+  color: var(--ink-inverse);
 }
 
 .option-mark {
