@@ -15,6 +15,7 @@ import type { QuizState } from "../quiz/useQuiz.ts";
 import { MicIcon } from "../shell/icons.tsx";
 import { useSession } from "../shell/session.tsx";
 import { optionLetter } from "./letters.ts";
+import { micProblem } from "./mic.ts";
 import { useVoiceTools } from "./tools.ts";
 import "./VoiceCoach.css";
 
@@ -100,7 +101,6 @@ function Coach({
   const { status } = useConversationStatus();
   const { isSpeaking } = useConversationMode();
   const [starting, setStarting] = useState(false);
-  const [micBlocked, setMicBlocked] = useState(false);
   const level = useRef<HTMLSpanElement>(null);
   const transcript = useRef<HTMLOListElement>(null);
   // False once the panel is gone, so a start still waiting on the mic prompt or the token never opens a call.
@@ -142,7 +142,6 @@ function Coach({
 
   const start = async () => {
     setProblem(null);
-    setMicBlocked(false);
     setStarting(true);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -155,13 +154,7 @@ function Coach({
         probe.getTracks().forEach((track) => track.stop());
       } catch (caught) {
         if (!alive.current) return;
-        const denied = caught instanceof DOMException && (caught.name === "NotAllowedError" || caught.name === "SecurityError");
-        setMicBlocked(denied);
-        setProblem(
-          denied
-            ? "Microphone access is blocked. Allow it in your browser's site settings, then start again."
-            : "No microphone was found. Plug one in, or use the text quiz.",
-        );
+        setProblem(micProblem(caught));
         return;
       }
       // The mic prompt can sit for seconds; if the panel closed meanwhile, spend nothing and open nothing.
@@ -225,7 +218,6 @@ function Coach({
         <div className="banner banner-error" role="alert">
           <div className="banner-body">
             {problem}
-            {micBlocked && <span> Look for the microphone or lock icon in the address bar.</span>}
             <div className="panel-row">
               <button type="button" className="btn btn-sm" onClick={onUseText}>
                 Use the text quiz

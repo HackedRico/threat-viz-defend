@@ -9,7 +9,7 @@ from mcp.types import CallToolResult, TextContent
 
 from app.analysis.analyst import DemoAnalyst
 from app.domain.models import Answer, SystemMap, ThreatAnalysis
-from tests.conftest import ClientFactory, sign_up
+from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import node, system
 
 # =============================================================================
@@ -115,6 +115,23 @@ def test_describe_element_reports_an_id_missing_from_the_map_as_an_error(signed_
     assert failed
     assert "no node or flow with id ghost" in text
     assert "Call get_board for its node and flow ids." in text
+
+
+@pytest.mark.parametrize(
+    ("overrides", "origin"),
+    [({}, "http://testserver"), ({"cors_origins": ("https://app.example.com",)}, "https://app.example.com")],
+)
+def test_report_change_links_the_board_in_the_web_app(
+    make_client: ClientFactory, overrides: dict[str, Any], origin: str
+) -> None:
+    client = make_client(**overrides)
+    sign_up(client)
+    board_id = empty_board(client)
+    arguments = {"board_id": board_id, "summary": example_material()["sources"][0]["text"]}
+    failed, text = call_tool(client, agent_token(client), "report_change", arguments)
+    assert not failed
+    # With no web origin configured, as in a local run, the link uses the origin the agent called.
+    assert text.endswith(f"review it at {origin}/boards/{board_id}.")
 
 
 def test_ask_board_folds_the_answer_so_it_cannot_forge_the_ids_line(make_client: ClientFactory) -> None:

@@ -229,7 +229,7 @@ Bearer. `200` with the token owner's boards as `BoardSummary`. The hook uses it 
 ### `POST /api/agent/boards/{board_id}/changes`
 Bearer. Body `AgentChangeIn`: `agent` (default `Coding agent`), `summary` (up to 4,000 characters), `diff` (a unified diff, up to 200,000 characters), `files` (up to 500 paths of up to 1,000 characters). Diff sections for files the policy skips are dropped, values are masked, and the map is updated from the change.
 
-`202` with `AgentChangeOut`: `board_id`, `status` and `review_url`, a link to the board in the web app (the first `CORS_ORIGINS` entry, else `PUBLIC_ORIGIN`; a path alone when neither is set, as in a local run). Errors: `401`, `404`, `409` when the board is busy, `429`. A busy board is refused before the hourly limit is counted, so a hook's retries do not use it up.
+`202` with `AgentChangeOut`: `board_id`, `status` and `review_url`, a link to the board in the web app (the first `CORS_ORIGINS` entry, else `PUBLIC_ORIGIN`, else the origin the request came to, as in a local run through the web app's dev server). The MCP tool `report_change` names the same link. Errors: `401`, `404`, `409` when the board is busy, `429`. A busy board is refused before the hourly limit is counted, so a hook's retries do not use it up.
 
 ## MCP tools
 

@@ -7,6 +7,7 @@ from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
+from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -17,7 +18,7 @@ from starlette.applications import Starlette
 from app.boards.ingest import agent_material
 from app.boards.service import current_analysis, read_map
 from app.boards.views import board_summary
-from app.context import Services
+from app.context import Services, web_app_origin
 from app.db import utcnow
 from app.domain.briefing import brief
 from app.domain.briefing import describe_element as describe_one
@@ -156,12 +157,14 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False))
     async def report_change(
+        ctx: Context,
         board_id: board_arg,
         summary: Annotated[str, Field(description="What you changed and why, in one or two sentences.")],
         diff: Annotated[str, Field(description="The unified diff of the change, if you have it.")] = "",
         files: Annotated[list[str], Field(description="Paths of the files you changed.")] = [],  # noqa: B006
     ) -> str:
         """Update the board's map from a change you just made; the developer reviews it in the app."""
+        origin = web_app_origin(ctx.request_context.request, services.settings)
 
         def work(user_id: str) -> str:
             with services.db.session() as session:
@@ -170,7 +173,6 @@ def _register_tools(mcp: MCPServer, services: Services) -> None:
             paths = [f[:1000] for f in files[:500]]
             material = agent_material("Coding agent", summary[:4000], diff[:200_000], paths, utcnow())
             services.boards.add_material(user_id, board_id, material)
-            origin = services.settings.web_origin
             return f"The map is being updated. The developer can review it at {origin}/boards/{board_id}."
 
         return await _as_user(work)
