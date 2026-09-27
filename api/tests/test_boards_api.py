@@ -4,14 +4,15 @@ from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 
+from app.analysis.analyst import DemoAnalyst
 from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.llm.base import LlmError
-from app.tables import LoginSessionRow
+from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow
 from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
@@ -267,3 +268,25 @@ def test_confirming_twice_finds_threats_once(signed_in: TestClient) -> None:
     assert signed_in.post(f"/api/boards/{board['id']}/confirm").status_code == 202
     assert signed_in.post(f"/api/boards/{board['id']}/confirm").status_code == 409
     assert signed_in.get(f"/api/boards/{board['id']}").json()["analysis_version"] == 1
+
+
+def test_an_answer_graded_while_the_board_changed_is_not_saved(make_client: ClientFactory) -> None:
+    holder: dict[str, TestClient] = {}
+
+    class Interrupted(DemoAnalyst):
+        def grade(
+            self, system: SystemMap, analysis: ThreatAnalysis | None, question: QuizQuestion, text: str
+        ) -> OpenGrade:
+            # A coding agent's change lands while the model grades.
+            with holder["client"].app.state.services.db.session() as session:  # type: ignore[attr-defined]
+                session.execute(update(BoardRow).values(status="mapping"))
+            return super().grade(system, analysis, question, text)
+
+    client = holder["client"] = make_client(analyst=Interrupted())
+    sign_up(client)
+    board_id = client.get("/api/boards").json()[0]["id"]
+    body = {"question_id": "fix:T1", "text": "Turn off auto send and confirm every email"}
+    assert client.post(f"/api/boards/{board_id}/quiz/answers", json=body).status_code == 409
+    db = client.app.state.services.db  # type: ignore[attr-defined]
+    with db.session() as session:
+        assert session.scalar(select(func.count()).select_from(QuizAttemptRow)) == 0

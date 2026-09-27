@@ -1,6 +1,7 @@
 import json
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any
 
@@ -304,3 +305,18 @@ def test_a_slow_lookup_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(netguard, "DNS_TIMEOUT_S", 0.1)
     with pytest.raises(OSError, match="took too long"):
         netguard.resolve("slow.example", 443)
+
+
+def test_parallel_lookups_of_one_host_share_one_thread(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def slow(host: str, *args: object, **kwargs: object) -> list[tuple[Any, ...]]:
+        calls.append(host)
+        time.sleep(0.3)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", slow)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        answers = list(pool.map(lambda _: netguard.resolve("shared.example", 443), range(6)))
+    assert answers == [["93.184.216.34"]] * 6
+    assert calls == ["shared.example"]

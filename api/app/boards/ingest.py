@@ -204,7 +204,8 @@ def _collapse_code(sources: list[dict[str, Any]], now: datetime) -> list[dict[st
     return [s for s in sources if s["kind"] != "code"] + [folder]
 
 
-_DIFF_HEADER = re.compile(r"^diff --git [^\n]*$", re.MULTILINE)
+# Git's own headers; `--cc` and `--combined` are what a plain `git diff` prints during an unresolved merge.
+_DIFF_HEADER = re.compile(r"^diff (?:--git|--cc|--combined) [^\n]*$", re.MULTILINE)
 # Lines between a section's header and its first hunk that name the file on either side.
 _PATH_LINES = ("--- ", "+++ ", "rename from ", "rename to ", "copy from ", "copy to ")
 _C_ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, "\\": 92}
@@ -212,13 +213,15 @@ _C_ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 3
 
 def _drop_secret_hunks(diff: str) -> str:
     """Remove whole file sections of a unified diff for files that should never be read, or cannot be named."""
+    diff = diff.replace("\r\n", "\n")
     sections = _DIFF_HEADER.split(diff)
-    if len(sections) == 1:
-        return diff
     headers = _DIFF_HEADER.findall(diff)
-    kept = [sections[0]]
+    # Text before the first header is usually a message, but a plain `diff -u` block there names its files too.
+    preamble = sections[0]
+    reasons = [reason for path in _named_paths(preamble, in_header=False) if (reason := skip_reason(path))]
+    kept = [f"[left out: {reasons[0]}]\n" if reasons else preamble]
     for header, body in zip(headers, sections[1:], strict=True):
-        paths = _section_paths(header, body)
+        paths = [*_header_paths(header), *_named_paths(body, in_header=True)]
         reasons = [reason for path in paths if (reason := skip_reason(path))]
         if not paths:
             # A header this parser cannot read might hide a secret file, so it is dropped rather than trusted.
@@ -230,24 +233,38 @@ def _drop_secret_hunks(diff: str) -> str:
     return "".join(kept)
 
 
-def _section_paths(header: str, body: str) -> list[str]:
-    """Every path one diff section names: from its header, its `---` and `+++` lines, and any rename or copy."""
-    paths = _header_paths(header.removeprefix("diff --git "))
-    for line in body.split("\n")[1:40]:
+def _named_paths(text: str, *, in_header: bool) -> list[str]:
+    """Every path `text` names on `---`, `+++`, rename and copy lines, header lines until each first hunk."""
+    paths: list[str] = []
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
         if line.startswith("@@"):
-            break
-        for prefix in _PATH_LINES:
-            if line.startswith(prefix):
-                name = _unquote(line.removeprefix(prefix).split("\t")[0])
-                if prefix in ("--- ", "+++ "):
-                    name = name[2:] if name[:2] in ("a/", "b/") else name
-                if name and name != "/dev/null":
-                    paths.append(name)
-    return paths
+            in_header = False
+        elif in_header:
+            paths += [_diff_name(line, prefix) for prefix in _PATH_LINES if line.startswith(prefix)]
+        elif line.startswith("--- ") and index + 1 < len(lines) and lines[index + 1].startswith("+++ "):
+            # Inside hunks only a `---` line right above a `+++` line starts another file, so a removed
+            # line that happens to begin with two dashes is not read as a name.
+            in_header = True
+            paths.append(_diff_name(line, "--- "))
+    return [path for path in paths if path and path != "/dev/null"]
 
 
-def _header_paths(rest: str) -> list[str]:
-    """The two paths of a `diff --git` header, quoted or not; empty when they cannot be told apart."""
+def _diff_name(line: str, prefix: str) -> str:
+    """The path on one `---`, `+++`, rename or copy line, unquoted and without git's `a/` or `b/`."""
+    name = _unquote(line.removeprefix(prefix).split("\t")[0])
+    if prefix in ("--- ", "+++ ") and name[:2] in ("a/", "b/"):
+        return name[2:]
+    return name
+
+
+def _header_paths(header: str) -> list[str]:
+    """The paths a `diff` header names, quoted or not; empty when they cannot be told apart."""
+    if not header.startswith("diff --git "):
+        # A merge's `diff --cc path` names one path.
+        path = _unquote(header.split(" ", 2)[2].strip())
+        return [path] if path else []
+    rest = header.removeprefix("diff --git ")
     if rest.startswith('"'):
         first, _, after = _split_quoted(rest)
         second = _unquote(after.strip())

@@ -48,6 +48,8 @@ interface CoachProps {
   active: string | null;
   onActive: (id: string) => void;
   onUseText: () => void;
+  /** Told when a call connects or ends, so a tab that hides this panel can still show the call is live. */
+  onLive?: (live: boolean) => void;
 }
 
 /** The voice coach panel, with its own conversation provider. */
@@ -87,6 +89,7 @@ function Coach({
   active,
   onActive,
   onUseText,
+  onLive,
   turns,
   problem,
   setProblem,
@@ -105,6 +108,11 @@ function Coach({
   const live = status === "connected";
 
   useVoiceTools({ board, map, state, onActive });
+
+  useEffect(() => {
+    onLive?.(live);
+    return () => onLive?.(false);
+  }, [live, onLive]);
 
   // End the call when the panel closes, so the microphone never stays open unseen.
   useEffect(() => {

@@ -89,6 +89,10 @@ class Quiz:
             )
 
         with self._db.session() as session:
+            # Grading an open answer takes seconds; if the board moved on meanwhile, nothing is saved.
+            now = self._boards.get(session, user_id, board_id)
+            if now.analysis_version != version or current_analysis(now) is None:
+                raise conflict("The board changed while grading. Reload the quiz.")
             session.add(
                 QuizAttemptRow(
                     user_id=user_id,

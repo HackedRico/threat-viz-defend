@@ -74,9 +74,9 @@ in one place only, or every turn is posted twice.
 
 - On prompt submit it saves the prompt, masked, to `.git/threatviz/prompts.json`. Only the last 5 are kept.
 - On stop it returns at once and carries on in the background. It snapshots the worktree through a temporary
-  index into `refs/worktree/threatviz/pending`, without touching your index, branch, stash or files, and diffs it
-  against `refs/worktree/threatviz/base` (or `HEAD` the first time). Both refs belong to one worktree, so each git
-  worktree an agent works in reports its own changes.
+  index into `refs/threatviz/pending`, without touching your index, branch, stash or files, and diffs it against
+  `refs/threatviz/base` (or `HEAD` the first time). A linked git worktree gets its own pair under
+  `refs/threatviz/worktrees/<id>/`, so each worktree an agent works in reports only its own changes.
 - It skips the post when nothing changed, or when the change looks non-architectural, and forgets the prompts
   behind a skipped change. It counts as architectural
   when it touches a manifest, Dockerfile, compose file, infrastructure code or env example, or adds lines about
@@ -109,9 +109,8 @@ config for that editor.
   records the refusal.
 - The MCP server receives only what the agent puts in a tool call.
 - Snapshots stay in your repo's local git objects. To remove all hook state:
-  `git update-ref -d refs/worktree/threatviz/base; git update-ref -d refs/worktree/threatviz/pending; rm -rf .git/threatviz`.
-  Versions before per-worktree refs kept them in `refs/threatviz/`; delete those the same way. After upgrading, the
-  first report diffs against `HEAD` again.
+  `git for-each-ref --format='delete %(refname)' refs/threatviz/ | git update-ref --stdin; rm -rf .git/threatviz`,
+  plus `.git/worktrees/<name>/threatviz` for each linked worktree.
 
 ## Troubleshooting
 

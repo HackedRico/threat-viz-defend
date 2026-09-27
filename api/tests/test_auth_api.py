@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.auth import service as auth_service
 from tests.conftest import INVITE, PASSWORD, ClientFactory, sign_up
 
 
@@ -125,3 +127,19 @@ def test_a_right_password_gives_back_its_reserved_failure(client: TestClient) ->
     for _ in range(4):
         client.post("/api/auth/login", json={"username": "hana", "password": "wrong password"})
     assert client.post("/api/auth/login", json={"username": "hana", "password": PASSWORD}).status_code == 200
+
+
+def test_a_busy_sign_in_is_not_counted_as_a_failure(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    sign_up(client, "ines")
+    client.post("/api/auth/logout")
+    monkeypatch.setattr(auth_service, "_HASH_WAIT_S", 0.01)
+    for _ in range(2):
+        assert auth_service._HASH_SLOTS.acquire(timeout=1)
+    try:
+        for _ in range(6):
+            busy = client.post("/api/auth/login", json={"username": "ines", "password": PASSWORD})
+            assert busy.status_code == 503
+    finally:
+        for _ in range(2):
+            auth_service._HASH_SLOTS.release()
+    assert client.post("/api/auth/login", json={"username": "ines", "password": PASSWORD}).status_code == 200

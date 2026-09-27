@@ -30,7 +30,12 @@ export function useMapLayout(map: SystemMap | null): { layouts: MapLayouts | nul
   const key = map ? layoutKey(map) : null;
 
   useEffect(() => {
-    if (map === null || key === null || key === state.key) return undefined;
+    if (key !== null && key === state.key) {
+      // Back on the map that last laid out, as after undoing an edit that failed: its layout is current again.
+      if (state.error !== null) setState((prev) => ({ ...prev, error: null }));
+      return undefined;
+    }
+    if (map === null || key === null) return undefined;
     let cancelled = false;
     const run = () =>
       loadEngine()

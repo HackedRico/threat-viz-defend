@@ -688,7 +688,13 @@ def test_each_worktree_diffs_against_its_own_base(repo: Path, hook_env: dict[str
     run_hook(claude_payload("Stop", repo), repo, hook_env)
 
     assert api.posts()[1]["body"]["files"] == ["app.py"]
-    assert ref(repo, hook.BASE_REF) != ref(other, hook.BASE_REF)
+    other_base = hook.find_repo(other).base_ref
+    assert other_base != hook.BASE_REF
+    assert ref(repo, hook.BASE_REF) != ref(repo, other_base)
+    # Both bases are ordinary refs, so gc in the main worktree keeps the linked worktree's snapshot.
+    git(repo, "gc", "-q", "--prune=now")
+    assert ref(other, other_base) is not None
+    git(other, "fsck", "--no-progress")
 
 
 def test_manifest_changes_count_as_architectural() -> None:

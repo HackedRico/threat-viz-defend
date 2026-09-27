@@ -137,10 +137,17 @@ class Accounts:
         except AppError:
             self._limiter.undo(failures)
             raise too_many(locked, 900) from None
-        user = session.scalar(select(UserRow).where(UserRow.username == name))
-        if user is None or not _verify(user.password_hash, password):
+        try:
+            user = session.scalar(select(UserRow).where(UserRow.username == name))
+            matched = user is not None and _verify(user.password_hash, password)
             if user is None:
                 _verify(_DUMMY_HASH, password)
+        except Exception:
+            # A busy hash slot or a database error says nothing about the password, so it is not a failure.
+            self._limiter.undo(spread)
+            self._limiter.undo(failures)
+            raise
+        if user is None or not matched:
             raise unauthorized("Wrong username or password.")
         self._limiter.undo(spread)
         self._limiter.reset(failures)

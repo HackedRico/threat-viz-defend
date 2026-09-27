@@ -22,7 +22,16 @@ import "./Quiz.css";
 type Mode = "text" | "voice";
 
 /** The defend panel for a finished board. */
-export function DefendPanel({ board, map }: { board: BoardOut; map: SystemMap }) {
+export function DefendPanel({
+  board,
+  map,
+  onVoiceLive,
+}: {
+  board: BoardOut;
+  map: SystemMap;
+  /** Told when a voice call connects or ends. */
+  onVoiceLive?: (live: boolean) => void;
+}) {
   const { config } = useSession();
   const state = useQuiz(board.id, board.analysis_version);
   const [mode, setMode] = useState<Mode>("text");
@@ -125,7 +134,7 @@ export function DefendPanel({ board, map }: { board: BoardOut; map: SystemMap })
       {!voice && <p className="field-hint">The voice coach is off on this server, so the quiz is text only.</p>}
 
       {mode === "voice" && voice ? (
-        <VoicePanel board={board} map={map} state={state} active={active} onActive={setActive} onUseText={() => setMode("text")} />
+        <VoicePanel board={board} map={map} state={state} active={active} onActive={setActive} onUseText={() => setMode("text")} onLive={onVoiceLive} />
       ) : (
         <QuizPanel state={state} active={active} onActive={setActive} />
       )}

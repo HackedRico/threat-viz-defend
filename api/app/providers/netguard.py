@@ -1,7 +1,9 @@
 import ipaddress
 import socket
+import threading
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Any
 from urllib.parse import urlparse
 
 from app.errors import bad_request
@@ -22,19 +24,33 @@ Resolver = Callable[[str, int], list[str]]
 # minutes, and at most a few lookups hold threads at once; the rest wait their turn and time out the same way.
 DNS_TIMEOUT_S = 3.0
 _lookups = ThreadPoolExecutor(max_workers=4, thread_name_prefix="dns")
+# Requests for a host already being looked up share that lookup, so one stalling host holds one thread, not all.
+_in_flight: dict[tuple[str, int], Future[list[tuple[Any, ...]]]] = {}
+_in_flight_lock = threading.Lock()
 _NAT64 = ipaddress.ip_network("64:ff9b::/96")
 _SITE_LOCAL = ipaddress.ip_network("fec0::/10")
 
 
 def resolve(host: str, port: int) -> list[str]:
     """Every IP address `host` resolves to; `OSError` when it does not resolve within `DNS_TIMEOUT_S`."""
-    future = _lookups.submit(socket.getaddrinfo, host, port, proto=socket.IPPROTO_TCP)
+    with _in_flight_lock:
+        future = _in_flight.get((host, port))
+        if future is None:
+            future = _lookups.submit(socket.getaddrinfo, host, port, proto=socket.IPPROTO_TCP)
+            _in_flight[(host, port)] = future
+            future.add_done_callback(lambda done: _forget(host, port, done))
     try:
         infos = future.result(timeout=DNS_TIMEOUT_S)
     except TimeoutError as exc:
-        future.cancel()
         raise OSError(f"Looking up {host} took too long.") from exc
     return sorted({str(info[4][0]) for info in infos})
+
+
+def _forget(host: str, port: int, done: Future[list[tuple[Any, ...]]]) -> None:
+    """Drop a finished lookup, so the next request resolves the host afresh."""
+    with _in_flight_lock:
+        if _in_flight.get((host, port)) is done:
+            del _in_flight[(host, port)]
 
 
 def check_base_url(url: str, *, allow_private: bool, resolver: Resolver = resolve) -> str:

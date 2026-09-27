@@ -168,7 +168,7 @@ Cookie. Body `AnswerIn`: `question_id`, `choice_ids` (up to 10, for `single` and
 
 `200` with `AnsweredOut`: `attempt` and the new `mastery`. `attempt` holds `result` (`correct`, `partial` or `wrong`), `feedback`, `explanation`, `evidence` (quotes from the map), `highlight`, `correct_ids`, `your_ids` and `your_text`.
 
-Errors: `400` with no option picked or an empty open answer, `404` when the question is out of date because the board changed, `409` when the board changed while grading, `429`, `502` or `503` for open answers.
+Errors: `400` with no option picked or an empty open answer, `404` when the question is out of date because the board changed, `409` when the board changed while grading (the answer is not saved), `429`, `502` or `503` for open answers.
 
 ### `DELETE /api/boards/{board_id}/quiz`
 Cookie. Forgets every answer on the board. `204`.
