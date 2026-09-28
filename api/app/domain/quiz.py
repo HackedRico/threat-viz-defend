@@ -107,7 +107,8 @@ def grade_choice(question: QuizQuestion, picked: Sequence[str]) -> ChoiceGrade:
     wrong = [item for item in chosen if item not in key]
     if not missed and not wrong:
         return ChoiceGrade(result="correct", missed=[], wrong=[])
-    if any(item in key for item in chosen):
+    # A single choice question has one answer, so hedging across options earns nothing, not partial credit.
+    if question.kind != "single" and any(item in key for item in chosen):
         return ChoiceGrade(result="partial", missed=missed, wrong=wrong)
     return ChoiceGrade(result="wrong", missed=missed, wrong=wrong)
 

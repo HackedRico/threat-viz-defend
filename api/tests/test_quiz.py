@@ -127,3 +127,12 @@ def test_mastery_scores_partials_as_half() -> None:
     assert score.answered == 2
     assert score.score == round(1.5 / len(quiz), 3)
     assert set(quiz[1].highlight) <= set(score.weak_spots)
+
+
+def test_picking_several_options_on_a_single_choice_question_is_wrong() -> None:
+    # Partial credit made every single choice question free: pick all the options and half the score comes back.
+    example = inbox()
+    for question in (q for q in build_quiz(example.map, example.analysis) if q.kind == "single"):
+        every = [option.id for option in question.options]
+        assert grade_choice(question, every).result == "wrong"
+        assert grade_choice(question, question.answer).result == "correct"
