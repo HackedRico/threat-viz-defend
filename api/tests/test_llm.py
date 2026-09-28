@@ -266,6 +266,31 @@ def test_parse_json_finds_the_reply_among_other_text(reply: str) -> None:
     assert parse_json(reply, ThreatAnalysis) == inbox().analysis
 
 
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        "```" + " " * 20_000 + "x",
+        "<think>" * 20_000,
+        "<thinking> x " * 10_000,
+        '{"a":' + "[" * 100_000,
+        '{"a":[' * 20_000,
+    ],
+)
+def test_parse_json_stays_fast_and_fails_cleanly_on_a_hostile_reply(hostile: str) -> None:
+    # A user's own provider writes this text, and a regex holds the GIL while it backtracks, stalling every request.
+    started = time.perf_counter()
+    with pytest.raises(ValueError, match="reply"):
+        parse_json(hostile, ThreatAnalysis)
+    assert time.perf_counter() - started < 1.0
+
+
+def test_parse_json_skips_reasoning_whose_opening_tag_was_in_the_prompt() -> None:
+    # Some chat templates open the reasoning block in the prompt, so the reply holds only its closing tag.
+    draft = inbox().analysis.model_copy(update={"verdict": "Fix the sync worker first: it was a draft."})
+    reply = f"Maybe {draft.model_dump_json()} is right, but the agent matters more.</think>\n{GOOD}"
+    assert parse_json(reply, ThreatAnalysis) == inbox().analysis
+
+
 def test_parse_json_forgives_case_spelled_out_stride_and_left_out_nulls() -> None:
     raw = inbox().analysis.model_dump(mode="json")
     raw["threats"][0].update({"severity": "Critical", "stride": "Tampering", "extra": "ignored"})

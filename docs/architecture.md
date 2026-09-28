@@ -79,7 +79,7 @@ Every model call goes through an `Analyst` ([analysis/analyst.py](../api/app/ana
 **Schema validation.** The Pydantic models in [domain/models.py](../api/app/domain/models.py) double as the JSON Schemas the model fills. Every key is required and unknown keys are rejected, which strict structured output needs. [llm/base.py](../api/app/llm/base.py) holds the helpers every adapter shares:
 
 - `strict_schema` closes every object and marks every property required.
-- `parse_json` accepts a reply wrapped in code fences or a sentence and validates it against the schema.
+- `parse_json` accepts a reply wrapped in code fences or a sentence and validates it against the schema. It reads a reply in time linear in its length, since a user's own provider writes that text, and refuses one over 500,000 characters or nested deeper than the JSON decoder allows.
 - `repair_message` lists what failed. Each adapter sends it once in the same conversation and gives up with `LlmError("bad_output")` if the second reply also fails.
 
 `OpenAICompatibleLlm` asks for JSON the strongest way the provider allows: `json_schema` with `strict: true` for OpenAI, `json_object`, or the schema written into the system prompt. If a provider rejects `response_format`, it falls back to the prompt for the rest of its life. Only a 400 that names `response_format`, JSON or a schema does this; any other 400, such as a prompt over the context length, fails that one call and leaves structured output on for the next. A reply cut off at the token limit, a refusal and an empty reply each raise `LlmError`.
