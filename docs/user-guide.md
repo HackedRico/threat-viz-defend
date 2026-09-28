@@ -13,7 +13,7 @@ You need an invite code from whoever runs the deployment. On a local server the 
 5. Enter the **Invite code**.
 6. Choose **Create account**. You are signed in and land on your example board.
 
-To come back later, choose **Sign in** on the home page, or open `/signin`, and use the same username and password. A link into the app, such as a board link a coding agent prints, asks you to sign in first and then opens the board. **Sign out** returns you to the home page; if the server cannot be reached, you stay signed in and the menu says so, so try again. If the home page has no **Create an account** button and says "New accounts are closed right now", the deployment has no invite codes configured.
+To come back later, choose **Sign in** on the home page, or open `/signin`, and use the same username and password. A link into the app, such as a board link a coding agent prints, asks you to sign in first and then opens the board. **Sign out** returns you to the home page; if the server cannot be reached, you stay signed in and the menu says so, so try again. If the home page has no **Create an account** button and says "New accounts are closed right now", the deployment has no invite codes configured or has reached its account limit.
 
 There is no password reset. If you forget your password, ask the operator to delete the account, then create a new one.
 
