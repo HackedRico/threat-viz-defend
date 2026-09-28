@@ -211,3 +211,12 @@ def test_agents_see_backboard_memory_take_part(make_client: ClientFactory) -> No
 )
 def test_choice_answers_read_only_the_letters_meant_as_options(answer: str, letters: list[str]) -> None:
     assert _option_letters(answer, 5) == letters
+
+
+def test_an_open_answer_that_is_too_long_gets_a_reason_the_agent_can_act_on(signed_in: TestClient) -> None:
+    token = agent_token(signed_in)
+    arguments = {"board_id": example_board(signed_in), "question_id": "fix:T1", "answer": "word " * 1000}
+    failed, text = call_tool(signed_in, token, "answer_quiz_question", arguments)
+    # A request body the tool builds can refuse the agent's input; the agent needs to know why, not that it crashed.
+    assert failed
+    assert "3000" in text or "3,000" in text
