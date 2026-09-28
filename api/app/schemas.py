@@ -51,7 +51,7 @@ def plain_key(value: str | None) -> str | None:
 
 
 class SignupIn(RequestBody):
-    """Create an account with the event's invite code."""
+    """Create an account with an invite code."""
 
     username: str = Field(min_length=3, max_length=24)
     password: str = Field(min_length=10, max_length=128)
