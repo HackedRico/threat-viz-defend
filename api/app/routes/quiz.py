@@ -56,7 +56,8 @@ def start_voice(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Voic
     svc.budget.spend(session, user.id, "voice", "conversation")
     session.commit()
     token = svc.voice.conversation_token()
-    questions = build_quiz(system, analysis)
+    # The quiz serves questions only once threats are found on the current map; the coach must promise no more.
+    questions = build_quiz(system, analysis) if analysis is not None else []
     # The coach already speaks from the brief, so memory reaches it there, ahead of anything the cap would cut.
     remembered = (
         f"From memory: in earlier sessions they found {', '.join(TOPIC_NAMES[t] for t in focus.topics)} hard, "

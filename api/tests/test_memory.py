@@ -322,3 +322,15 @@ def test_the_voice_coach_hears_what_memory_says_to_ask_first(make_client: Client
     second = client.post("/api/boards/example").json()["id"]
     brief = client.post(f"/api/boards/{second}/voice").json()["dynamic_variables"]["board_brief"]
     assert brief.startswith("From memory: in earlier sessions they found the lethal trifecta hard")
+
+
+def test_the_voice_coach_is_told_only_the_questions_the_quiz_will_serve(make_client: ClientFactory) -> None:
+    client = make_client(voice=FakeVoice())
+    sign_up(client)
+    board_id = client.get("/api/boards").json()[0]["id"]
+    edited = client.get(f"/api/boards/{board_id}").json()["map"]
+    client.put(f"/api/boards/{board_id}/map", json={"map": edited})
+    # In review the quiz serves nothing, so a coach told there are questions would promise ones it cannot ask.
+    assert client.get(f"/api/boards/{board_id}/quiz").json()["questions"] == []
+    started = client.post(f"/api/boards/{board_id}/voice").json()
+    assert started["dynamic_variables"]["question_count"] == "0"
