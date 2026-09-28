@@ -59,8 +59,9 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
   const { boards, loaded, error: listError } = useBoardList();
   const [tokens, setTokens] = useState<TokenOut[] | null>(null);
   const [name, setName] = useState("");
-  const [fresh, setFresh] = useState<{ token: string; name: string } | null>(null);
+  const [fresh, setFresh] = useState<{ id: string; token: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const ids = useId();
   // Agents talk to the API, which may live on another origin than this page.
@@ -79,7 +80,7 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
     setError(null);
     try {
       const created = await api.createToken(label);
-      setFresh({ token: created.token, name: created.info.name });
+      setFresh({ id: created.info.id, token: created.token, name: created.info.name });
       setTokens((before) => [created.info, ...(before ?? [])]);
       setName("");
     } catch (caught) {
@@ -91,11 +92,16 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
 
   const revoke = async (id: string) => {
     setError(null);
+    setRevoking((before) => [...before, id]);
     try {
       await api.deleteToken(id);
       setTokens((before) => (before ?? []).filter((t) => t.id !== id));
+      // A revoked token no longer works, so it must not stay on screen as the one to copy.
+      setFresh((shown) => (shown?.id === id ? null : shown));
     } catch (caught) {
       setError(errorMessage(caught));
+    } finally {
+      setRevoking((before) => before.filter((other) => other !== id));
     }
   };
 
@@ -169,7 +175,13 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
                     <td>{formatTime(t.created_at)}</td>
                     <td>{t.last_used_at ? formatTime(t.last_used_at) : "never"}</td>
                     <td>
-                      <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={() => void revoke(t.id)} aria-label={`Revoke ${t.name}`}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm btn-danger"
+                        onClick={() => void revoke(t.id)}
+                        disabled={revoking.includes(t.id)}
+                        aria-label={`Revoke ${t.name}`}
+                      >
                         <TrashIcon width={15} height={15} /> Revoke
                       </button>
                     </td>
