@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.analyst import Analyst
 from app.boards.ingest import Material
-from app.boards.versions import attach_analysis, ensure_version, record_change
+from app.boards.versions import attach_analysis, ensure_version, newest_has_threats, record_change
 from app.db import Database, utcnow
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.notes import question_note
@@ -292,7 +292,7 @@ class Boards:
         with self._db.session() as session:
             rows = list(session.scalars(select(BoardRow).where(BoardRow.status.in_(BUSY))))
             for row in rows:
-                row.status = _stable_status(row)
+                row.status = _recovered_status(session, row)
                 row.error = "The server restarted while this was running. Try again."
                 _touch(row)
             return len(rows)
@@ -475,6 +475,16 @@ def _stable_status(row: BoardRow) -> str:
     if row.analysis is not None and row.map is not None:
         return "ready"
     return "review" if row.map is not None else "empty"
+
+
+def _recovered_status(session: Session, row: BoardRow) -> str:
+    """The status a board left busy by a restart goes back to, since the one it had before its job is not kept."""
+    status = _stable_status(row)
+    if status != "ready":
+        return status
+    # Stored threats describe the current map only when a confirm pinned them to its version; after a hand edit or an
+    # agent change they are for an older map. A board older than version history leaves only the old guess.
+    return "review" if newest_has_threats(session, row.id) is False else status
 
 
 def _headline(material: Material) -> str:

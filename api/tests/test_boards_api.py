@@ -381,3 +381,25 @@ def test_slow_board_routes_hold_no_database_connection_while_they_work(
     assert client.post(f"/api/boards/{example}/snowflake", json=target).status_code == 200
     assert client.post(f"/api/boards/{example}/voice").status_code == 200
     assert held == [0, 0, 0, 0]
+
+
+def _restart_mid_redraw(client: TestClient, board_id: str) -> str:
+    """Leave the board drawing, as a crash or deploy during a job does, then run startup recovery."""
+    services = client.app.state.services  # type: ignore[attr-defined]
+    with services.db.session() as session:
+        session.execute(update(BoardRow).where(BoardRow.id == board_id).values(status="mapping"))
+    services.boards.recover_interrupted()
+    status: str = client.get(f"/api/boards/{board_id}").json()["status"]
+    return status
+
+
+def test_a_restart_during_a_redraw_never_revives_threats_found_on_an_older_map(signed_in: TestClient) -> None:
+    board_id = signed_in.get("/api/boards").json()[0]["id"]
+    # Unchanged since its threats were found, the board may go back to ready.
+    assert _restart_mid_redraw(signed_in, board_id) == "ready"
+    edited = signed_in.get(f"/api/boards/{board_id}").json()["map"]
+    edited["nodes"] = [n for n in edited["nodes"] if n["id"] != "logs"]
+    assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+    # After a hand edit the stored threats describe the older map, so the board goes back to review.
+    assert _restart_mid_redraw(signed_in, board_id) == "review"
+    assert signed_in.get(f"/api/boards/{board_id}/quiz").json()["questions"] == []
