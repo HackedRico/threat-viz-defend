@@ -9,12 +9,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 
 from app.analysis.analyst import DemoAnalyst
+from app.boards import ingest
 from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.errors import AppError
 from app.llm.base import LlmError
+from app.routes import agents as agents_routes
+from app.routes import boards as boards_routes
 from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow, UsageRow
 from tests.conftest import ClientFactory, example_material, sign_up
 from tests.factories import inbox
@@ -332,3 +335,49 @@ def test_two_requests_that_both_saw_an_idle_board_start_one_job(make_client: Cli
     with services.db.session() as session:
         assert session.scalar(select(func.count()).select_from(UsageRow)) == 0
         assert session.get(BoardRow, board_id).status == "mapping"
+
+
+class _Voice:
+    def __init__(self, measure: Any) -> None:
+        self._measure = measure
+
+    def conversation_token(self) -> str:
+        self._measure()
+        return "one-time-token"
+
+
+def test_slow_board_routes_hold_no_database_connection_while_they_work(
+    make_client: ClientFactory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A route that kept its request's connection while masking an upload or waiting on an outside host drained the
+    # pool: on Postgres, 16 uploads at once all failed after a 30 second wait for a connection.
+    held: list[int] = []
+    client: TestClient
+
+    def measure() -> None:
+        held.append(client.app.state.services.db.engine.pool.checkedout())  # type: ignore[attr-defined]
+
+    client = make_client(database_url=f"sqlite:///{tmp_path / 'pool.db'}", voice=_Voice(measure))
+    sign_up(client)
+
+    def measured(real: Any) -> Any:
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
+            measure()
+            return real(*args, **kwargs)
+
+        return wrapped
+
+    monkeypatch.setattr(boards_routes, "build_material", measured(ingest.build_material))
+    monkeypatch.setattr(agents_routes, "agent_material", measured(ingest.agent_material))
+    monkeypatch.setattr(boards_routes, "push_board", measured(lambda *args: None))
+    board_id = client.post("/api/boards", json={"title": "Pool"}).json()["id"]
+    assert client.post(f"/api/boards/{board_id}/sources", json=example_material()).status_code == 202
+    token = client.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    change = {"agent": "claude-code", "summary": "add a cache", "diff": "diff --git a/x b/x\n", "files": ["x"]}
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.post(f"/api/agent/boards/{board_id}/changes", json=change, headers=headers).status_code == 202
+    example = next(b["id"] for b in client.get("/api/boards").json() if b["example"])
+    target = {"account": "myorg", "token": "pat-token-1", "warehouse": "W", "database": "D", "schema_name": "S"}
+    assert client.post(f"/api/boards/{example}/snowflake", json=target).status_code == 200
+    assert client.post(f"/api/boards/{example}/voice").status_code == 200
+    assert held == [0, 0, 0, 0]

@@ -84,6 +84,9 @@ def add_sources(board_id: str, body: SourcesIn, user: CurrentUser, svc: Svc, ses
     """Add pasted text or files and start drawing the map; poll the board for the result."""
     # Check ownership and pace before masking, which is the expensive part of an upload.
     svc.boards.get(session, user.id, board_id)
+    # Then hand the connection back: masking takes a while and `add_material` opens sessions of its own, so a burst
+    # of uploads holding theirs would drain the pool.
+    session.commit()
     svc.limiter.hit(f"sources:{user.id}", 20, 600, "Too many uploads in a few minutes. Wait, then try again.")
     items = [SourceItem(name=s.name, kind=s.kind, text=s.text) for s in body.sources]
     svc.boards.add_material(user.id, board_id, build_material(items, utcnow()))
@@ -95,6 +98,8 @@ def add_github(board_id: str, body: GithubIn, user: CurrentUser, svc: Svc, sessi
     """Read a public GitHub repository and start drawing the map from it."""
     repo = parse_repo_url(body.url)
     svc.boards.get(session, user.id, board_id)
+    # `add_from_fetch` opens sessions of its own, so this request's connection goes back to the pool first.
+    session.commit()
     svc.limiter.hit(f"sources:{user.id}", 20, 600, "Too many uploads in a few minutes. Wait, then try again.")
     svc.boards.add_from_fetch(
         user.id, board_id, lambda: fetch_repo(repo, utcnow()), f"Reading {repo.label} from GitHub."
@@ -166,6 +171,8 @@ def export_snowflake(
     svc.limiter.hit(f"snowflake:{user.id}", 20, 600, "Too many exports in a few minutes. Wait, then try again.")
     target = SnowflakeTarget(body.account, body.token, body.warehouse, body.database, body.schema_name)
     rows = findings(row.id, system, analysis, row.updated_at)
+    # Snowflake can take a minute per statement, and a connection held that long would starve other requests.
+    session.commit()
     try:
         with snowflake_client() as client:
             push_board(target, row.id, rows, client)

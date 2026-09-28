@@ -49,9 +49,12 @@ def start_voice(board_id: str, user: CurrentUser, svc: Svc, session: Db) -> Voic
     if system is None:
         raise conflict("Add material and draw a map before starting the voice coach.")
     analysis = current_analysis(row)
-    # Before the spend, so no write lock is held while Backboard answers.
+    # No connection is held while Backboard answers, and the spend commits before ElevenLabs is asked for a token,
+    # so neither outside call keeps a connection from the pool.
+    session.commit()
     focus = svc.quiz.focus(user.id, board_id)
     svc.budget.spend(session, user.id, "voice", "conversation")
+    session.commit()
     token = svc.voice.conversation_token()
     questions = build_quiz(system, analysis)
     # The coach already speaks from the brief, so memory reaches it there, ahead of anything the cap would cut.
