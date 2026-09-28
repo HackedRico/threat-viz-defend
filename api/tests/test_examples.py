@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from app.analysis.analyst import DemoAnalyst
 from app.boards.service import read_map
 from app.domain.briefing import brief, describe_element
 from app.domain.report import render_report
+from app.domain.rules import known_ids
 from app.examples import EXAMPLES_DIR, find_example, load_examples
 from app.tables import BoardRow
 from tests.factories import inbox
@@ -40,6 +42,16 @@ def test_every_example_reads_in_the_style_the_prompt_asks_for() -> None:
     for example in load_examples():
         assert re.match(r"Fix .+ first: ", example.analysis.verdict)
         assert not re.search(r"\bT\d+\b", example.analysis.verdict)
+
+
+def test_demo_mode_answers_every_recorded_question_with_ids_on_the_map() -> None:
+    # The ask bar's starter questions on the example are recorded answers, so a first run without a key gets replies.
+    demo = DemoAnalyst()
+    for example in load_examples():
+        known = known_ids(example.map, example.analysis)
+        for question, recorded in example.answers.items():
+            assert set(recorded.highlight) <= known, question
+            assert demo.answer(example.map, example.analysis, question, None) == recorded
 
 
 def test_brief_reads_the_board_aloud() -> None:
