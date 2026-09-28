@@ -120,6 +120,9 @@ class RequestGuard:
         if length is not None and (not length.isdigit() or int(length) > MAX_BODY_BYTES):
             return 413, "payload_too_large", _TOO_LARGE
         path: str = scope["path"]
+        if "\x00" in path:
+            # No id holds a NUL, and Postgres would fail the lookup with a 500 rather than find nothing.
+            return 400, "bad_request", "Invalid path."
         method: str = scope["method"]
         if method not in _UNSAFE or not path.startswith("/api/") or path.startswith(_TOKEN_PATHS):
             return None
@@ -130,7 +133,10 @@ class RequestGuard:
         # it comes from a frontend origin listed in `CORS_ORIGINS`.
         if headers.get("sec-fetch-site") == "cross-site" and origin not in self._settings.trusted_origins:
             return 403, "forbidden", "Cross-site requests are not allowed."
-        has_body = method != "DELETE" and headers.get("content-length", "0") != "0"
+        # A chunked body has no Content-Length, so a Transfer-Encoding header counts as a body too.
+        has_body = method != "DELETE" and (
+            headers.get("content-length", "0") != "0" or headers.get("transfer-encoding") is not None
+        )
         if has_body and not headers.get("content-type", "").startswith("application/json"):
             return 415, "bad_request", "Send the request body as JSON."
         return None

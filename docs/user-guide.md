@@ -344,7 +344,7 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 |---|---|
 | "That invite code is not valid." | Check the code with the organizers. Codes are exact. |
 | "This account is locked for 15 minutes after repeated failed sign ins." | Five wrong passwords lock the username. Wait 15 minutes, then sign in. |
-| "Sign ups are closed: this event has reached its account limit." | The deployment is full. Ask the operator. |
+| "Sign ups are closed: this server has reached its account limit." | The deployment is full. Ask the operator. |
 | You are sent back to the sign in screen | Your session expired or was ended. Sign in again. |
 | "Demo mode can only map the built-in examples" | The server has no model. Save your own under **Model provider**, or explore the example board. |
 | "None of those files can be sent. See the skipped list for why." | Every file was skipped. Open the skipped list, then add docs or source files instead. |

@@ -4,13 +4,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 
 from app.boards.github import parse_repo_url
 from app.config import load_settings
 from app.errors import AppError
 from app.limits import RateLimiter
 from app.tables import BoardRow
-from tests.conftest import ClientFactory, example_material, sign_up
+from tests.conftest import INVITE, PASSWORD, ClientFactory, example_material, sign_up
 
 
 def test_security_headers_are_on_every_response(client: TestClient) -> None:
@@ -35,6 +36,17 @@ def test_writes_must_be_json(signed_in: TestClient) -> None:
         "/api/boards", content="title=x", headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     assert response.status_code == 415
+
+
+def test_a_streamed_body_must_be_json_too(signed_in: TestClient) -> None:
+    def chunks() -> Iterator[bytes]:
+        yield b'{"title": "streamed"}'
+
+    # A chunked body carries no Content-Length, which is not the same as carrying no body.
+    for headers in ({}, {"Content-Type": "text/plain"}):
+        streamed = signed_in.build_request("POST", "/api/boards", content=chunks(), headers=headers)
+        assert streamed.headers["transfer-encoding"] == "chunked"
+        assert signed_in.send(streamed).status_code == 415
 
 
 def test_large_bodies_are_refused(signed_in: TestClient) -> None:
@@ -238,3 +250,32 @@ def test_a_short_window_flood_does_not_erase_a_lockout() -> None:
     for n in range(50_001):
         limiter.hit(f"signup:{n}", 60, 60, "")
     assert limiter.count("login-fail:gina:1.2.3.4", 900) == 5
+
+
+def test_nul_characters_never_reach_the_database(signed_in: TestClient) -> None:
+    # Postgres text columns refuse NUL outright, so any that got through would turn a write into a 500 there.
+    created = signed_in.post("/api/boards", json={"title": "pay\u0000ments"})
+    assert created.status_code == 201
+    assert created.json()["title"] == "payments"
+    board_id = created.json()["id"]
+    assert signed_in.get("/api/boards/a%00b").status_code == 400
+    example = next(b for b in signed_in.get("/api/boards").json() if b["example"])
+    system = signed_in.get(f"/api/boards/{example['id']}").json()["map"]
+    system["nodes"][0]["label"] = "Web\u0000 app"
+    edited = signed_in.put(f"/api/boards/{example['id']}/map", json={"map": system}).json()
+    assert "\u0000" not in edited["map"]["nodes"][0]["label"]
+    assert signed_in.get(f"/api/boards/{board_id}").status_code == 200
+
+
+def test_a_request_that_loses_an_insert_race_gets_a_409_not_a_500(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Two sign ups for one name, or two first saves of a provider, both insert; the loser hit a unique constraint.
+    def lost_race(*args: object, **kwargs: object) -> None:
+        raise IntegrityError("INSERT INTO users ...", {}, Exception("UNIQUE constraint failed: users.username"))
+
+    monkeypatch.setattr(client.app.state.services.accounts, "signup", lost_race)  # type: ignore[attr-defined]
+    raced = client.post("/api/auth/signup", json={"username": "sam", "password": PASSWORD, "invite_code": INVITE})
+    assert raced.status_code == 409
+    assert raced.json()["error"]["code"] == "conflict"
+    assert "UNIQUE" not in raced.text

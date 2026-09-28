@@ -11,7 +11,7 @@ from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
-from pydantic import AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, Field, ValidationError
 from sqlalchemy.orm import Session
 from starlette.applications import Starlette
 
@@ -316,3 +316,11 @@ async def _as_user[T](work: Callable[[str], T]) -> T:
     except AppError as exc:
         # The agent can act on the app's message, such as a busy board or a used-up budget.
         raise ToolError(exc.message) from exc
+    except ValidationError as exc:
+        # A request body a tool builds from the agent's arguments can refuse them, such as an answer over 3,000
+        # characters; the SDK would report only that the tool failed.
+        errors = exc.errors()
+        if not errors:
+            raise ToolError("The input is not valid.") from exc
+        where = ".".join(str(part) for part in errors[0]["loc"])
+        raise ToolError(f"{where}: {errors[0]['msg']}" if where else errors[0]["msg"]) from exc

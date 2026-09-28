@@ -87,17 +87,18 @@ class OpenAICompatibleLlm:
 
     def generate[T: BaseModel](self, request: LlmRequest[T]) -> T:
         """Call the model, validate its JSON against `request.schema`, and repair once on failure."""
+        # A person's budget starts when they ask, so the wait for a turn comes out of it, not on top of it.
+        deadline = self._clock() + INTERACTIVE_BUDGET_S if request.task in INTERACTIVE_TASKS else None
         # One turn covers the repair too, so a queued call cannot slip in between a reply and its repair.
-        with self._turn(request.task):
-            return self._generate(request)
+        with self._turn(deadline):
+            return self._generate(request, deadline)
 
-    def _generate[T: BaseModel](self, request: LlmRequest[T]) -> T:
-        """The call and its one repair round."""
+    def _generate[T: BaseModel](self, request: LlmRequest[T], deadline: float | None) -> T:
+        """The call and its one repair round, finished by `deadline` when set."""
         messages: list[dict[str, str]] = [
             {"role": "system", "content": self._system_prompt(request)},
             {"role": "user", "content": request.user},
         ]
-        deadline = self._clock() + INTERACTIVE_BUDGET_S if request.task in INTERACTIVE_TASKS else None
         reply = self._complete(messages, request, deadline)
         try:
             return parse_json(reply, request.schema)
@@ -116,12 +117,12 @@ class OpenAICompatibleLlm:
             ) from second
 
     @contextmanager
-    def _turn(self, task: str) -> Iterator[None]:
-        """Hold one call slot for a whole `generate`, waiting as long as the task's person, or job, can."""
+    def _turn(self, deadline: float | None) -> Iterator[None]:
+        """Hold one call slot for a whole `generate`, waiting until `deadline`, or as long as a job can."""
         if self._turns is None:
             yield
             return
-        wait = INTERACTIVE_BUDGET_S if task in INTERACTIVE_TASKS else QUEUE_WAIT_S
+        wait = QUEUE_WAIT_S if deadline is None else max(0.0, deadline - self._clock())
         if not self._turns.acquire(timeout=wait):
             raise LlmError("rate_limited", f"{self._label} is still busy with another board. Try again in a minute.")
         try:
@@ -156,6 +157,12 @@ class OpenAICompatibleLlm:
         try:
             response = self._create(messages, response_format, request.task, deadline)
         except openai.BadRequestError as exc:
+            if self._max_tokens is not None and _about_token_cap(exc):
+                # `LLM_MAX_TOKENS` reaches users' own providers too, and a model with a smaller output limit refuses
+                # it outright; leaving the cap to the provider from now on is what the user could not do themselves.
+                log.warning("[llm] %s refused an output cap of %s tokens; sending none.", self._label, self._max_tokens)
+                self._max_tokens = None
+                return self._complete(messages, request, deadline)
             if response_format is None or not _about_response_format(exc):
                 raise LlmError("unavailable", f"{self._label} rejected the request: {_brief(exc)}") from exc
             # Many compatible servers reject `response_format`; fall back to asking in the prompt from now on.
@@ -201,6 +208,11 @@ class OpenAICompatibleLlm:
                 )
             except openai.BadRequestError:
                 raise
+            except UnicodeError as exc:
+                # A key saved before keys were checked can hold a character a header cannot carry.
+                raise LlmError(
+                    "auth", f"The API key for {self._label} holds a character keys never have. Save it again."
+                ) from exc
             except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
                 raise LlmError("auth", f"{self._label} rejected the API key. Check `LLM_API_KEY`.") from exc
             except openai.NotFoundError as exc:
@@ -256,6 +268,12 @@ def _about_response_format(exc: openai.BadRequestError) -> bool:
     """True when a 400 complains about `response_format` or JSON output, not about the prompt or the model."""
     text = f"{exc} {exc.body}".lower()
     return any(word in text for word in ("response_format", "json_schema", "json_object", "json mode", "schema"))
+
+
+def _about_token_cap(exc: openai.BadRequestError) -> bool:
+    """True when a 400 complains about the output token cap this client sent."""
+    text = f"{exc} {exc.body}".lower()
+    return "max_tokens" in text or "max_completion_tokens" in text
 
 
 def _brief(exc: Exception) -> str:

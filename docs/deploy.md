@@ -200,7 +200,7 @@ The API ships an admin CLI. Run it inside the running container:
    python -m app.cli create-user <name> # make an organizer account without an invite code; prompts for the password
    python -m app.cli disable <username> # block an account and sign it out
    python -m app.cli enable <username>  # unblock it
-   python -m app.cli delete <username>  # delete an account and everything it owns; asks first, --yes skips that
+   python -m app.cli delete <username>  # delete an account, everything it owns and its Backboard notes; asks first, --yes skips that
    ```
 
 The CLI talks to the same database through `DATABASE_URL`, so changes take effect right away. There is no admin page in the web app on purpose. `python -m app.cli --help` lists the commands.

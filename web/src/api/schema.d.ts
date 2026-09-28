@@ -115,7 +115,7 @@ export interface paths {
         put?: never;
         /**
          * Signup
-         * @description Create an account with the event's invite code, add the example board, and sign in.
+         * @description Create an account with an invite code, add the example board, and sign in.
          */
         post: operations["signup_api_auth_signup_post"];
         delete?: never;
@@ -1522,7 +1522,7 @@ export interface components {
         };
         /**
          * SignupIn
-         * @description Create an account with the event's invite code.
+         * @description Create an account with an invite code.
          */
         SignupIn: {
             /** Invite Code */

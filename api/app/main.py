@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
+from sqlalchemy.exc import IntegrityError
 from starlette.convertors import PathConvertor, register_url_convertor
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
@@ -226,6 +227,14 @@ def _add_error_handlers(app: FastAPI) -> None:
         where = ".".join(str(p) for p in first.get("loc", ()) if p != "body")
         message = f"{where}: {first.get('msg', 'invalid value')}" if where else "The request body is not valid."
         return JSONResponse({"error": {"code": "invalid_request", "message": message}}, 422)
+
+    @app.exception_handler(IntegrityError)
+    async def raced(_: Request, exc: IntegrityError) -> JSONResponse:
+        # Two requests that both saw no row, such as a double submitted sign up or a first provider save, both
+        # insert, and the second meets a unique constraint; that is a conflict to retry, not a server fault.
+        log.warning("[http] A write lost a race with another request: %s", type(exc.orig).__name__)
+        message = "That changed in another request at the same moment. Try again."
+        return JSONResponse({"error": {"code": "conflict", "message": message}}, 409)
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

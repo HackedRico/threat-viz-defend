@@ -43,6 +43,11 @@ _NAME_TOPIC = {name.lower(): topic for topic, name in TOPIC_NAMES.items()}
 _QUIZ_NOTE = re.compile(r'topic (?P<topic>[^:]+): they got ".*" (?P<result>right|partly right|wrong)\.$', re.DOTALL)
 # How a reworded note says a question went badly; "partly right" counts, plain "right" does not.
 _MISSED = re.compile(r"\b(?:wrong|partly|partial|partially|missed|incorrect|struggl\w*|mistak\w*)\b", re.IGNORECASE)
+# A question the developer asked, such as "what could go wrong at the trust boundary", names a topic and a miss word
+# without being a result, so a note about asking is read as a miss only when it is also about the quiz.
+_QUIZ = re.compile(r"\bquiz", re.IGNORECASE)
+_ASKED = re.compile(r"\bask(?:ed|s|ing)?\b", re.IGNORECASE)
+_QUESTION_NOTE = re.compile(r'^On the ".*" board they asked: ', re.DOTALL)
 
 _TITLE_CHARS = 80
 _TEXT_CHARS = 300
@@ -89,7 +94,9 @@ def _read(note: str) -> tuple[list[QuestionTopic], bool]:
     if ours is not None:
         topic = _NAME_TOPIC.get(ours["topic"].strip().lower())
         return ([topic] if topic else []), ours["result"] != "right"
-    return [topic for topic, words in _TOPIC_WORDS.items() if words.search(note)], bool(_MISSED.search(note))
+    topics = [topic for topic, words in _TOPIC_WORDS.items() if words.search(note)]
+    asked = _QUESTION_NOTE.match(note.strip()) is not None or (_ASKED.search(note) and not _QUIZ.search(note))
+    return topics, not asked and _MISSED.search(note) is not None
 
 
 def _clip(text: str, limit: int) -> str:

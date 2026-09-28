@@ -158,6 +158,18 @@ def _unsaved_first(row: BoardRow, analysis: dict[str, Any] | None) -> OpenedVers
     return OpenedVersion(version, row.map, analysis)
 
 
+def newest_has_threats(session: Session, board_id: str) -> bool | None:
+    """Whether a confirm pinned threats to the board's newest version, or `None` for a board with no history yet."""
+    # `counts` is set with the threats and is not deferred, so this reads no map or analysis JSON.
+    newest = session.execute(
+        select(MapVersionRow.counts)
+        .where(MapVersionRow.board_id == board_id)
+        .order_by(MapVersionRow.number.desc())
+        .limit(1)
+    ).first()
+    return None if newest is None else newest.counts is not None
+
+
 def _newest_number(session: Session, board_id: str) -> int:
     """The highest version number on a board, or 0 before its first."""
     found = session.scalar(select(func.max(MapVersionRow.number)).where(MapVersionRow.board_id == board_id))

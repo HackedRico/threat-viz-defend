@@ -1949,7 +1949,7 @@
       },
       "SignupIn": {
         "additionalProperties": false,
-        "description": "Create an account with the event's invite code.",
+        "description": "Create an account with an invite code.",
         "properties": {
           "invite_code": {
             "maxLength": 64,
@@ -3191,7 +3191,7 @@
     },
     "/api/auth/signup": {
       "post": {
-        "description": "Create an account with the event's invite code, add the example board, and sign in.",
+        "description": "Create an account with an invite code, add the example board, and sign in.",
         "operationId": "signup_api_auth_signup_post",
         "requestBody": {
           "content": {

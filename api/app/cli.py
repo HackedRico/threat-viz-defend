@@ -4,6 +4,7 @@ import os
 import sys
 from collections.abc import Sequence
 
+import httpx
 from sqlalchemy import func, select
 
 from app.auth.service import Accounts
@@ -11,19 +12,20 @@ from app.config import load_settings
 from app.db import Database
 from app.errors import AppError
 from app.limits import RateLimiter
+from app.providers.memory import MemorySettings
 from app.tables import BoardRow, LoginSessionRow, UsageRow, UserRow
 
 # =============================================================================
 # Module Overview
 # =============================================================================
-# Admin commands for the people running an event, from a shell on the server:
+# Admin commands for the people running a deployment, from a shell on the server:
 # `python -m app.cli users`, `disable <name>`, `enable <name>`, `delete <name>`
 # and `stats`. There is no admin page on purpose: a command line on the host
 # is an admin surface attackers cannot reach from the web.
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run one admin command and return the exit code."""
+def main(argv: Sequence[str] | None = None, *, backboard: httpx.BaseTransport | None = None) -> int:
+    """Run one admin command and return the exit code; tests pass a fake `backboard` transport."""
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="Manage accounts on this deployment.")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("users", help="list accounts")
@@ -80,6 +82,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "delete":
             if not args.yes and input(f"Delete {user.username} and all their boards? Type the name: ") != user.username:
                 print("Nothing deleted.")
+                return 1
+            try:
+                # Memory notes live on Backboard, outside this database, so deleting the rows alone would leave them.
+                MemorySettings(db, settings, transport=backboard).forget(user.id)
+            except AppError as exc:
+                print(
+                    f"Could not delete the Backboard notes: {exc.message} Nothing deleted; try again.", file=sys.stderr
+                )
                 return 1
             session.delete(user)
             print(f"Deleted {user.username}.")

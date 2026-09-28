@@ -37,7 +37,7 @@ The message is written for the user and says what to do next. `429` responses ca
 | `unauthorized` | 401 | No valid session or token, or a wrong password |
 | `forbidden` | 403 | Signed in but not allowed: bad invite code, sign ups closed, disabled account, cross-site request |
 | `not_found` | 404 | No such thing, or it belongs to someone else |
-| `conflict` | 409 | Wrong state: the board is busy, has no map yet, or is not in review |
+| `conflict` | 409 | Wrong state: the board is busy, changed since it was read, has no map yet, or is not in review; or another request saved the same thing at the same moment |
 | `rate_limited` | 429 | Too many requests in a window, or a locked account |
 | `budget_exhausted` | 429 | Today's model calls, voice sessions or dictations are used up, for the user or for the whole app |
 | `payload_too_large` | 413 | The body is over the cap |

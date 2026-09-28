@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import service as auth_service
+from app.errors import AppError
 from tests.conftest import INVITE, PASSWORD, ClientFactory, sign_up
 
 
@@ -143,3 +144,41 @@ def test_a_busy_sign_in_is_not_counted_as_a_failure(client: TestClient, monkeypa
         for _ in range(2):
             auth_service._HASH_SLOTS.release()
     assert client.post("/api/auth/login", json={"username": "ines", "password": PASSWORD}).status_code == 200
+
+
+def test_the_right_invite_code_waits_out_a_network_that_guessed_too_often(client: TestClient) -> None:
+    for _ in range(20):
+        client.post("/api/auth/signup", json={"username": "guess", "password": PASSWORD, "invite_code": "nope-nope"})
+    right = client.post("/api/auth/signup", json={"username": "guess", "password": PASSWORD, "invite_code": INVITE})
+    assert right.status_code == 429
+
+
+def test_wrong_invite_codes_from_many_networks_all_count_toward_the_overall_cap(client: TestClient) -> None:
+    services = client.app.state.services  # type: ignore[attr-defined]
+
+    def attempt(code: str, ip: str) -> int:
+        try:
+            with services.db.session() as session:
+                services.accounts.signup(
+                    session, username="spread", password=PASSWORD, invite_code=code, honeypot="", ip=ip
+                )
+        except AppError as error:
+            return error.status
+        return 201
+
+    # Guesses past one network's limit are refused before the code is judged, so they must not use up the overall
+    # count either; 15 networks of 20 guesses reach it exactly.
+    for network in range(15):
+        assert {attempt("nope-nope", f"203.0.113.{network}") for _ in range(25)} == {403, 429}
+    assert attempt(INVITE, "198.51.100.7") == 429
+
+
+def test_a_sign_in_name_holding_a_colon_cannot_reach_another_accounts_lockout(client: TestClient) -> None:
+    sign_up(client, "ivy")
+    client.post("/api/auth/logout")
+    services = client.app.state.services  # type: ignore[attr-defined]
+    # Without a check, the per-name limit for "ivy:<ip>" is the key of ivy's tight lockout on that network.
+    for _ in range(6):
+        client.post("/api/auth/login", json={"username": "ivy:198.51.100.7", "password": "wrong password"})
+    with services.db.session() as session:
+        assert services.accounts.login(session, username="ivy", password=PASSWORD, ip="198.51.100.7")

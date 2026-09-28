@@ -20,9 +20,9 @@ ThreatViz Defend never says a system is secure. The threats it shows are written
 
 The app is invite-only, and the expensive parts are metered. All limits live in [limits.py](../api/app/limits.py) and [auth/service.py](../api/app/auth/service.py); [api.md](api.md#rate-limits-and-budgets) lists every number.
 
-- **Invite codes.** Sign up needs a code from `INVITE_CODES`. Codes are compared in constant time. Production refuses codes shorter than 6 characters, and an empty list closes sign ups. A wrong code counts against a limit of 20 per hour per network.
+- **Invite codes.** Sign up needs a code from `INVITE_CODES`. Codes are compared in constant time. Production refuses codes shorter than 6 characters, and an empty list closes sign ups. A wrong code counts against a limit of 20 per hour per network, and a network at that limit is refused even the right code until the hour passes.
 - **Honeypot.** The sign up form has a `website` field that people never see. A request that fills it is refused and the source IP is logged.
-- **Per-network limits, kept loose on purpose.** At a venue everyone can share one public IP, so per-IP limits are high: 60 sign ups per hour and 150 sign in attempts per 5 minutes. The invite code is the real gate. The client IP comes from the header named by `CLIENT_IP_HEADER` (App Platform's `do-connecting-ip`) only when `TRUST_PROXY` is on; otherwise it is the socket peer. IPv6 clients are counted by their /64, since one client usually holds a whole /64, and wrong invite codes also have a ceiling across all networks, 300 per hour.
+- **Per-network limits, kept loose on purpose.** At a venue everyone can share one public IP, so per-IP limits are high: 60 sign ups per hour and 150 sign in attempts per 5 minutes. The invite code is the real gate. The client IP comes from the header named by `CLIENT_IP_HEADER` (App Platform's `do-connecting-ip`) only when `TRUST_PROXY` is on; otherwise it is the socket peer. IPv6 clients are counted by their /64, since one client usually holds a whole /64, and wrong invite codes also have a ceiling across all networks, 300 per hour, which refuses every code once reached. Sign in refuses a name no account could have before it counts a failure, so a name with a colon cannot reach another account's lockout.
 - **Account lockout.** After 5 failed sign ins for one username from one network in 15 minutes, that pair is locked for 15 minutes, even with the right password. A looser ceiling of 50 failures per username across all networks stops a distributed guess. Keying the tight limit on the network means a stranger cannot lock someone else out from elsewhere. Each attempt reserves its failure before the password is checked, so parallel guesses cannot all slip past the count. A success, or a busy server that never checked the password, gives the reservation back. The limiter prunes idle keys by the longest window it has seen, so a flood of short-lived keys cannot erase a lockout.
 - **Account cap.** Sign ups stop at `MAX_USERS` accounts, 300 by default.
 - **Daily budgets.** Each user may make `DAILY_MODEL_CALLS` model calls (60), start `DAILY_VOICE_SESSIONS` voice sessions (10, 2 a minute at most, since parallel requests cannot see each other's uncommitted spends) and dictate `DAILY_DICTATIONS` questions (30, 10 a minute at most) per UTC day on the server's keys. All users together may make `GLOBAL_DAILY_MODEL_CALLS` model calls (3000). The `usage` table records every spend, so budgets survive a restart.
@@ -34,7 +34,7 @@ The app is invite-only, and the expensive parts are metered. All limits live in 
 ## Sessions and CSRF
 
 - **Session cookie.** Sign in creates a 32-byte random secret. Only its SHA-256 hash is stored, so a database leak cannot be replayed as a session. The cookie is `HttpOnly`, `Path=/`, `SameSite=Lax` by default, and lasts `SESSION_DAYS` days (7). In production it is `Secure` and named `__Host-tvd_session`; the prefix makes browsers refuse it unless it is Secure, host-only and on `/`. Sign out deletes the session row. `COOKIE_SAMESITE=none` is refused unless the cookie is also Secure.
-- **JSON-only writes.** A `POST`, `PUT` or `PATCH` with a body to a cookie route must be `Content-Type: application/json`, or it gets `415`. An HTML form cannot send that type, and a cross-origin script cannot send it without a CORS preflight.
+- **JSON-only writes.** A `POST`, `PUT` or `PATCH` with a body to a cookie route, whether it gives a `Content-Length` or streams in chunks, must be `Content-Type: application/json`, or it gets `415`. An HTML form cannot send that type, and a cross-origin script cannot send it without a CORS preflight.
 - **Origin check.** A write to a cookie route that carries an `Origin` header must come from `PUBLIC_ORIGIN` or a `CORS_ORIGINS` entry, or it gets `403`. Outside production, `localhost` origins also pass.
 - **Fetch metadata.** A write labeled `Sec-Fetch-Site: cross-site` is refused unless its origin is on the list.
 - **CORS allowlist.** CORS is on only when `CORS_ORIGINS` is set. It allows exactly those origins with credentials, never `*`, and only the `Content-Type` request header. Production requires every entry to be https.
@@ -80,6 +80,7 @@ No inline scripts are allowed. The voice SDK's audio worklets are served from ou
 
 - `APP_SECRET` must be at least 32 characters, and production refuses to start without it. Changing it makes every saved key unreadable; users then save their keys again.
 - Keys never leave the server. Responses show `...` and the last four characters at most. The form never refills a saved key; leaving the field empty keeps it.
+- A key must be printable ASCII with no spaces, as every header value is, so a character pasted in with it by mistake is refused when it is saved rather than failing every call later.
 - Keys are never logged.
 
 ## Server-side request forgery
@@ -91,6 +92,7 @@ The server makes outbound requests to three kinds of address. Two are fixed; one
 - Only `https` is allowed. Plain `http` is allowed only where private addresses are.
 - No username or password in the URL, no query string and no fragment.
 - Every address the host resolves to must be globally routable and not multicast. One private address among public ones fails the check.
+- The check looks up the host in the ASCII form the model client connects to, so a Unicode name, which the system resolver and the HTTP client can spell differently, cannot pass under one spelling and connect under the other.
 - `ALLOW_PRIVATE_PROVIDER_URLS` lets a deployment call local models such as Ollama. It defaults to on in development and off in production.
 - Error messages from the provider are cut to 200 characters before they reach the user.
 
@@ -108,14 +110,14 @@ The server makes outbound requests to three kinds of address. Two are fixed; one
 
 Uploads, agent diffs, questions and quiz answers are untrusted, and any of them can contain text written to steer a model. The defenses are layered so that a successful injection changes only words a person then reads.
 
-- **Fencing.** Untrusted text enters a prompt only through `fence()` in [analysis/prompts.py](../api/app/analysis/prompts.py). It escapes anything that looks like one of our block tags, so a document cannot close its block and speak as instructions.
+- **Fencing.** Untrusted text enters a prompt only through `fence()` in [analysis/prompts.py](../api/app/analysis/prompts.py). It drops invisible format characters, such as zero-width spaces, soft hyphens and the Unicode tag characters used to hide text, then escapes anything that looks like one of our block tags, so a document cannot close its block and speak as instructions.
 - **Untrusted blocks named.** Every system prompt ends with `untrusted(...)`, which names the blocks that hold data and tells the model to ignore instructions in them, including text claiming to come from the user, the developer or the system. The map prompt also asks the model to note such instructions in the map's assumptions.
 - **Structured output only.** Every reply must validate against a strict schema. There is no free text channel to act on.
 - **Sanitizers.** Ids the map does not contain are dropped from threats, paths and highlights, and every text field is clipped. A reply cannot point the page at anything that is not on the board. `sanitize_map` and `sanitize_analysis` also fold each text field of a map and its threats, attack paths and verdict onto one line, and `ask_board` folds its answer the same way, so no text a model wrote can add a line that poses as another node, flow, threat or id list in the plain text the MCP tools return.
 - **A person reviews the map.** Threats are only found on a map the user has checked and confirmed.
 - **Answer keys from code.** Injected text cannot change which quiz answer is right. Only open answers are graded by a model, and that grade affects only the user's own score.
 - **Plain text rendering.** The web app renders all model output as React text. It never uses `dangerouslySetInnerHTML` and never turns Markdown into HTML.
-- **Escaped report.** The Markdown export escapes every character that could form a link, image, HTML tag or heading in model text, so a poisoned upload cannot plant a phishing link in a report someone else opens.
+- **Escaped report.** The Markdown export escapes every character that could form a link, image, HTML tag or heading in model text. GitHub-flavored viewers also link a bare URL, a `www.` name or an email after they read escapes, so the export breaks each of those with an invisible word joiner. A poisoned upload cannot plant a phishing link in a report someone else opens.
 - **Plain exports.** The PDF report and the PNG and SVG images draw model text as React and SVG text, as the screen does. The SVG file holds shapes, text, inline styles and embedded fonts only, with no script, link or outside reference, so opening one someone shared runs nothing.
 - **No tools on the analysis model.** The model that reads untrusted material cannot call tools, browse or send anything. It reads sensitive data and untrusted content, but it has no way out, so our own pipeline does not have the lethal trifecta.
 - **Voice tools check their input.** The voice agent's client tools treat every parameter as untrusted, match letters to known options, and only light ids that exist on the board.
@@ -141,7 +143,7 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 
 ## Data retention
 
-- **Kept until deleted:** accounts, boards with their maps, their last 30 map versions, analyses, source records and activity, quiz answers including open answers in the user's own words, personal tokens, saved providers and usage records. A user can delete boards, revoke tokens, remove their provider and start a quiz over. Deleting an account takes an operator, and deletes everything the account owns.
+- **Kept until deleted:** accounts, boards with their maps, their last 30 map versions, analyses, source records and activity, quiz answers including open answers in the user's own words, personal tokens, saved providers and usage records. A user can delete boards, revoke tokens, remove their provider and start a quiz over. Deleting an account takes an operator, and deletes everything the account owns, including its memory notes on Backboard.
 - **Never kept:** the content of uploads, pasted text, GitHub files and agent diffs, and dictated recordings and their text.
 - **Sessions** stop working after `SESSION_DAYS`. Expired rows stay in the table.
 - **Server logs** hold usernames at sign up, the IP of a request that filled the honeypot, job failure messages, and, when a model reply fails validation, a short excerpt of that reply.

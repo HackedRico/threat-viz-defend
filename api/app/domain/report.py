@@ -21,11 +21,16 @@ from app.domain.rules import (
 # report someone else opens.
 
 _SPECIAL = re.compile(r"([\\`*_{}\[\]()#+\-.!|<>~])")
+# GitHub-flavored viewers turn a bare URL, a www. name or an email into a link after they read escapes, so no escape
+# stops them. A word joiner, which renders as nothing, breaks each pattern: inside `://`, after a leading `www`, and
+# before `@`.
+_AUTOLINK = re.compile(r"(?<=:)(?=//)|(?<=\bwww)(?=\.)|(?=@)", re.IGNORECASE)
+_JOINER = "\u2060"
 
 
 def _md(text: str) -> str:
-    """Escape Markdown and HTML syntax in untrusted text and fold it onto one line."""
-    return _SPECIAL.sub(r"\\\1", " ".join(text.split()))
+    """Escape Markdown and HTML syntax in untrusted text, break autolinks, and fold it onto one line."""
+    return _SPECIAL.sub(r"\\\1", _AUTOLINK.sub(_JOINER, " ".join(text.split())))
 
 
 def render_report(title: str, system: SystemMap, analysis: ThreatAnalysis | None, analyzed_by: str | None) -> str:

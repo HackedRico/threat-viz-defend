@@ -57,9 +57,13 @@ class Llm(Protocol):
 # Shared helpers for adapters
 # =============================================================================
 
-_FENCED = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
-# Reasoning models may think aloud first, braces and all.
-_THINKING = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
+# Reasoning models may think aloud first, braces and all. The tags are found one at a time rather than with one
+# pattern spanning a block, since a reply from a provider a user chose can be written to make that backtrack.
+_THINK_OPEN = re.compile(r"<think(?:ing)?>", re.IGNORECASE)
+_THINK_CLOSE = re.compile(r"</think(?:ing)?>", re.IGNORECASE)
+# Several times the largest map or analysis the sanitizers keep, and a bound on how long the brace scan can run on
+# text written to be slow to scan.
+_MAX_REPLY_CHARS = 500_000
 # Supporting lists a model drops when it has nothing for them. The lists that carry a reply, such as a map's
 # nodes or an analysis's threats, stay required: filling those would pass off a broken reply as an empty one.
 _SPARE_LISTS = frozenset({"how", "code", "refs", "highlight", "assumptions"})
@@ -97,10 +101,10 @@ def schema_instructions(schema: type[BaseModel]) -> str:
 
 def parse_json[T: BaseModel](text: str, schema: type[T]) -> T:
     """Parse model text as `schema`: the first JSON object in it that fits, whatever text surrounds it."""
-    stripped = _THINKING.sub("", text).strip()
-    fenced = _FENCED.match(stripped)
-    if fenced:
-        stripped = fenced.group(1)
+    # Code fences need no handling of their own: the scan below starts at the first brace either way.
+    stripped = _drop_thinking(text).strip()
+    if len(stripped) > _MAX_REPLY_CHARS:
+        raise ValueError(f"The reply ran past {_MAX_REPLY_CHARS:,} characters.")
     decoder = json.JSONDecoder()
     invalid: ValidationError | None = None
     start = stripped.find("{")
@@ -111,6 +115,10 @@ def parse_json[T: BaseModel](text: str, schema: type[T]) -> T:
             # A brace in prose, such as "{like this}", starts no object; the reply's object comes later.
             start = stripped.find("{", start + 1)
             continue
+        except RecursionError as exc:
+            # No schema nests anywhere near the decoder's limit, and retrying from each inner brace would pay the
+            # whole depth again every time.
+            raise ValueError("The reply nests too deep to be a JSON reply.") from exc
         if isinstance(value, dict):
             try:
                 return schema.model_validate(_bend(value, schema))
@@ -121,6 +129,24 @@ def parse_json[T: BaseModel](text: str, schema: type[T]) -> T:
     if invalid is not None:
         raise invalid
     raise ValueError("The reply held no JSON object.")
+
+
+def _drop_thinking(text: str) -> str:
+    """`text` without its reasoning blocks, in one pass; an unclosed block stays, since the reply may follow it."""
+    kept: list[str] = []
+    position = 0
+    # Some chat templates open the block in the prompt, so the reply starts inside it and holds only the closing tag.
+    first_close, first_open = _THINK_CLOSE.search(text), _THINK_OPEN.search(text)
+    if first_close and (first_open is None or first_close.start() < first_open.start()):
+        position = first_close.end()
+    while (opening := _THINK_OPEN.search(text, position)) is not None:
+        closing = _THINK_CLOSE.search(text, opening.end())
+        if closing is None:
+            break
+        kept.append(text[position : opening.start()])
+        position = closing.end()
+    kept.append(text[position:])
+    return "".join(kept)
 
 
 def _bend(value: Any, annotation: Any) -> Any:

@@ -29,6 +29,8 @@ def report_change(
     """Update the board's map from a coding agent's change."""
     # A hook retries a busy board on its next turn, and those retries must not use up the hour's changes.
     svc.boards.check_idle(session, user.id, board_id)
+    # Masking the diff takes a while and `add_material` opens sessions of its own, so the connection goes back first.
+    session.commit()
     svc.limiter.hit(f"agent-change:{user.id}", 30, 3600, "Too many agent changes this hour. Batch them or wait.")
     material = agent_material(body.agent, body.summary, body.diff, body.files, utcnow())
     svc.boards.add_material(user.id, board_id, material)

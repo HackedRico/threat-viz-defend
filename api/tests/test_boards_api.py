@@ -1,5 +1,6 @@
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -7,16 +8,22 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
+from sqlalchemy.orm import object_session
 
 from app.analysis.analyst import DemoAnalyst
+from app.boards import ingest
+from app.boards import service as boards_service
 from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.errors import AppError
 from app.llm.base import LlmError
+from app.main import create_app
+from app.routes import agents as agents_routes
+from app.routes import boards as boards_routes
 from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow, UsageRow
-from tests.conftest import ClientFactory, example_material, sign_up
+from tests.conftest import BASE_SETTINGS, ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
 
@@ -332,3 +339,145 @@ def test_two_requests_that_both_saw_an_idle_board_start_one_job(make_client: Cli
     with services.db.session() as session:
         assert session.scalar(select(func.count()).select_from(UsageRow)) == 0
         assert session.get(BoardRow, board_id).status == "mapping"
+
+
+class _Voice:
+    def __init__(self, measure: Any) -> None:
+        self._measure = measure
+
+    def conversation_token(self) -> str:
+        self._measure()
+        return "one-time-token"
+
+
+def test_slow_board_routes_hold_no_database_connection_while_they_work(
+    make_client: ClientFactory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A route that kept its request's connection while masking an upload or waiting on an outside host drained the
+    # pool: on Postgres, 16 uploads at once all failed after a 30 second wait for a connection.
+    held: list[int] = []
+    client: TestClient
+
+    def measure() -> None:
+        held.append(client.app.state.services.db.engine.pool.checkedout())  # type: ignore[attr-defined]
+
+    client = make_client(database_url=f"sqlite:///{tmp_path / 'pool.db'}", voice=_Voice(measure))
+    sign_up(client)
+
+    def measured(real: Any) -> Any:
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
+            measure()
+            return real(*args, **kwargs)
+
+        return wrapped
+
+    monkeypatch.setattr(boards_routes, "build_material", measured(ingest.build_material))
+    monkeypatch.setattr(agents_routes, "agent_material", measured(ingest.agent_material))
+    monkeypatch.setattr(boards_routes, "push_board", measured(lambda *args: None))
+    board_id = client.post("/api/boards", json={"title": "Pool"}).json()["id"]
+    assert client.post(f"/api/boards/{board_id}/sources", json=example_material()).status_code == 202
+    token = client.post("/api/tokens", json={"name": "hook"}).json()["token"]
+    change = {"agent": "claude-code", "summary": "add a cache", "diff": "diff --git a/x b/x\n", "files": ["x"]}
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.post(f"/api/agent/boards/{board_id}/changes", json=change, headers=headers).status_code == 202
+    example = next(b["id"] for b in client.get("/api/boards").json() if b["example"])
+    target = {"account": "myorg", "token": "pat-token-1", "warehouse": "W", "database": "D", "schema_name": "S"}
+    assert client.post(f"/api/boards/{example}/snowflake", json=target).status_code == 200
+    assert client.post(f"/api/boards/{example}/voice").status_code == 200
+    assert held == [0, 0, 0, 0]
+
+
+def _restart_mid_redraw(client: TestClient, board_id: str) -> str:
+    """Leave the board drawing, as a crash or deploy during a job does, then run startup recovery."""
+    services = client.app.state.services  # type: ignore[attr-defined]
+    with services.db.session() as session:
+        session.execute(update(BoardRow).where(BoardRow.id == board_id).values(status="mapping"))
+    services.boards.recover_interrupted()
+    status: str = client.get(f"/api/boards/{board_id}").json()["status"]
+    return status
+
+
+def test_a_restart_during_a_redraw_never_revives_threats_found_on_an_older_map(signed_in: TestClient) -> None:
+    board_id = signed_in.get("/api/boards").json()[0]["id"]
+    # Unchanged since its threats were found, the board may go back to ready.
+    assert _restart_mid_redraw(signed_in, board_id) == "ready"
+    edited = signed_in.get(f"/api/boards/{board_id}").json()["map"]
+    edited["nodes"] = [n for n in edited["nodes"] if n["id"] != "logs"]
+    assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+    # After a hand edit the stored threats describe the older map, so the board goes back to review.
+    assert _restart_mid_redraw(signed_in, board_id) == "review"
+    assert signed_in.get(f"/api/boards/{board_id}/quiz").json()["questions"] == []
+
+
+def test_a_confirm_is_refused_when_the_map_changed_after_it_was_read(
+    signed_in: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    board_id = signed_in.get("/api/boards").json()[0]["id"]
+    edited = signed_in.get(f"/api/boards/{board_id}").json()["map"]
+    assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+    real_read = boards_service.read_map
+
+    def edit_lands_meanwhile(row: BoardRow) -> SystemMap | None:
+        # Another request commits a hand edit after this confirm read the map and before it claims the board.
+        bump = update(BoardRow).where(BoardRow.id == row.id).values(revision=BoardRow.revision + 1)
+        session = object_session(row)
+        assert session is not None
+        session.execute(bump.execution_options(synchronize_session=False))
+        return real_read(row)
+
+    monkeypatch.setattr(boards_service, "read_map", edit_lands_meanwhile)
+    # Finding threats on the map it read would pin them to the edited map's version.
+    assert signed_in.post(f"/api/boards/{board_id}/confirm").status_code == 409
+    monkeypatch.setattr(boards_service, "read_map", real_read)
+    assert signed_in.get(f"/api/boards/{board_id}").json()["status"] == "review"
+
+
+def test_a_long_provider_label_still_saves_the_threats(make_client: ClientFactory) -> None:
+    class LongLabel(DemoAnalyst):
+        # A saved provider's label is its model id and host, and a Bedrock profile ARN alone runs past 100 characters.
+        label = (
+            "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.a-very-long-model-name-v1:0 via x"
+        )
+
+    client = make_client(analyst=LongLabel())
+    sign_up(client)
+    board = client.post("/api/boards", json={"title": "Label"}).json()
+    client.post(f"/api/boards/{board['id']}/sources", json=example_material())
+    client.post(f"/api/boards/{board['id']}/confirm")
+    ready = client.get(f"/api/boards/{board['id']}").json()
+    assert ready["status"] == "ready"
+    assert len(ready["analyzed_by"]) <= 120
+
+
+class _HeldJobs:
+    """Keeps jobs until `run` is called, as a job still running on an instance being replaced does."""
+
+    def __init__(self) -> None:
+        self.held: list[Any] = []
+
+    def submit(self, work: Any, label: str) -> None:
+        self.held.append(work)
+
+    def run(self) -> None:
+        while self.held:
+            self.held.pop(0)()
+
+
+def test_a_job_that_outlives_a_restart_never_overwrites_what_happened_since(tmp_path: Path) -> None:
+    jobs = _HeldJobs()
+    settings = replace(BASE_SETTINGS, database_url=f"sqlite:///{tmp_path / 'late.db'}")
+    with TestClient(create_app(settings, analyst=DemoAnalyst(), jobs=jobs)) as client:
+        sign_up(client)
+        board_id = client.get("/api/boards").json()[0]["id"]
+        edited = client.get(f"/api/boards/{board_id}").json()["map"]
+        client.put(f"/api/boards/{board_id}/map", json={"map": edited})
+        assert client.post(f"/api/boards/{board_id}/confirm").status_code == 202
+        # A new instance starts during a deploy and resets the board, and the person edits it again...
+        client.app.state.services.boards.recover_interrupted()  # type: ignore[attr-defined]
+        edited["nodes"] = [n for n in edited["nodes"] if n["id"] != "logs"]
+        assert client.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+        # ...then the old instance's job finishes and must not pin its threats to the new map.
+        jobs.run()
+        board = client.get(f"/api/boards/{board_id}").json()
+        assert board["status"] == "review"
+        assert "logs" not in {n["id"] for n in board["map"]["nodes"]}

@@ -9,6 +9,7 @@ from app.domain.rules import (
     sanitize_analysis,
     sanitize_map,
     severity_counts,
+    slug_id,
 )
 from tests.factories import analysis, flow, inbox, node, system, threat, trifecta_map
 
@@ -234,3 +235,10 @@ def test_sanitize_analysis_resolves_elements_and_steps_named_by_label_and_keeps_
     assert [(t.id, t.element) for t in clean.threats] == [("T1", "agent"), ("T2", "f3")]
     assert clean.paths[0].steps == ["attacker", "agent", "mail"]
     assert clean.paths[0].threats == ["T1"]
+
+
+def test_a_long_id_keeps_its_name_through_every_later_save() -> None:
+    # Cut at 40 characters right after a dash, the id lost that dash on the next save and read as a new node.
+    once = slug_id("user-authentication-service-postgres-db-replica", "n1")
+    assert not once.endswith("-")
+    assert slug_id(once, "n1") == once

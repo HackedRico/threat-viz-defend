@@ -1,15 +1,22 @@
 import json
 import socket
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
+import httpx2
+import openai
 import pytest
 from fastapi.testclient import TestClient
 
+from app.domain.models import Answer
 from app.errors import AppError
-from app.llm.base import LlmError
+from app.llm.base import LlmError, LlmRequest
+from app.llm.openai_compat import OpenAICompatibleLlm
+from app.memory import BackboardApi
 from app.providers import netguard, service
 from app.providers.netguard import check_base_url
 from app.providers.secrets_box import SecretBox
@@ -187,6 +194,25 @@ def test_private_addresses_inside_ipv6_are_refused(address: str) -> None:
         check_base_url("https://api.example.com/v1", allow_private=False, resolver=lambda host, port: [address])
 
 
+def test_a_unicode_host_is_checked_under_the_name_the_client_connects_to() -> None:
+    asked: list[str] = []
+
+    def record(host: str, port: int) -> list[str]:
+        asked.append(host)
+        return [PUBLIC]
+
+    # getaddrinfo would look this name up as strasse.example, but httpx, and so the OpenAI SDK, connects to the
+    # IDNA 2008 name. Two names an attacker controls could then point at a public and a private address.
+    check_base_url("https://straße.example/v1", allow_private=False, resolver=record)
+    assert asked == ["xn--strae-oqa.example"]
+    # The OpenAI SDK connects through its own copy of httpx, so pin the check to what the SDK itself would reach.
+    sdk = openai.OpenAI(api_key="k", base_url="https://straße.example/v1")
+    assert asked == [sdk.base_url.raw_host.decode("ascii")]
+    with pytest.raises(AppError) as invalid:
+        check_base_url(f"https://{'ß' * 70}.example/v1", allow_private=False, resolver=record)
+    assert invalid.value.status == 400
+
+
 def test_malformed_urls_and_names_are_400_not_500() -> None:
     with pytest.raises(AppError) as bracket:
         check_base_url("https://[::1/v1", allow_private=False, resolver=public_dns)
@@ -211,6 +237,29 @@ def test_a_slow_lookup_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
         netguard.resolve("slow.example", 443)
 
 
+def test_a_lookup_that_finishes_before_its_callback_is_added_does_not_hang(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An IP literal resolves in microseconds, so the future can be done before `resolve` registers its cleanup.
+    class Instant:
+        def submit(self, fn: Any, *args: Any, **kwargs: Any) -> Future[Any]:
+            done: Future[Any] = Future()
+            done.set_result(fn(*args, **kwargs))
+            return done
+
+    def literal(host: str, *args: object, **kwargs: object) -> list[tuple[Any, ...]]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", literal)
+    monkeypatch.setattr(netguard, "_lookups", Instant())
+    answers: list[list[str]] = []
+    # Twice, since a lock left held would stall every later lookup; daemon threads fail the test rather than hang it.
+    for _ in range(2):
+        worker = threading.Thread(target=lambda: answers.append(netguard.resolve(PUBLIC, 443)), daemon=True)
+        worker.start()
+        worker.join(timeout=2)
+        assert not worker.is_alive(), "resolve deadlocked on its own lock"
+    assert answers == [[PUBLIC], [PUBLIC]]
+
+
 def test_parallel_lookups_of_one_host_share_one_thread(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
@@ -224,3 +273,37 @@ def test_parallel_lookups_of_one_host_share_one_thread(monkeypatch: pytest.Monke
         answers = list(pool.map(lambda _: netguard.resolve("shared.example", 443), range(6)))
     assert answers == [["93.184.216.34"]] * 6
     assert calls == ["shared.example"]
+
+
+def test_a_key_holding_a_character_keys_never_have_is_refused_before_it_is_saved(make_client: ClientFactory) -> None:
+    client = make_client(allow_private_provider_urls=False, resolver=public_dns)
+    sign_up(client)
+    # A zero-width space from a copy and paste saved fine before, then failed every call as the key went into a header.
+    for body in (provider_body(api_key="sk-user​-key-1234"), provider_body(api_key="sk-user key-1234")):
+        refused = client.put("/api/provider", json=body)
+        assert refused.status_code == 422
+        assert "Paste it again" in refused.json()["error"]["message"]
+    assert client.put("/api/memory", json={"api_key": "bb-​key-1234"}).status_code == 422
+
+
+def test_a_saved_key_that_cannot_go_in_a_header_fails_as_an_auth_error_not_a_crash() -> None:
+    sent: list[object] = []
+
+    def answer(request: object) -> httpx2.Response:
+        sent.append(request)
+        return httpx2.Response(200, json={})
+
+    sdk_client = httpx2.Client(transport=httpx2.MockTransport(answer))
+    client = openai.OpenAI(
+        api_key="sk-\u200bkey", base_url="https://api.example.com/v1", max_retries=0, http_client=sdk_client
+    )
+    llm = OpenAICompatibleLlm(model="m", api_key="sk-\u200bkey", json_mode="json_schema", client=client)
+    with pytest.raises(LlmError) as model_error:
+        llm.generate(LlmRequest("answer", "system", "user", Answer))
+    assert model_error.value.code == "auth"
+    backboard_transport = httpx.MockTransport(lambda request: httpx.Response(200, json={}))
+    backboard = BackboardApi(api_key="bb-\u200bkey", base_url="https://bb.test/api", transport=backboard_transport)
+    with pytest.raises(LlmError) as memory_error:
+        backboard.request("GET", "/assistants")
+    assert memory_error.value.code == "auth"
+    assert sent == []

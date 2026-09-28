@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, TypeGuard, cast
 
 from pydantic import ValidationError
 from sqlalchemy import CursorResult, delete, select, update
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analysis.analyst import Analyst
 from app.boards.ingest import Material
-from app.boards.versions import attach_analysis, ensure_version, record_change
+from app.boards.versions import attach_analysis, ensure_version, newest_has_threats, record_change
 from app.db import Database, utcnow
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.notes import question_note
@@ -186,10 +186,12 @@ class Boards:
             raise bad_request("A map needs at least one component.")
         # Claimed with one conditional write, as `_begin` does, so a confirm that started since this row was read
         # cannot find threats on one map while this edit saves another under it.
-        claim = update(BoardRow).where(BoardRow.id == row.id, BoardRow.status.not_in(BUSY))
+        claim = update(BoardRow).where(
+            BoardRow.id == row.id, BoardRow.status.not_in(BUSY), BoardRow.revision == row.revision
+        )
         claimed = session.execute(claim.values(status="review").execution_options(synchronize_session=False))
         if cast(CursorResult[tuple[()]], claimed).rowcount != 1:
-            raise conflict("The board is busy. Wait for it to finish, then save your edits.")
+            raise conflict("The board changed or is busy. Reload it, then save your edits again.")
         # Keep the map before the edit so review marks what the person changed.
         before, before_analysis = row.map, _analysis_json(row)
         row.previous_map = row.map
@@ -234,13 +236,14 @@ class Boards:
                 return
             try:
                 with self._db.session() as session:
-                    target = session.get(BoardRow, board_id)
-                    if target is None:
+                    target = session.get(BoardRow, board_id, with_for_update=True)
+                    if not _still_claimed(target, "analyzing", board_id):
                         return
                     target.analysis = analysis.model_dump(mode="json")
                     attach_analysis(session, board_id, target.analysis, confirmed[0])
                     target.analysis_version += 1
-                    target.analyzed_by = analyst.label
+                    # The column holds 120 characters, and a saved provider's model id and host can run longer.
+                    target.analyzed_by = analyst.label[:120]
                     target.status = "ready"
                     target.error = None
                     _event(session, board_id, "analyzed", f"Found {len(analysis.threats)} threats. {analysis.verdict}")
@@ -292,7 +295,7 @@ class Boards:
         with self._db.session() as session:
             rows = list(session.scalars(select(BoardRow).where(BoardRow.status.in_(BUSY))))
             for row in rows:
-                row.status = _stable_status(row)
+                row.status = _recovered_status(session, row)
                 row.error = "The server restarted while this was running. Try again."
                 _touch(row)
             return len(rows)
@@ -327,13 +330,17 @@ class Boards:
             restore = _stable_status(row)
             current = read_map(row)
             # One conditional write claims the board, so two requests that both saw it idle, such as a coding
-            # agent's change and a click on confirm, cannot both spend a call and start a job.
-            claim = update(BoardRow).where(BoardRow.id == board_id, BoardRow.status.not_in(BUSY))
+            # agent's change and a click on confirm, cannot both spend a call and start a job. The revision must
+            # also be the one read, or a hand edit that committed in between would be drafted over or pinned to
+            # threats found on the map this read.
+            claim = update(BoardRow).where(
+                BoardRow.id == board_id, BoardRow.status.not_in(BUSY), BoardRow.revision == row.revision
+            )
             claimed = session.execute(
                 claim.values(status=status, error=None).execution_options(synchronize_session=False)
             )
             if cast(CursorResult[tuple[()]], claimed).rowcount != 1:
-                raise conflict("The board is already working. Wait for it to finish, then try again.")
+                raise conflict("The board changed or is already working. Reload it, then try again.")
             self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             row.status = status
             row.error = None
@@ -369,8 +376,8 @@ class Boards:
                 return
             try:
                 with self._db.session() as session:
-                    target = session.get(BoardRow, board_id)
-                    if target is None:
+                    target = session.get(BoardRow, board_id, with_for_update=True)
+                    if not _still_claimed(target, "mapping", board_id):
                         return
                     before, before_analysis = target.map, _analysis_json(target, restore)
                     target.previous_map = current.model_dump(mode="json") if current else None
@@ -393,11 +400,14 @@ class Boards:
 
     def _fail(self, board_id: str, status: str, message: str) -> None:
         """Record a failed job and put the board back to `status`."""
+        # A provider's error text can hold a NUL, which would fail this write too and leave the board busy.
+        message = message.replace("\x00", "")
         log.warning("[boards] Job on %s failed: %s", board_id, message)
         try:
             with self._db.session() as session:
-                row = session.get(BoardRow, board_id)
-                if row is None:
+                row = session.get(BoardRow, board_id, with_for_update=True)
+                # A board no longer busy moved on without this job, as after a restart, and keeps what it has now.
+                if row is None or row.status not in BUSY:
                     return
                 row.status = status
                 row.error = message
@@ -475,6 +485,26 @@ def _stable_status(row: BoardRow) -> str:
     return "review" if row.map is not None else "empty"
 
 
+def _still_claimed(row: BoardRow | None, status: str, board_id: str) -> TypeGuard[BoardRow]:
+    """Whether a job's board is still in the busy `status` the job claimed, so its result may be saved."""
+    # A restart during a deploy resets busy boards while the old instance's jobs may still finish; saving one then
+    # would overwrite whatever the person did since.
+    if row is None or row.status != status:
+        log.warning("[boards] Dropping a finished job's result on %s: the board moved on while it ran.", board_id)
+        return False
+    return True
+
+
+def _recovered_status(session: Session, row: BoardRow) -> str:
+    """The status a board left busy by a restart goes back to, since the one it had before its job is not kept."""
+    status = _stable_status(row)
+    if status != "ready":
+        return status
+    # Stored threats describe the current map only when a confirm pinned them to its version; after a hand edit or an
+    # agent change they are for an older map. A board older than version history leaves only the old guess.
+    return "review" if newest_has_threats(session, row.id) is False else status
+
+
 def _headline(material: Material) -> str:
     """What was added, for a version's label: the summary's first sentence, without the masking and skip counts."""
     return material.summary().split(". ")[0].rstrip(".")
@@ -487,7 +517,8 @@ def _analysis_json(row: BoardRow, status: str | None = None) -> dict[str, Any] |
 
 def _event(session: Session, board_id: str, kind: str, text: str) -> None:
     """Append a line to a board's activity log."""
-    session.add(BoardEventRow(board_id=board_id, kind=kind[:24], text=text[:1000]))
+    # Event text quotes model and provider text, and Postgres refuses a NUL in it.
+    session.add(BoardEventRow(board_id=board_id, kind=kind[:24], text=text.replace("\x00", "")[:1000]))
 
 
 def _touch(row: BoardRow) -> None:

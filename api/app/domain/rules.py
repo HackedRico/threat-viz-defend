@@ -38,6 +38,8 @@ MAX_TEXT = 600
 MAX_LABEL = 80
 MAX_DETAILS = 4
 MAX_PATH = 200
+# An answer or a grade's feedback: a few sentences, with room to spare.
+MAX_REPLY = 1500
 
 
 @dataclass(frozen=True)
@@ -258,7 +260,8 @@ def checklist_text(system: SystemMap) -> str:
 
 def slug_id(raw: str, fallback: str) -> str:
     """Normalize an id to lowercase characters that are safe in URLs, DOM ids and prompts."""
-    cleaned = _ID_UNSAFE.sub("-", raw.strip().lower()).strip("-")[:40]
+    # Stripped again after the cut, or a cut landing on a dash would be undone by the next save, renaming the id.
+    cleaned = _ID_UNSAFE.sub("-", raw.strip().lower()).strip("-")[:40].strip("-")
     return cleaned or fallback
 
 
@@ -468,11 +471,18 @@ def remove_element(system: SystemMap, item_id: str) -> SystemMap:
     return trimmed.model_copy(update={"boundaries": [b for b in trimmed.boundaries if b.id in used]})
 
 
+def clip(text: str, limit: int) -> str:
+    """`text` cut to `limit` characters, marking the cut, for model text that keeps its line breaks."""
+    text = text.replace("\x00", "")
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
 def _one_line(text: str, limit: int) -> str:
     """Fold every run of whitespace, line breaks included, into one space and cut to `limit`, marking the cut."""
     # Agents read map and threat text line by line in `get_board` and `describe_element`, where a line
     # break could pose as another id or threat. `str.split()` also breaks on `\r`, `\x85` and U+2028.
-    folded = " ".join(text.split())
+    # NUL is dropped too, since Postgres text columns refuse it.
+    folded = " ".join(text.replace("\x00", "").split())
     return folded if len(folded) <= limit else folded[: limit - 1].rstrip() + "…"
 
 

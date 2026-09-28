@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api", tags=["auth"])
 
 @router.post("/auth/signup", status_code=status.HTTP_201_CREATED)
 def signup(body: SignupIn, request: Request, response: Response, svc: Svc, session: Db) -> MeOut:
-    """Create an account with the event's invite code, add the example board, and sign in."""
+    """Create an account with an invite code, add the example board, and sign in."""
     signed_in = svc.accounts.signup(
         session,
         username=body.username,
