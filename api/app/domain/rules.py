@@ -260,7 +260,8 @@ def checklist_text(system: SystemMap) -> str:
 
 def slug_id(raw: str, fallback: str) -> str:
     """Normalize an id to lowercase characters that are safe in URLs, DOM ids and prompts."""
-    cleaned = _ID_UNSAFE.sub("-", raw.strip().lower()).strip("-")[:40]
+    # Stripped again after the cut, or a cut landing on a dash would be undone by the next save, renaming the id.
+    cleaned = _ID_UNSAFE.sub("-", raw.strip().lower()).strip("-")[:40].strip("-")
     return cleaned or fallback
 
 

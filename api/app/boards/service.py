@@ -242,7 +242,8 @@ class Boards:
                     target.analysis = analysis.model_dump(mode="json")
                     attach_analysis(session, board_id, target.analysis, confirmed[0])
                     target.analysis_version += 1
-                    target.analyzed_by = analyst.label
+                    # The column holds 120 characters, and a saved provider's model id and host can run longer.
+                    target.analyzed_by = analyst.label[:120]
                     target.status = "ready"
                     target.error = None
                     _event(session, board_id, "analyzed", f"Found {len(analysis.threats)} threats. {analysis.verdict}")

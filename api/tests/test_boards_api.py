@@ -429,3 +429,19 @@ def test_a_confirm_is_refused_when_the_map_changed_after_it_was_read(
     monkeypatch.setattr(boards_service, "read_map", real_read)
     assert signed_in.get(f"/api/boards/{board_id}").json()["status"] == "review"
 
+
+def test_a_long_provider_label_still_saves_the_threats(make_client: ClientFactory) -> None:
+    class LongLabel(DemoAnalyst):
+        # A saved provider's label is its model id and host, and a Bedrock profile ARN alone runs past 100 characters.
+        label = (
+            "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.a-very-long-model-name-v1:0 via x"
+        )
+
+    client = make_client(analyst=LongLabel())
+    sign_up(client)
+    board = client.post("/api/boards", json={"title": "Label"}).json()
+    client.post(f"/api/boards/{board['id']}/sources", json=example_material())
+    client.post(f"/api/boards/{board['id']}/confirm")
+    ready = client.get(f"/api/boards/{board['id']}").json()
+    assert ready["status"] == "ready"
+    assert len(ready["analyzed_by"]) <= 120
