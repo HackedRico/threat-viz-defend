@@ -4,13 +4,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 
 from app.boards.github import parse_repo_url
 from app.config import load_settings
 from app.errors import AppError
 from app.limits import RateLimiter
 from app.tables import BoardRow
-from tests.conftest import ClientFactory, example_material, sign_up
+from tests.conftest import INVITE, PASSWORD, ClientFactory, example_material, sign_up
 
 
 def test_security_headers_are_on_every_response(client: TestClient) -> None:
@@ -264,3 +265,17 @@ def test_nul_characters_never_reach_the_database(signed_in: TestClient) -> None:
     edited = signed_in.put(f"/api/boards/{example['id']}/map", json={"map": system}).json()
     assert "\u0000" not in edited["map"]["nodes"][0]["label"]
     assert signed_in.get(f"/api/boards/{board_id}").status_code == 200
+
+
+def test_a_request_that_loses_an_insert_race_gets_a_409_not_a_500(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Two sign ups for one name, or two first saves of a provider, both insert; the loser hit a unique constraint.
+    def lost_race(*args: object, **kwargs: object) -> None:
+        raise IntegrityError("INSERT INTO users ...", {}, Exception("UNIQUE constraint failed: users.username"))
+
+    monkeypatch.setattr(client.app.state.services.accounts, "signup", lost_race)  # type: ignore[attr-defined]
+    raced = client.post("/api/auth/signup", json={"username": "sam", "password": PASSWORD, "invite_code": INVITE})
+    assert raced.status_code == 409
+    assert raced.json()["error"]["code"] == "conflict"
+    assert "UNIQUE" not in raced.text
