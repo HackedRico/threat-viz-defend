@@ -219,6 +219,20 @@ With `BACKBOARD_API_KEY` set on the server, memory is on for every account; each
 
 Memory is kept this small on purpose: it lives on a third-party service and lasts across sessions, so it holds progress, never your code. Notes never hold uploads, maps or the words of an answer. When Backboard fails, the answer or grade goes on without memory. Boards live in our Postgres, answer keys always come from code, and a developer's own Backboard key is sealed on the server.
 
+### How Snowflake is used
+
+One click sends a board's threats to your own Snowflake account, so you can chart risk across every board you have analyzed. Choose **Export**, then **Snowflake**, and enter your account, warehouse, database, schema and a programmatic access token.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/snowflake-dark.svg">
+  <img alt="Snowflake export: our API turns each threat into a row and runs four statements over the Snowflake SQL REST API with your access token: create the table, create three chart views, delete the board's old rows, and insert every threat in one bound statement. Snowsight charts the views with no SQL." src="docs/images/snowflake-light.svg" width="100%">
+</picture>
+
+- **The SQL REST API, no SDK.** The API posts each statement to `/api/v2/statements` with your token, using the HTTP client it already has.
+- **Chart-ready views.** Every export refreshes `threats_by_stride`, `threats_by_element` and `boards_by_risk`, so a Snowsight dashboard needs no SQL.
+- **Safe to resend.** An export replaces that board's rows instead of duplicating them.
+- **Your account, your token.** The token is used for that one request and never stored or logged. Only the threat rows leave our server, never your uploads or the map's evidence.
+
 ## Security by design
 
 <picture>
@@ -242,6 +256,7 @@ Memory is kept this small on purpose: it lives on a third-party service and last
 | DigitalOcean | App Platform, Postgres 16, and Gradient AI serverless inference for the default model. [How it is used](#how-digitalocean-is-used) | Built |
 | GoDaddy Registry | Our domain, [threat-viz-defend.vip](https://threat-viz-defend.vip), serves the web app and the API on App Platform | Built |
 | Backboard | A memory store of each developer's progress across boards and sessions. [How it is used](#how-backboard-is-used) | Built |
+| Best Use of Snowflake API | One click sends a board's threats to your own Snowflake account over the SQL REST API, with chart-ready views. [How it is used](#how-snowflake-is-used) | Built |
 | Most Engaging Demo | Watch an agent build an app while its threat model draws, updates and gets defended by voice | Built |
 | Best Overall | Runtime threat modeling end to end: from a prompt to a threat model you can defend | At the demo |
 
