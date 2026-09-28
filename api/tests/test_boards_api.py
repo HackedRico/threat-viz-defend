@@ -1,5 +1,6 @@
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -18,10 +19,11 @@ from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
 from app.errors import AppError
 from app.llm.base import LlmError
+from app.main import create_app
 from app.routes import agents as agents_routes
 from app.routes import boards as boards_routes
 from app.tables import BoardRow, LoginSessionRow, QuizAttemptRow, UsageRow
-from tests.conftest import ClientFactory, example_material, sign_up
+from tests.conftest import BASE_SETTINGS, ClientFactory, example_material, sign_up
 from tests.factories import inbox
 
 
@@ -445,3 +447,37 @@ def test_a_long_provider_label_still_saves_the_threats(make_client: ClientFactor
     ready = client.get(f"/api/boards/{board['id']}").json()
     assert ready["status"] == "ready"
     assert len(ready["analyzed_by"]) <= 120
+
+
+class _HeldJobs:
+    """Keeps jobs until `run` is called, as a job still running on an instance being replaced does."""
+
+    def __init__(self) -> None:
+        self.held: list[Any] = []
+
+    def submit(self, work: Any, label: str) -> None:
+        self.held.append(work)
+
+    def run(self) -> None:
+        while self.held:
+            self.held.pop(0)()
+
+
+def test_a_job_that_outlives_a_restart_never_overwrites_what_happened_since(tmp_path: Path) -> None:
+    jobs = _HeldJobs()
+    settings = replace(BASE_SETTINGS, database_url=f"sqlite:///{tmp_path / 'late.db'}")
+    with TestClient(create_app(settings, analyst=DemoAnalyst(), jobs=jobs)) as client:
+        sign_up(client)
+        board_id = client.get("/api/boards").json()[0]["id"]
+        edited = client.get(f"/api/boards/{board_id}").json()["map"]
+        client.put(f"/api/boards/{board_id}/map", json={"map": edited})
+        assert client.post(f"/api/boards/{board_id}/confirm").status_code == 202
+        # A new instance starts during a deploy and resets the board, and the person edits it again...
+        client.app.state.services.boards.recover_interrupted()  # type: ignore[attr-defined]
+        edited["nodes"] = [n for n in edited["nodes"] if n["id"] != "logs"]
+        assert client.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+        # ...then the old instance's job finishes and must not pin its threats to the new map.
+        jobs.run()
+        board = client.get(f"/api/boards/{board_id}").json()
+        assert board["status"] == "review"
+        assert "logs" not in {n["id"] for n in board["map"]["nodes"]}

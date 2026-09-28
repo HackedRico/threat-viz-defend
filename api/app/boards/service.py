@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, TypeGuard, cast
 
 from pydantic import ValidationError
 from sqlalchemy import CursorResult, delete, select, update
@@ -236,8 +236,8 @@ class Boards:
                 return
             try:
                 with self._db.session() as session:
-                    target = session.get(BoardRow, board_id)
-                    if target is None:
+                    target = session.get(BoardRow, board_id, with_for_update=True)
+                    if not _still_claimed(target, "analyzing", board_id):
                         return
                     target.analysis = analysis.model_dump(mode="json")
                     attach_analysis(session, board_id, target.analysis, confirmed[0])
@@ -376,8 +376,8 @@ class Boards:
                 return
             try:
                 with self._db.session() as session:
-                    target = session.get(BoardRow, board_id)
-                    if target is None:
+                    target = session.get(BoardRow, board_id, with_for_update=True)
+                    if not _still_claimed(target, "mapping", board_id):
                         return
                     before, before_analysis = target.map, _analysis_json(target, restore)
                     target.previous_map = current.model_dump(mode="json") if current else None
@@ -405,8 +405,9 @@ class Boards:
         log.warning("[boards] Job on %s failed: %s", board_id, message)
         try:
             with self._db.session() as session:
-                row = session.get(BoardRow, board_id)
-                if row is None:
+                row = session.get(BoardRow, board_id, with_for_update=True)
+                # A board no longer busy moved on without this job, as after a restart, and keeps what it has now.
+                if row is None or row.status not in BUSY:
                     return
                 row.status = status
                 row.error = message
@@ -482,6 +483,16 @@ def _stable_status(row: BoardRow) -> str:
     if row.analysis is not None and row.map is not None:
         return "ready"
     return "review" if row.map is not None else "empty"
+
+
+def _still_claimed(row: BoardRow | None, status: str, board_id: str) -> TypeGuard[BoardRow]:
+    """Whether a job's board is still in the busy `status` the job claimed, so its result may be saved."""
+    # A restart during a deploy resets busy boards while the old instance's jobs may still finish; saving one then
+    # would overwrite whatever the person did since.
+    if row is None or row.status != status:
+        log.warning("[boards] Dropping a finished job's result on %s: the board moved on while it ran.", board_id)
+        return False
+    return True
 
 
 def _recovered_status(session: Session, row: BoardRow) -> str:
