@@ -130,7 +130,10 @@ class RequestGuard:
         # it comes from a frontend origin listed in `CORS_ORIGINS`.
         if headers.get("sec-fetch-site") == "cross-site" and origin not in self._settings.trusted_origins:
             return 403, "forbidden", "Cross-site requests are not allowed."
-        has_body = method != "DELETE" and headers.get("content-length", "0") != "0"
+        # A chunked body has no Content-Length, so a Transfer-Encoding header counts as a body too.
+        has_body = method != "DELETE" and (
+            headers.get("content-length", "0") != "0" or headers.get("transfer-encoding") is not None
+        )
         if has_body and not headers.get("content-type", "").startswith("application/json"):
             return 415, "bad_request", "Send the request body as JSON."
         return None

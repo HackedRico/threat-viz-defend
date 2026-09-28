@@ -34,7 +34,7 @@ The app is invite-only, and the expensive parts are metered. All limits live in 
 ## Sessions and CSRF
 
 - **Session cookie.** Sign in creates a 32-byte random secret. Only its SHA-256 hash is stored, so a database leak cannot be replayed as a session. The cookie is `HttpOnly`, `Path=/`, `SameSite=Lax` by default, and lasts `SESSION_DAYS` days (7). In production it is `Secure` and named `__Host-tvd_session`; the prefix makes browsers refuse it unless it is Secure, host-only and on `/`. Sign out deletes the session row. `COOKIE_SAMESITE=none` is refused unless the cookie is also Secure.
-- **JSON-only writes.** A `POST`, `PUT` or `PATCH` with a body to a cookie route must be `Content-Type: application/json`, or it gets `415`. An HTML form cannot send that type, and a cross-origin script cannot send it without a CORS preflight.
+- **JSON-only writes.** A `POST`, `PUT` or `PATCH` with a body to a cookie route, whether it gives a `Content-Length` or streams in chunks, must be `Content-Type: application/json`, or it gets `415`. An HTML form cannot send that type, and a cross-origin script cannot send it without a CORS preflight.
 - **Origin check.** A write to a cookie route that carries an `Origin` header must come from `PUBLIC_ORIGIN` or a `CORS_ORIGINS` entry, or it gets `403`. Outside production, `localhost` origins also pass.
 - **Fetch metadata.** A write labeled `Sec-Fetch-Site: cross-site` is refused unless its origin is on the list.
 - **CORS allowlist.** CORS is on only when `CORS_ORIGINS` is set. It allows exactly those origins with credentials, never `*`, and only the `Content-Type` request header. Production requires every entry to be https.

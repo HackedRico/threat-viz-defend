@@ -37,6 +37,17 @@ def test_writes_must_be_json(signed_in: TestClient) -> None:
     assert response.status_code == 415
 
 
+def test_a_streamed_body_must_be_json_too(signed_in: TestClient) -> None:
+    def chunks() -> Iterator[bytes]:
+        yield b'{"title": "streamed"}'
+
+    # A chunked body carries no Content-Length, which is not the same as carrying no body.
+    for headers in ({}, {"Content-Type": "text/plain"}):
+        streamed = signed_in.build_request("POST", "/api/boards", content=chunks(), headers=headers)
+        assert streamed.headers["transfer-encoding"] == "chunked"
+        assert signed_in.send(streamed).status_code == 415
+
+
 def test_large_bodies_are_refused(signed_in: TestClient) -> None:
     board_id = signed_in.get("/api/boards").json()[0]["id"]
     huge = {"sources": [{"name": f"f{i}.md", "kind": "text", "text": "x" * 199_000} for i in range(14)]}
