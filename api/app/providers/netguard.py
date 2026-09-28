@@ -35,10 +35,14 @@ def resolve(host: str, port: int) -> list[str]:
     """Every IP address `host` resolves to; `OSError` when it does not resolve within `DNS_TIMEOUT_S`."""
     with _in_flight_lock:
         future = _in_flight.get((host, port))
+        started = future is None
         if future is None:
             future = _lookups.submit(socket.getaddrinfo, host, port, proto=socket.IPPROTO_TCP)
             _in_flight[(host, port)] = future
-            future.add_done_callback(lambda done: _forget(host, port, done))
+    if started:
+        # Outside the lock: a lookup that already finished, such as an IP literal, runs the callback right here,
+        # and `_forget` takes the same lock, which is not reentrant.
+        future.add_done_callback(lambda done: _forget(host, port, done))
     try:
         infos = future.result(timeout=DNS_TIMEOUT_S)
     except TimeoutError as exc:

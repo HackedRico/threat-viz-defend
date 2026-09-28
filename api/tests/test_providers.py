@@ -1,7 +1,8 @@
 import json
 import socket
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any
 
@@ -209,6 +210,29 @@ def test_a_slow_lookup_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(netguard, "DNS_TIMEOUT_S", 0.1)
     with pytest.raises(OSError, match="took too long"):
         netguard.resolve("slow.example", 443)
+
+
+def test_a_lookup_that_finishes_before_its_callback_is_added_does_not_hang(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An IP literal resolves in microseconds, so the future can be done before `resolve` registers its cleanup.
+    class Instant:
+        def submit(self, fn: Any, *args: Any, **kwargs: Any) -> Future[Any]:
+            done: Future[Any] = Future()
+            done.set_result(fn(*args, **kwargs))
+            return done
+
+    def literal(host: str, *args: object, **kwargs: object) -> list[tuple[Any, ...]]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", literal)
+    monkeypatch.setattr(netguard, "_lookups", Instant())
+    answers: list[list[str]] = []
+    # Twice, since a lock left held would stall every later lookup; daemon threads fail the test rather than hang it.
+    for _ in range(2):
+        worker = threading.Thread(target=lambda: answers.append(netguard.resolve(PUBLIC, 443)), daemon=True)
+        worker.start()
+        worker.join(timeout=2)
+        assert not worker.is_alive(), "resolve deadlocked on its own lock"
+    assert answers == [[PUBLIC], [PUBLIC]]
 
 
 def test_parallel_lookups_of_one_host_share_one_thread(monkeypatch: pytest.MonkeyPatch) -> None:
