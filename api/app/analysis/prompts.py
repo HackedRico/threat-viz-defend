@@ -1,5 +1,6 @@
 import json
 import re
+import unicodedata
 from collections.abc import Sequence
 
 from app.domain.models import SystemMap, ThreatAnalysis
@@ -35,8 +36,12 @@ _TAG_START = re.compile(rf"<(?=[\s/]*(?:{'|'.join(_TAGS)})\b)", re.IGNORECASE)
 
 
 def neutralize(text: str) -> str:
-    """Escape anything that looks like one of our block tags inside untrusted text."""
-    return _TAG_START.sub("&lt;", text)
+    """Escape anything that looks like one of our block tags inside untrusted text, invisible characters dropped."""
+    # A model reads through a zero-width space, a soft hyphen or a word joiner, so `</mat\u200berial>` would still
+    # close the block. Format characters carry nothing a threat model needs, and dropping them also removes the
+    # invisible tag characters used to smuggle text a person cannot see.
+    visible = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    return _TAG_START.sub("&lt;", visible)
 
 
 def fence(tag: str, body: str) -> str:
