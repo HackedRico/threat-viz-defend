@@ -205,6 +205,9 @@ def test_a_unicode_host_is_checked_under_the_name_the_client_connects_to() -> No
     # IDNA 2008 name. Two names an attacker controls could then point at a public and a private address.
     check_base_url("https://straße.example/v1", allow_private=False, resolver=record)
     assert asked == ["xn--strae-oqa.example"]
+    # The OpenAI SDK connects through its own copy of httpx, so pin the check to what the SDK itself would reach.
+    sdk = openai.OpenAI(api_key="k", base_url="https://straße.example/v1")
+    assert asked == [sdk.base_url.raw_host.decode("ascii")]
     with pytest.raises(AppError) as invalid:
         check_base_url(f"https://{'ß' * 70}.example/v1", allow_private=False, resolver=record)
     assert invalid.value.status == 400

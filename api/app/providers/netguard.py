@@ -93,6 +93,7 @@ def _connect_host(url: str, hostname: str) -> str:
     """The host name the model client will look up, in the ASCII form httpx sends to DNS."""
     # getaddrinfo encodes a Unicode name with IDNA 2003 and httpx with IDNA 2008, which can spell it differently
     # (straße.example is strasse.example to one and xn--strae-oqa.example to the other), so resolve what httpx uses.
+    # The OpenAI SDK's own copy of httpx encodes the same way, which a test pins.
     try:
         return httpx.URL(url).raw_host.decode("ascii")
     except (httpx.InvalidURL, UnicodeError) as exc:
