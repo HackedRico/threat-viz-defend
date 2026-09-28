@@ -90,6 +90,8 @@ export function ExportMenu({ board, onError }: { board: BoardOut; onError: (mess
         return;
       }
       if (board.map === null) throw new Error("This board has no map yet, so there is nothing to export.");
+      // A ready board whose stored analysis no longer loads comes without one, and a job below draws only with it.
+      if (board.analysis === null) throw new Error("This board has no threat model yet, so there is nothing to export.");
       const layouts = await layOutBoth(board.map);
       const direction = useBoardUi.getState().direction ?? pickDirection(layouts, FALLBACK_VIEW.width, FALLBACK_VIEW.height);
       setJob({ format, layout: layouts[direction], exportedAt: new Date() });
