@@ -472,6 +472,7 @@ def remove_element(system: SystemMap, item_id: str) -> SystemMap:
 
 def clip(text: str, limit: int) -> str:
     """`text` cut to `limit` characters, marking the cut, for model text that keeps its line breaks."""
+    text = text.replace("\x00", "")
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
@@ -479,7 +480,8 @@ def _one_line(text: str, limit: int) -> str:
     """Fold every run of whitespace, line breaks included, into one space and cut to `limit`, marking the cut."""
     # Agents read map and threat text line by line in `get_board` and `describe_element`, where a line
     # break could pose as another id or threat. `str.split()` also breaks on `\r`, `\x85` and U+2028.
-    folded = " ".join(text.split())
+    # NUL is dropped too, since Postgres text columns refuse it.
+    folded = " ".join(text.replace("\x00", "").split())
     return folded if len(folded) <= limit else folded[: limit - 1].rstrip() + "…"
 
 

@@ -21,9 +21,19 @@ VersionSource = Literal["example", "upload", "github", "agent", "edit", "earlier
 
 
 class RequestBody(BaseModel):
-    """Base for request bodies: unknown keys are rejected so typos fail loudly."""
+    """Base for request bodies: unknown keys are rejected so typos fail loudly, and NUL characters are dropped."""
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _drop_nul(cls, value: object) -> object:
+        """Remove NUL from each string, and each string in a list, since Postgres text columns refuse it."""
+        if isinstance(value, str):
+            return value.replace("\x00", "")
+        if isinstance(value, list):
+            return [item.replace("\x00", "") if isinstance(item, str) else item for item in value]
+        return value
 
 
 def plain_key(value: str | None) -> str | None:

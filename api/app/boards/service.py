@@ -393,6 +393,8 @@ class Boards:
 
     def _fail(self, board_id: str, status: str, message: str) -> None:
         """Record a failed job and put the board back to `status`."""
+        # A provider's error text can hold a NUL, which would fail this write too and leave the board busy.
+        message = message.replace("\x00", "")
         log.warning("[boards] Job on %s failed: %s", board_id, message)
         try:
             with self._db.session() as session:
@@ -487,7 +489,8 @@ def _analysis_json(row: BoardRow, status: str | None = None) -> dict[str, Any] |
 
 def _event(session: Session, board_id: str, kind: str, text: str) -> None:
     """Append a line to a board's activity log."""
-    session.add(BoardEventRow(board_id=board_id, kind=kind[:24], text=text[:1000]))
+    # Event text quotes model and provider text, and Postgres refuses a NUL in it.
+    session.add(BoardEventRow(board_id=board_id, kind=kind[:24], text=text.replace("\x00", "")[:1000]))
 
 
 def _touch(row: BoardRow) -> None:

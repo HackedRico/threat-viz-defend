@@ -120,6 +120,9 @@ class RequestGuard:
         if length is not None and (not length.isdigit() or int(length) > MAX_BODY_BYTES):
             return 413, "payload_too_large", _TOO_LARGE
         path: str = scope["path"]
+        if "\x00" in path:
+            # No id holds a NUL, and Postgres would fail the lookup with a 500 rather than find nothing.
+            return 400, "bad_request", "Invalid path."
         method: str = scope["method"]
         if method not in _UNSAFE or not path.startswith("/api/") or path.startswith(_TOKEN_PATHS):
             return None
