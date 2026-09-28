@@ -346,9 +346,11 @@ class _Held:
         self.started = threading.Event()
         self.release = threading.Event()
         self.calls = 0
+        self.timeouts: list[float] = []
 
     def create(self, **kwargs: Any) -> Any:
         self.calls += 1
+        self.timeouts.append(kwargs["timeout"])
         if self.calls == 1:
             self.started.set()
             self.release.wait(5)
@@ -394,6 +396,21 @@ def test_a_question_stops_waiting_for_a_busy_model_after_its_budget(monkeypatch:
     finally:
         held.release.set()
         first.join(5)
+
+
+def test_a_question_that_waited_for_a_turn_gets_only_what_is_left_of_its_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(openai_compat, "INTERACTIVE_BUDGET_S", 1.0)
+    llm, held = queued(1)
+    first = threading.Thread(target=llm.generate, args=(LlmRequest("draft_map", "system", "user", Answer),))
+    first.start()
+    assert held.started.wait(5)
+    threading.Timer(0.6, held.release.set).start()
+    llm.generate(ANSWER)
+    first.join(5)
+    # The wait for the slot spent 0.6 of the one second budget, so the call itself may take only what is left.
+    assert held.timeouts[-1] <= 0.45
 
 
 def test_answers_and_grades_are_clipped_like_every_other_model_text() -> None:
