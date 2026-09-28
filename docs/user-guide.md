@@ -13,7 +13,7 @@ You need an invite code from whoever runs the deployment. On a local server the 
 5. Enter the **Invite code**.
 6. Choose **Create account**. You are signed in and land on your example board.
 
-To come back later, choose **Sign in** on the home page, or open `/signin`, and use the same username and password. A link into the app, such as a board link a coding agent prints, asks you to sign in first and then opens the board. **Sign out** returns you to the home page. If the home page has no **Create an account** button and says "New accounts are closed right now", the deployment has no invite codes configured.
+To come back later, choose **Sign in** on the home page, or open `/signin`, and use the same username and password. A link into the app, such as a board link a coding agent prints, asks you to sign in first and then opens the board. **Sign out** returns you to the home page; if the server cannot be reached, you stay signed in and the menu says so, so try again. If the home page has no **Create an account** button and says "New accounts are closed right now", the deployment has no invite codes configured.
 
 There is no password reset. If you forget your password, ask the operator to delete the account, then create a new one.
 
@@ -25,14 +25,14 @@ The picker at the top right of the home page, and in the account menu once you s
 
 The left rail holds everything outside the open board.
 
-- **App name.** Goes home, which opens the board you changed most recently. With no boards, home shows "A clean whiteboard." with **Start a board** and **Open the example board**.
+- **App name.** Goes home, which opens the board you changed most recently. With no boards, home shows "A clean whiteboard." with **Start a board** and **Open the example board**. If your boards could not be loaded, home says "Your boards did not load." with **Retry** instead.
 - **Collapse sidebar.** The icon beside the name narrows the rail to one letter per board. The app remembers your choice in this browser.
 - **Resize sidebar.** Drag the sidebar's right edge to make it wider or narrower, between 200 and 480 pixels. With the edge focused, the arrow keys move it 16 pixels and Home and End jump to the limits. Double click the edge to go back to the default width. The app remembers the width in this browser.
 - **New board.** Type a name and choose **Create**, or press Escape to cancel. An empty name becomes "Untitled system".
 - **Your boards.** Every board with its status and, once threats are found, its worst severity and threat count. The example board carries an `example` tag. The list refreshes every 15 seconds, so boards a coding agent changes show up on their own.
 - **Example board.** Opens the example. If you deleted it, the button reads **Restore the example board** and adds a fresh copy.
 - **Connect a coding agent.** Opens the coding agents settings.
-- **Account menu.** Your name and today's model calls. Open it for two meters, **Model calls today** and **Voice sessions today**, the **Theme** picker, plus **Connect a coding agent**, **Model provider** and **Sign out**.
+- **Account menu.** Your name and today's model calls. Open it for today's meters, **Model calls today**, plus **Voice sessions today** and **Dictations today** where the server offers them, the **Theme** picker, plus **Connect a coding agent**, **Model provider** and **Sign out**.
 
 Board statuses read the same everywhere:
 
@@ -167,7 +167,7 @@ A node's details also list its flows; choose one to see it. On a finished board 
 On the right:
 
 - **Check the map before threats are found.** The main button reads **Looks right, find threats**, or **Save and find threats** when you have edits.
-- **Unsaved edits.** A banner offers **Save changes** and **Discard**. If someone else, such as a coding agent, changed the map while you edited, the banner turns red and warns that saving replaces their version.
+- **Unsaved edits.** A banner offers **Save changes** and **Discard**. If someone else, such as a coding agent, changed the map while you edited, the banner turns red and warns that saving replaces their version. Leaving with unsaved edits asks first, whether by **Add material**, **Connect an agent**, another board or **Sign out**, and reloading or closing the tab warns too. The browser's back button does not ask.
 - **Changed since the last map.** Elements marked `new`, `edited` or `gone`. Click one to select it.
 - **Things to check.** Boundaries, sensitive stores, AI parts and missing flows.
 - **What was assumed.** The model's own notes on what was unclear.
@@ -348,6 +348,8 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 | You are sent back to the sign in screen | Your session expired or was ended. Sign in again. |
 | "Demo mode can only map the built-in examples" | The server has no model. Save your own under **Model provider**, or explore the example board. |
 | "None of those files can be sent. See the skipped list for why." | Every file was skipped. Open the skipped list, then add docs or source files instead. |
+| "Those files are already added." | They are staged already, under the same names. Add other files, or remove them first to add them again. |
+| "Send at most 400 files at a time" | Pasted notes count as one file. Remove some files, or pick a smaller folder. |
 | "Everything together must stay under 1.5 MB." | Remove files, or pick a smaller folder such as the service you care about. |
 | "Nothing readable was sent: every file was empty or skipped." | Same as above, checked on the server. |
 | A GitHub import fails with "GitHub has no public repository or ref" | The repository is private or the URL is wrong. Upload the folder instead. |
@@ -362,6 +364,7 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 | "You have used today's 60 model requests." | Wait for midnight UTC, or use your own provider. |
 | "You are asking the model very quickly." | Wait a minute. |
 | "The server restarted while this was running." | Run the step again: add the material again, or confirm again. |
+| "Your boards did not load." | The server did not answer. Choose **Retry**, or reload the page. |
 | The quiz says a question is out of date | The board changed. Reload the quiz. |
 | **Talk it through** is greyed out | The server has no voice coach. Use the text quiz. |
 | "Microphone access is blocked." | Allow the microphone in the browser's site settings, then start again. This covers the coach and the mic beside **Ask**. |
