@@ -64,13 +64,11 @@ export function App() {
   }, []);
 
   const signOut = useCallback(async () => {
-    try {
-      await api.logout();
-    } finally {
-      // Only a deliberate sign out goes home; an expired session keeps its path, so signing in again returns there.
-      history.replaceState(null, "", "/");
-      setMe(null);
-    }
+    // A failed call leaves the server session alive, so the user stays signed in and the rejection reaches the menu.
+    await api.logout();
+    // Only a deliberate sign out goes home; an expired session keeps its path, so signing in again returns there.
+    history.replaceState(null, "", "/");
+    setMe(null);
   }, []);
 
   const session = useMemo<Session | null>(

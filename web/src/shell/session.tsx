@@ -16,6 +16,7 @@ export interface Session {
   config: ConfigOut;
   me: MeOut;
   refreshMe: () => void;
+  /** Ends the session on the server, then shows the signed-out screens; rejects, still signed in, when that fails. */
   signOut: () => Promise<void>;
 }
 

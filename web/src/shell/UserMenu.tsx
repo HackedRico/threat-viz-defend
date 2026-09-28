@@ -13,8 +13,8 @@ import "./UserMenu.css";
 // =============================================================================
 // The account menu at the foot of the sidebar: who is signed in, what they have
 // spent today against their limits, the theme picker, ways to connect a coding
-// agent, pick the model and set up memory, and sign out. Usage refreshes each
-// time the menu opens.
+// agent, pick the model and set up memory, and sign out, which says so when it
+// fails. Usage refreshes each time the menu opens.
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
@@ -44,9 +44,33 @@ export function UsageMeters({ usage, dictation }: { usage: UsageOut; dictation: 
   );
 }
 
+/** Sign out, or say it failed; rendered inside the menu so the message clears when the menu closes. */
+function SignOutButton() {
+  const { signOut } = useSession();
+  const [failed, setFailed] = useState(false);
+  const leave = () => {
+    // Signing out leaves the open board without `navigate`, so it asks about unsaved work itself.
+    if (!mayLeave()) return;
+    setFailed(false);
+    signOut().catch(() => setFailed(true));
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-ghost user-pop-item" onClick={leave}>
+        <LogoutIcon /> Sign out
+      </button>
+      {failed && (
+        <p className="user-pop-error" role="alert">
+          Could not sign out. Check your connection and try again.
+        </p>
+      )}
+    </>
+  );
+}
+
 /** The account button and its menu; `collapsed` shows only the initial. */
 export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: string | null }) {
-  const { config, me, refreshMe, signOut } = useSession();
+  const { config, me, refreshMe } = useSession();
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -112,16 +136,7 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
           >
             <MemoryIcon /> Memory
           </button>
-          {/* Signing out leaves the open board without `navigate`, so it asks about unsaved work itself. */}
-          <button
-            type="button"
-            className="btn btn-ghost user-pop-item"
-            onClick={() => {
-              if (mayLeave()) void signOut();
-            }}
-          >
-            <LogoutIcon /> Sign out
-          </button>
+          <SignOutButton />
         </div>
       )}
       <button
