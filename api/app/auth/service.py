@@ -78,23 +78,37 @@ class Accounts:
         name = username.strip().lower()
         if not USERNAME.match(name):
             raise bad_request("Usernames are 3 to 24 characters: letters, digits, dots, dashes and underscores.")
-        if not self._invite_ok(invite_code):
-            self._limiter.hit(f"invite-fail:{ip}", 20, 3600, "Too many wrong invite codes. Try again in an hour.")
-            # Across all networks too, so rotating addresses cannot guess codes without end.
-            self._limiter.hit("invite-fail:all", 300, 3600, "Too many wrong invite codes. Try again in an hour.")
-            raise forbidden("That invite code is not valid. Ask the organizers for the current code.")
+        self._check_invite(invite_code, ip)
         if password.lower() in _COMMON_PASSWORDS or name in password.lower():
             raise bad_request("Pick a less guessable password, one that does not contain your username.")
         if session.scalar(select(UserRow.id).where(UserRow.username == name)) is not None:
             raise conflict("That username is taken. Pick another.")
         count = session.scalar(select(func.count()).select_from(UserRow)) or 0
         if count >= self._settings.max_users:
-            raise forbidden("Sign ups are closed: this event has reached its account limit.")
+            raise forbidden("Sign ups are closed: this server has reached its account limit.")
         user = UserRow(id=str(uuid.uuid4()), username=name, password_hash=_hash(password))
         session.add(user)
         session.flush()
         log.info("[auth] New account %s.", name)
         return SignedIn(user, self._open_session(session, user))
+
+    def _check_invite(self, invite_code: str, ip: str) -> None:
+        """Refuse a wrong invite code, and any code at all from a network, or a server, that has guessed too often."""
+        guessing = "Too many wrong invite codes. Try again in an hour."
+        per_network, overall = f"invite-fail:{ip}", "invite-fail:all"
+        # A failure is reserved before the code is judged, as sign in does, so a network past its limit is refused
+        # even the right code, and parallel guesses cannot all slip under a count taken before any of them failed.
+        # The overall limit stops rotating addresses from guessing without end.
+        self._limiter.hit(per_network, 20, 3600, guessing)
+        try:
+            self._limiter.hit(overall, 300, 3600, guessing)
+        except AppError:
+            self._limiter.undo(per_network)
+            raise
+        if not self._invite_ok(invite_code):
+            raise forbidden("That invite code is not valid. Ask whoever runs this server for the current code.")
+        self._limiter.undo(overall)
+        self._limiter.undo(per_network)
 
     def ensure_account(self, session: Session, username: str, password: str) -> UserRow:
         """Create `username` with `password`, or reset an existing one to it; for admins and development only."""
@@ -121,6 +135,10 @@ class Accounts:
         self._limiter.hit(
             f"login-ip:{ip}", 150, 300, "Too many sign in attempts from this network. Wait a few minutes."
         )
+        if not USERNAME.match(name):
+            # No account can have such a name, so there is nothing to hide by timing, and a colon in one would reach
+            # into another account's lockout key below.
+            raise unauthorized("Wrong username or password.")
         # Locking by username alone would let anyone lock anyone out, so the tight limit is per network
         # and a looser one per username still stops a distributed guess.
         failures = f"login-fail:{name}:{ip}"
@@ -152,7 +170,7 @@ class Accounts:
         self._limiter.undo(spread)
         self._limiter.reset(failures)
         if user.disabled:
-            raise forbidden("This account is disabled. Ask the organizers.")
+            raise forbidden("This account is disabled. Ask whoever runs this server.")
         if _hasher.check_needs_rehash(user.password_hash):
             user.password_hash = _hash(password)
         user.last_login_at = utcnow()
