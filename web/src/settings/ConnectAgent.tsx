@@ -3,7 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { api, errorMessage } from "../api/client.ts";
 import type { TokenOut } from "../api/types.ts";
 import { formatTime } from "../board/ActivityLog.tsx";
-import { useBoardList } from "../shell/boards.tsx";
+import { BoardListError, useBoardList } from "../shell/boards.tsx";
 import { CheckIcon, CopyIcon, TrashIcon } from "../shell/icons.tsx";
 import { navigate } from "../shell/useRoute.ts";
 import { apiOrigin } from "../api/base.ts";
@@ -56,7 +56,7 @@ function Snippet({ title, value, label }: { title: string; value: string; label:
 
 /** The connect-a-coding-agent screen. */
 export function ConnectAgent({ boardId }: { boardId: string | null }) {
-  const { boards } = useBoardList();
+  const { boards, loaded, error: listError } = useBoardList();
   const [tokens, setTokens] = useState<TokenOut[] | null>(null);
   const [name, setName] = useState("");
   const [fresh, setFresh] = useState<{ token: string; name: string } | null>(null);
@@ -207,7 +207,11 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
             <span className="step-num">3</span> Tell the agent which board
           </h3>
           {boards.length === 0 ? (
-            <p className="muted">Make a board first; agent tools take its id.</p>
+            listError !== null ? (
+              <BoardListError />
+            ) : (
+              loaded && <p className="muted">Make a board first; agent tools take its id.</p>
+            )
           ) : (
             <>
               <label htmlFor={`${ids}-board`} className="field-label">

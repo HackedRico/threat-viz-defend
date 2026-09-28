@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
-import { api } from "../api/client.ts";
+import { api, errorMessage } from "../api/client.ts";
 import type { BoardSummary } from "../api/types.ts";
 import { BoardView } from "../board/BoardView.tsx";
 import { SettingsView } from "../settings/SettingsView.tsx";
-import { BoardListContext, type BoardList } from "./boards.tsx";
+import { BoardListContext, BoardListError, type BoardList } from "./boards.tsx";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { ResizeHandle, useStoredWidth } from "./ResizeHandle.tsx";
 import { Sidebar } from "./Sidebar.tsx";
@@ -17,8 +17,8 @@ import "./Shell.css";
 // Module Overview
 // =============================================================================
 // The signed-in layout: the sidebar and the current screen. It owns the board
-// list, reloading it on a slow timer so boards a coding agent creates or
-// changes show up without a refresh.
+// list and why its last load failed, reloading it on a slow timer so boards a
+// coding agent creates or changes show up without a refresh.
 
 const LIST_POLL_MS = 15_000;
 const COLLAPSE_KEY = "sidebar-collapsed";
@@ -40,18 +40,26 @@ export function Shell() {
   const route = useRoute();
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [width, setWidth] = useStoredWidth(WIDTH_KEY, DEFAULT_WIDTH, WIDTH_BOUNDS);
 
   const refresh = useCallback(async () => {
-    const next = await api.boards();
-    setBoards(next);
-    setLoaded(true);
-    return next;
+    try {
+      const next = await api.boards();
+      setBoards(next);
+      setLoaded(true);
+      setError(null);
+      return next;
+    } catch (caught) {
+      setError(errorMessage(caught));
+      throw caught;
+    }
   }, []);
 
   useEffect(() => {
-    refresh().catch(() => setLoaded(true));
+    // A failed load stays out of `loaded` and shows, with a retry, where the empty list would be.
+    refresh().catch(() => undefined);
   }, [refresh]);
   usePolling(refresh, LIST_POLL_MS);
 
@@ -75,7 +83,7 @@ export function Shell() {
     if (route.name === "home" && latest) navigate({ name: "board", boardId: latest.id }, true);
   }, [route.name, latest]);
 
-  const list = useMemo<BoardList>(() => ({ boards, loaded, refresh }), [boards, loaded, refresh]);
+  const list = useMemo<BoardList>(() => ({ boards, loaded, error, refresh }), [boards, loaded, error, refresh]);
   const activeBoardId = route.name === "board" ? route.boardId : route.name === "settings" ? route.boardId : null;
 
   return (
@@ -104,7 +112,14 @@ export function Shell() {
               <SettingsView section={route.section} boardId={route.boardId} />
             </ErrorBoundary>
           )}
-          {route.name === "home" && (loaded && latest === null ? <Welcome /> : <div className="shell-blank" />)}
+          {route.name === "home" &&
+            (latest === null && error !== null ? (
+              <BoardListError className="shell-list-error" />
+            ) : loaded && latest === null ? (
+              <Welcome />
+            ) : (
+              <div className="shell-blank" />
+            ))}
         </main>
       </div>
     </BoardListContext>
