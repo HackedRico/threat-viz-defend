@@ -182,3 +182,11 @@ def test_a_sign_in_name_holding_a_colon_cannot_reach_another_accounts_lockout(cl
         client.post("/api/auth/login", json={"username": "ivy:198.51.100.7", "password": "wrong password"})
     with services.db.session() as session:
         assert services.accounts.login(session, username="ivy", password=PASSWORD, ip="198.51.100.7")
+
+
+def test_the_home_page_stops_offering_sign_up_once_the_server_is_full(make_client: ClientFactory) -> None:
+    client = make_client(max_users=1)
+    assert client.get("/api/config").json()["signup_open"] is True
+    sign_up(client, "first")
+    # A full server refuses every sign up, so offering Create an account there only leads to an error.
+    assert client.get("/api/config").json()["signup_open"] is False

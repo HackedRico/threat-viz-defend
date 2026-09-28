@@ -1,8 +1,10 @@
 from fastapi import APIRouter
+from sqlalchemy import func, select
 
-from app.context import Svc
+from app.context import Db, Svc
 from app.domain.masking import file_policy
 from app.schemas import ConfigOut, FilePolicyOut, HealthOut
+from app.tables import UserRow
 
 # =============================================================================
 # Module Overview
@@ -20,15 +22,17 @@ def health() -> HealthOut:
 
 
 @router.get("/config")
-def config(svc: Svc) -> ConfigOut:
+def config(svc: Svc, session: Db) -> ConfigOut:
     """The app name, what analyzes boards, whether voice, dictation and sign up are on, and the upload policy."""
     settings = svc.settings
+    # A full server refuses every sign up, so the home page should not offer one.
+    accounts = session.scalar(select(func.count()).select_from(UserRow)) or 0
     return ConfigOut(
         app_name=settings.app_name,
         analyst=svc.analyst.label,
         demo_mode=not settings.llm_configured,
         voice_enabled=svc.voice is not None,
         dictation_enabled=svc.transcriber is not None,
-        signup_open=bool(settings.invite_codes),
+        signup_open=bool(settings.invite_codes) and accounts < settings.max_users,
         file_policy=FilePolicyOut.model_validate(file_policy()),
     )
