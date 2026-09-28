@@ -334,3 +334,15 @@ def test_the_voice_coach_is_told_only_the_questions_the_quiz_will_serve(make_cli
     assert client.get(f"/api/boards/{board_id}/quiz").json()["questions"] == []
     started = client.post(f"/api/boards/{board_id}/voice").json()
     assert started["dynamic_variables"]["question_count"] == "0"
+
+
+def test_questions_the_developer_asked_are_never_read_back_as_missed_topics() -> None:
+    # "What could go wrong" names a topic and says wrong, which made the quiz open on a topic never answered.
+    asked = [
+        question_note("Inbox", "What could go wrong with the lethal trifecta?"),
+        question_note("Inbox", "Which trust boundary is weakest, and what is wrong with it?"),
+        "They asked what could go wrong at the trust boundary.",
+    ]
+    assert weak_topics(asked) == []
+    # A quiz result that memory reworded still counts.
+    assert weak_topics(["In the quiz they got the lethal trifecta question wrong."]) == ["trifecta"]
