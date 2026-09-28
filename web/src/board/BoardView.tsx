@@ -4,6 +4,7 @@ import { api, errorMessage } from "../api/client.ts";
 import type { BoardOut } from "../api/types.ts";
 import { useBoardList } from "../shell/boards.tsx";
 import { CloseIcon, PlugIcon, PlusIcon, TrashIcon } from "../shell/icons.tsx";
+import { mayLeave } from "../shell/route.ts";
 import { SeverityBadge } from "../shell/SeverityBadge.tsx";
 import { isBusy, STATUS_LABEL } from "../shell/statusText.ts";
 import { useSession } from "../shell/session.tsx";
@@ -66,9 +67,13 @@ export function BoardView({ boardId }: { boardId: string }) {
 
   // A board whose stored map no longer loads has nothing to draw, so it takes material again rather than waiting.
   const showIntake = board.status === "empty" || adding || (board.map === null && !isBusy(board.status));
+  // The intake takes the map's place, and unsaved hand edits to the map would go with it.
+  const addMaterial = () => {
+    if (mayLeave()) setAdding(true);
+  };
   const top = (
     <>
-      <BoardHeader board={board} onApply={apply} onAddMaterial={() => setAdding(true)} adding={adding} />
+      <BoardHeader board={board} onApply={apply} onAddMaterial={addMaterial} adding={adding} />
       <ErrorBanner board={board} />
       {/* The failure banner already carries the error; a notice repeating it is noise. */}
       {notice && notice !== board.error && (

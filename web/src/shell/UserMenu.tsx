@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { UsageOut } from "../api/types.ts";
+import { mayLeave } from "./route.ts";
 import { navigate } from "./useRoute.ts";
 import { LogoutIcon, MemoryIcon, PlugIcon, SparkIcon } from "./icons.tsx";
 import { useSession } from "./session.tsx";
@@ -111,7 +112,14 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
           >
             <MemoryIcon /> Memory
           </button>
-          <button type="button" className="btn btn-ghost user-pop-item" onClick={() => void signOut()}>
+          {/* Signing out leaves the open board without `navigate`, so it asks about unsaved work itself. */}
+          <button
+            type="button"
+            className="btn btn-ghost user-pop-item"
+            onClick={() => {
+              if (mayLeave()) void signOut();
+            }}
+          >
             <LogoutIcon /> Sign out
           </button>
         </div>
