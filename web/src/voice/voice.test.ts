@@ -31,6 +31,18 @@ test("reports words that match no option", () => {
   assert.deepEqual(unmatched, ["Z", "maybe"]);
 });
 
+test("reads words named like object built-ins as unmatched instead of throwing", () => {
+  assert.deepEqual(lettersToOptionIds("constructor", options), { ids: [], unmatched: ["constructor"] });
+  assert.deepEqual(lettersToOptionIds("__proto__, B", options), { ids: ["f4"], unmatched: ["__proto__"] });
+});
+
+test("keeps only the last letter named for a single choice, so the article a is not option A", () => {
+  assert.deepEqual(lettersToOptionIds("it's a C", options, true).ids, ["f8"]);
+  assert.deepEqual(lettersToOptionIds("a", options, true).ids, ["f1"]);
+  assert.deepEqual(lettersToOptionIds("maybe", options, true).ids, []);
+  assert.deepEqual(lettersToOptionIds("it's a C", options).ids, ["f1", "f8"]);
+});
+
 test("accepts option ids when a letter is out of range", () => {
   const stride = ["S", "T", "R", "I", "D", "E"].map((id) => ({ id, label: id }));
   assert.deepEqual(lettersToOptionIds("B", stride).ids, ["T"]);

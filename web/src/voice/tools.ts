@@ -57,14 +57,15 @@ export function useVoiceTools({
     if (!quiz || !question) return `There is no question with id ${questionId || "(none)"}. Call get_next_question.`;
     if (!answer) return "The answer was empty. Ask the developer to answer again.";
     onActive(question.id);
-    let choiceIds: string[] = [];
-    if (question.kind !== "open") {
-      choiceIds = lettersToOptionIds(answer, question.options).ids;
-      if (choiceIds.length === 0) {
-        return `I could not match "${answer}" to an option letter. Ask the developer to say the letters again.`;
-      }
-    }
+    // The answer comes from a model, so reading it stays in the try too: a throw becomes a reply the agent can read.
     try {
+      let choiceIds: string[] = [];
+      if (question.kind !== "open") {
+        choiceIds = lettersToOptionIds(answer, question.options, question.kind === "single").ids;
+        if (choiceIds.length === 0) {
+          return `I could not match "${answer}" to an option letter. Ask the developer to say the letters again.`;
+        }
+      }
       const attempt = await state.submit(question.id, choiceIds, question.kind === "open" ? answer : null, "voice");
       return resultSpeech(attempt);
     } catch (caught) {
