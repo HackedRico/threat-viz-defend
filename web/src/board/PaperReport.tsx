@@ -180,8 +180,8 @@ export function PaperReport({ board, map, analysis, layout, appName, exportedAt 
                   <div>
                     <p className="paper-label">Fixes to start today</p>
                     <ul className="paper-list">
-                      {threat.fixes.map((fix) => (
-                        <li key={fix}>{fix}</li>
+                      {threat.fixes.map((fix, index) => (
+                        <li key={`${fix}-${index}`}>{fix}</li>
                       ))}
                     </ul>
                   </div>
@@ -191,8 +191,8 @@ export function PaperReport({ board, map, analysis, layout, appName, exportedAt 
                 </blockquote>
                 {threat.refs.length > 0 && (
                   <p className="paper-refs">
-                    {threat.refs.map((ref) => (
-                      <span key={ref} className="chip mono">
+                    {threat.refs.map((ref, index) => (
+                      <span key={`${ref}-${index}`} className="chip mono">
                         {ref}
                       </span>
                     ))}
@@ -334,8 +334,8 @@ export function PaperReport({ board, map, analysis, layout, appName, exportedAt 
         <section className="paper-section">
           <h2 className="paper-heading">Assumptions</h2>
           <ul className="paper-list">
-            {map.assumptions.map((assumption) => (
-              <li key={assumption}>{assumption}</li>
+            {map.assumptions.map((assumption, index) => (
+              <li key={`${assumption}-${index}`}>{assumption}</li>
             ))}
           </ul>
         </section>

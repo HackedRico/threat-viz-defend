@@ -151,8 +151,8 @@ export function ReviewPanel({ board, draft, dirty, staleEdits, diff, onSaved, on
         <section className="panel-section">
           <h3 className="panel-label">What was assumed</h3>
           <ul className="assumption-list">
-            {draft.assumptions.map((assumption) => (
-              <li key={assumption}>{assumption}</li>
+            {draft.assumptions.map((assumption, index) => (
+              <li key={`${assumption}-${index}`}>{assumption}</li>
             ))}
           </ul>
         </section>

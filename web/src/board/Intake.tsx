@@ -289,8 +289,8 @@ export function Intake({
                   </button>
                 </div>
                 <ul className="staged-list">
-                  {staged.map((source) => (
-                    <li key={source.name}>
+                  {staged.map((source, i) => (
+                    <li key={`${source.name}:${i}`}>
                       <span className={`staged-kind kind-${source.kind}`}>{source.kind}</span>
                       <span className="staged-name mono">{source.name}</span>
                       <span className="staged-size">{formatBytes(source.bytes)}</span>
