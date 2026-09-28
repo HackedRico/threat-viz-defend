@@ -32,9 +32,9 @@ docker build -t threatviz-api .                                        # optiona
 
 After a deploy: `curl https://api.<domain>/api/health` answers `{"ok":true}`, `curl https://api.<domain>/api/config` shows the expected `analyst` and `voice_enabled`, and signing in on `https://app.<domain>` works in a private window.
 
-## Accounts and credits
+## Accounts and keys
 
-You hold the DigitalOcean, GoDaddy, ElevenLabs and Backboard accounts. Hand a teammate a key directly for their local `.env`; never paste one into a PR, issue or chat. Keep a list of every key issued so teardown in [docs/deploy.md](../docs/deploy.md) can revoke them all.
+Whoever deploys holds the accounts: the host, the domain, and any model, ElevenLabs or Backboard account. Hand a teammate a key directly for their local `.env`; never paste one into a PR, issue or chat. Keep a list of every key issued so teardown in [docs/deploy.md](../docs/deploy.md) can revoke them all.
 
 ## Adding a platform
 

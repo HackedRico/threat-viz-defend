@@ -1,6 +1,6 @@
 # Deploying ThreatViz Defend
 
-This guide takes the app from the repo to `https://app.<domain>` and `https://api.<domain>` on DigitalOcean App Platform, with DNS at GoDaddy. Follow it top to bottom the first time. Every command runs from the repo root unless it says otherwise.
+This guide takes the app from the repo to `https://app.<domain>` and `https://api.<domain>` on DigitalOcean App Platform. The DNS steps use GoDaddy; any DNS host works the same way with CNAME records. Follow it top to bottom the first time. Every command runs from the repo root unless it says otherwise.
 
 Throughout, `example.com` stands for your domain. Replace it everywhere, including in `.do/app.yaml`.
 
@@ -14,15 +14,15 @@ One App Platform app, defined in `.do/app.yaml`, with three components:
 | `web` | Static site built from `web/` | `https://app.example.com` | free |
 | `db` | Dev Postgres 16 | the API only, through `DATABASE_URL` | $7 per month |
 
-The dev database has no backups and no high availability. It is fine for a hackathon, not for data you cannot lose. App Platform disks are wiped on every deploy and restart, so the API never uses SQLite there.
+The dev database has no backups and no high availability. It is fine for trying the app, not for data you cannot lose. App Platform disks are wiped on every deploy and restart, so the API never uses SQLite there.
 
 The API creates its tables on startup. There is no separate migration step.
 
-## Prerequisites and credits
+## Prerequisites
 
-- A DigitalOcean account with billing set up. If the team has promo credits, add the code under Billing > Promo code before you create anything, and check the credit covers the API instance and the $7 database for the event.
-- Owner or admin access to the GitHub repo `HackedRico/threat-viz-defend`, so you can authorize the DigitalOcean GitHub app on it.
-- The domain at GoDaddy, and a GoDaddy login that can edit its DNS.
+- A DigitalOcean account with billing set up. If you have promo credits, add the code under Billing > Promo code before you create anything.
+- A GitHub repository to deploy from, usually your fork of this one, with admin access so you can authorize the DigitalOcean GitHub app on it.
+- A domain, and a login that can edit its DNS.
 - Optional: `doctl`, the DigitalOcean CLI. Install it with `brew install doctl`, then run `doctl auth init` and paste a personal access token from API > Tokens. The control panel can do everything below without it.
 - Optional: a DigitalOcean model access key for the server's default model, and an ElevenLabs account for the voice coach and dictation. Both are covered below.
 
@@ -30,8 +30,9 @@ The API creates its tables on startup. There is no separate migration step.
 
 1. Open `.do/app.yaml`.
 2. Replace `api.example.com` and `app.example.com` with your two hostnames. They appear under `domains`, under `ingress.rules`, in `PUBLIC_ORIGIN`, in `CORS_ORIGINS` and in the static site's `VITE_API_BASE_URL`.
-3. Leave the `type: SECRET` entries without values. You set them in the control panel in step 3, so they never land in the public repo.
-4. If you have `doctl`, check the file:
+3. Set `repo` under both `github` blocks, for the `api` service and the `web` static site, to the repository you deploy from, such as `your-name/threat-viz-defend`.
+4. Leave the `type: SECRET` entries without values. You set them in the control panel in step 3, so they never land in the public repo.
+5. If you have `doctl`, check the file:
 
    ```sh
    doctl apps spec validate .do/app.yaml
@@ -39,13 +40,13 @@ The API creates its tables on startup. There is no separate migration step.
 
    It prints the spec back when it is valid, or names the field that is wrong.
 
-5. Commit and push the domain change to `main`. App Platform builds from GitHub, not from your laptop.
+6. Commit and push the change to `main`. App Platform builds from GitHub, not from your laptop.
 
 ## 2. Create the app
 
 Pick one of the two routes.
 
-**Control panel.** Apps > Create App > choose GitHub, authorize the repo if asked, pick `HackedRico/threat-viz-defend` and branch `main`. On the next screen choose to edit the app spec, paste the contents of `.do/app.yaml`, and save. Review the three components, then create the app.
+**Control panel.** Apps > Create App > choose GitHub, authorize the repo if asked, pick your repository and branch `main`. On the next screen choose to edit the app spec, paste the contents of `.do/app.yaml`, and save. Review the three components, then create the app.
 
 **doctl.**
 
@@ -71,7 +72,7 @@ In the control panel: the app > Settings > the `api` component > Environment Var
 
 Keep the scope of every secret at Run time. The default scope, Run and build time, passes the value into the Docker build as a build argument, where it can end up in build logs and image layers.
 
-Keep a copy of `APP_SECRET` in the team's password manager. It encrypts the provider API keys users save in the app. If it changes, every saved key becomes unreadable and users have to enter theirs again.
+Keep a copy of `APP_SECRET` in a password manager. It encrypts the provider API keys users save in the app. If it changes, every saved key becomes unreadable and users have to enter theirs again.
 
 The spec already sets the non-secret values:
 
@@ -100,7 +101,9 @@ Saving the environment variables starts a new deploy.
 
 `deploy_on_push` is on for both components, so every push to `main` redeploys. CI in `.github/workflows/ci.yml` runs on the same push, but App Platform does not wait for it. Merge to `main` only when CI is green.
 
-## 5. DNS at GoDaddy
+## 5. DNS
+
+These steps are for GoDaddy. Another DNS host needs the same CNAME records, added through its own DNS screen.
 
 App Platform shows the target for each custom domain under the app's Networking tab, in the Domains section. Older control panels show it under Settings > Domains. It is usually the app's default hostname, such as `threatviz-defend-abc12.ondigitalocean.app`.
 
@@ -181,7 +184,7 @@ Both run on one ElevenLabs API key, which stays on the API. Dictation, the mic b
 
 1. In ElevenLabs, create an API key. If the dashboard offers scopes, allow Speech to Text for dictation, plus what the agent script and conversation tokens need for the coach.
 2. Set `ELEVENLABS_API_KEY` (encrypted) in the `api` component. After the deploy, `curl -fsS https://api.example.com/api/config` shows `"dictation_enabled": true`.
-3. For the coach, create the agent with `scripts/elevenlabs_agent.py`. The voice teammate owns that script; run it from `api/` so it has the API's dependencies: `cd api && uv run python ../scripts/elevenlabs_agent.py`. [web/src/voice/AGENTS.md](../web/src/voice/AGENTS.md) says what it sets up. Keep the agent ID it gives you.
+3. For the coach, create the agent with `scripts/elevenlabs_agent.py`. Run it from `api/` so it has the API's dependencies: `cd api && uv run python ../scripts/elevenlabs_agent.py`. [web/src/voice/AGENTS.md](../web/src/voice/AGENTS.md) says what it sets up. Keep the agent ID it gives you.
 4. Set `ELEVENLABS_AGENT_ID` (plain) in the `api` component. The config now also shows `"voice_enabled": true`.
 
 Dictation needs no CSP or DNS change: the browser records a clip of up to a minute and posts it to the API as JSON, and the API calls ElevenLabs. Browsers only allow the microphone over https, which the custom domains already use. `DAILY_DICTATIONS` caps each user's clips per day; `0` turns dictation off while keeping the coach. `ELEVENLABS_STT_MODEL` picks the model, `scribe_v2` by default. If the API logs "ElevenLabs refused the key", the key lacks the Speech to Text permission.
@@ -197,7 +200,7 @@ The API ships an admin CLI. Run it inside the running container:
    ```sh
    python -m app.cli users              # list accounts and whether each is active or disabled
    python -m app.cli stats              # counts of accounts, boards and model calls
-   python -m app.cli create-user <name> # make an organizer account without an invite code; prompts for the password
+   python -m app.cli create-user <name> # make an account without an invite code; prompts for the password
    python -m app.cli disable <username> # block an account and sign it out
    python -m app.cli enable <username>  # unblock it
    python -m app.cli delete <username>  # delete an account and everything it owns; asks first, --yes skips that
@@ -286,15 +289,15 @@ Keep the site on a subdomain of the same domain as the API. On a different domai
 
 ## Teardown
 
-Run through this when the event is over. The repo stays public, so every key that was ever used must be revoked, not just deleted from the app.
+Run through this when you retire a deployment. Revoke every key it used, not just delete it from the app: a key copied anywhere keeps working until it is revoked.
 
 - [ ] Copy out anything you want to keep. The dev database has no backups.
 - [ ] Destroy the app: the app > Settings > Destroy, or `doctl apps delete <app-id>`. This removes the `api` service, the `web` static site and the dev database with it.
 - [ ] Check Databases in the control panel shows no leftover cluster, and Apps shows nothing for this project.
-- [ ] Delete the `api` and `app` CNAME records in GoDaddy DNS, plus the apex A records or forwarding and any CAA records you added for this.
+- [ ] Delete the `api` and `app` CNAME records at your DNS host, plus the apex A records or forwarding and any CAA records you added for this.
 - [ ] Revoke the DigitalOcean model access key under Serverless Inference > Model Access Keys.
-- [ ] Revoke the Backboard API key the team used, in the Backboard dashboard.
+- [ ] Revoke the Backboard API key, in the Backboard dashboard.
 - [ ] Revoke the ElevenLabs API key, and delete the ElevenLabs agent.
 - [ ] Revoke the DigitalOcean personal access token used with `doctl`, under API > Tokens, and run `doctl auth remove --context default`.
 - [ ] Remove the DigitalOcean GitHub app's access to the repo, in GitHub > Settings > Applications, if nothing else uses it.
-- [ ] Check Billing shows no running resources, so nothing eats the remaining credit.
+- [ ] Check Billing shows no running resources, so nothing keeps billing.

@@ -145,7 +145,6 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 - **Never kept:** the content of uploads, pasted text, GitHub files and agent diffs, and dictated recordings and their text.
 - **Sessions** stop working after `SESSION_DAYS`. Expired rows stay in the table.
 - **Server logs** hold usernames at sign up, the IP of a request that filled the honeypot, job failure messages, and, when a model reply fails validation, a short excerpt of that reply.
-- **The event deployment**, including its database, is torn down after the event.
 
 ## Our own threat model
 
@@ -197,4 +196,4 @@ The map below is how we see our own system. Each row is a STRIDE threat, what st
 
 ## Reporting a problem
 
-If you find a security problem, report it privately to the repository owner through GitHub, using the repository's private vulnerability reporting if it is enabled. Include the steps to reproduce and what an attacker gains. Please do not open a public issue with exploit details, and do not test against other users' accounts or data.
+If you find a security problem, report it privately as [SECURITY.md](../SECURITY.md) describes. Include the steps to reproduce and what an attacker gains. Please do not open a public issue with exploit details, and do not test against other users' accounts or data.

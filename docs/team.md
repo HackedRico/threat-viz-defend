@@ -1,6 +1,6 @@
 # Team and areas
 
-The core engine is the hub. Every other area is a spoke that touches it at one seam: a route, a schema, a setting or a protocol. A spoke never reaches into another spoke; it goes through the engine. So four people, each with a coding agent, can build at once, and the engine is where the pieces are put together.
+The core engine is the hub. Every other area is a spoke that touches it at one seam: a route, a schema, a setting or a protocol. A spoke never reaches into another spoke; it goes through the engine. So several people, each with a coding agent, can build at once, and the engine is where the pieces are put together. The four owners below built these areas at hackUMBC 2026 and review changes to them.
 
 ```text
                             Diagrams (MD)
@@ -22,8 +22,8 @@ The core engine is the hub. Every other area is a spoke that touches it at one s
   config.py settings                          Llm and Memory protocols
            │                                              │
   Hosting (Jonathan)                             Model and memory
-DigitalOcean, GoDaddy,                           OpenAI compatible,
-        credits                                 Backboard memory
+DigitalOcean, domain, CI                         OpenAI compatible,
+                                                Backboard memory
 ```
 
 ## The engine and its seams
@@ -53,7 +53,7 @@ When a spoke needs something the seam does not carry, change the seam, not the o
 | Ricky | Core engine: static and dynamic workflows, the API, integration of every spoke | `api/`, `integrations/`, `web/src/api/`, `web/src/shell/`, `web/src/settings/`, `web/src/quiz/` | [api/AGENTS.md](../api/AGENTS.md) |
 | MD | Diagrams: how the map is drawn by the model and on the canvas | `web/src/board/` | [web/src/board/AGENTS.md](../web/src/board/AGENTS.md) |
 | Eman | Voice agent: the ElevenLabs coach | `web/src/voice/`, `scripts/elevenlabs_agent.py`, `api/app/voice.py` | [web/src/voice/AGENTS.md](../web/src/voice/AGENTS.md) |
-| Jonathan | Hosting and credits: DigitalOcean, the GoDaddy domain, platform accounts | `Dockerfile`, `.do/`, `.github/`, `docker-compose.yml`, `docs/deploy.md` | [.do/AGENTS.md](../.do/AGENTS.md) |
+| Jonathan | Hosting: DigitalOcean App Platform, the domain, CI and Docker | `Dockerfile`, `.do/`, `.github/`, `docker-compose.yml`, `docs/deploy.md` | [.do/AGENTS.md](../.do/AGENTS.md) |
 
 Shared files sit on a seam, so the engine owner approves them. Change one in your own branch and name the approver in the PR:
 
@@ -82,6 +82,6 @@ A new platform or feature, such as a new model provider, attaches the same way:
 4. Pull `main` into your branch before you ask for review, and again when CI reports a stale `web/openapi.json`.
 5. A PR is done when CI is green, the doc for the changed behavior is updated, and the description says how to check it.
 
-## Credits and accounts
+## Keys and accounts
 
-Jonathan holds the platform accounts and credits: DigitalOcean, the GoDaddy domain, ElevenLabs and Backboard. Keys go into the host's environment settings or a teammate's local `.env`, never into the repository, a PR, an issue or a chat message. Ask Jonathan for a key; he rotates them after the event.
+Whoever runs a deployment holds its accounts: the host, the domain, and any model, ElevenLabs or Backboard account. Keys go into the host's encrypted environment settings or your own local `.env`, never into the repository, a PR, an issue or a chat message. To work on voice or memory, create your own ElevenLabs or Backboard key; none is shared.
