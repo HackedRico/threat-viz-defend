@@ -6,6 +6,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any
 from urllib.parse import urlparse
 
+import httpx
+
 from app.errors import bad_request
 
 # =============================================================================
@@ -76,14 +78,25 @@ def check_base_url(url: str, *, allow_private: bool, resolver: Resolver = resolv
     except ValueError as exc:
         raise bad_request("The base URL has an invalid port.") from exc
     if not allow_private:
+        host = _connect_host(url.strip(), parsed.hostname)
         try:
-            addresses = resolver(parsed.hostname, port)
+            addresses = resolver(host, port)
         except (OSError, ValueError) as exc:
             # `ValueError` covers names the IDNA codec refuses, such as a label over 63 characters.
             raise bad_request(f"The host {parsed.hostname} does not resolve. Check the URL.") from exc
         if not addresses or any(not _public(a) for a in addresses):
             raise bad_request("The base URL points at a private or local address, which this server does not allow.")
     return url.strip().rstrip("/")
+
+
+def _connect_host(url: str, hostname: str) -> str:
+    """The host name the model client will look up, in the ASCII form httpx sends to DNS."""
+    # getaddrinfo encodes a Unicode name with IDNA 2003 and httpx with IDNA 2008, which can spell it differently
+    # (straße.example is strasse.example to one and xn--strae-oqa.example to the other), so resolve what httpx uses.
+    try:
+        return httpx.URL(url).raw_host.decode("ascii")
+    except (httpx.InvalidURL, UnicodeError) as exc:
+        raise bad_request(f"The host {hostname} is not a valid name. Check the URL.") from exc
 
 
 def _public(address: str) -> bool:

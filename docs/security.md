@@ -91,6 +91,7 @@ The server makes outbound requests to three kinds of address. Two are fixed; one
 - Only `https` is allowed. Plain `http` is allowed only where private addresses are.
 - No username or password in the URL, no query string and no fragment.
 - Every address the host resolves to must be globally routable and not multicast. One private address among public ones fails the check.
+- The check looks up the host in the ASCII form the model client connects to, so a Unicode name, which the system resolver and the HTTP client can spell differently, cannot pass under one spelling and connect under the other.
 - `ALLOW_PRIVATE_PROVIDER_URLS` lets a deployment call local models such as Ollama. It defaults to on in development and off in production.
 - Error messages from the provider are cut to 200 characters before they reach the user.
 

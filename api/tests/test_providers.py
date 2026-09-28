@@ -188,6 +188,22 @@ def test_private_addresses_inside_ipv6_are_refused(address: str) -> None:
         check_base_url("https://api.example.com/v1", allow_private=False, resolver=lambda host, port: [address])
 
 
+def test_a_unicode_host_is_checked_under_the_name_the_client_connects_to() -> None:
+    asked: list[str] = []
+
+    def record(host: str, port: int) -> list[str]:
+        asked.append(host)
+        return [PUBLIC]
+
+    # getaddrinfo would look this name up as strasse.example, but httpx, and so the OpenAI SDK, connects to the
+    # IDNA 2008 name. Two names an attacker controls could then point at a public and a private address.
+    check_base_url("https://straße.example/v1", allow_private=False, resolver=record)
+    assert asked == ["xn--strae-oqa.example"]
+    with pytest.raises(AppError) as invalid:
+        check_base_url(f"https://{'ß' * 70}.example/v1", allow_private=False, resolver=record)
+    assert invalid.value.status == 400
+
+
 def test_malformed_urls_and_names_are_400_not_500() -> None:
     with pytest.raises(AppError) as bracket:
         check_base_url("https://[::1/v1", allow_private=False, resolver=public_dns)
