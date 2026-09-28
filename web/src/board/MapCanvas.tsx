@@ -19,7 +19,7 @@ import {
 } from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
 import { MapLegend } from "./MapLegend.tsx";
-import { placePins, type Pin } from "./pins.ts";
+import { pinState, placePins, type LitState, type Pin } from "./pins.ts";
 import { boundaryOutline, LID, nodeFill, nodeOutline, personGlyph } from "./shapes.ts";
 import { PinMark } from "./PinMark.tsx";
 import { useBoardUi } from "./store.ts";
@@ -520,7 +520,7 @@ export const MapScene = memo(function MapScene({
           <PinButton
             key={pin.threat.id}
             pin={pin}
-            state={litState(pin.threat.id) || litState(pin.threat.element)}
+            state={pinState(pin.threat, lit)}
             onOpen={() => onOpenThreat(pin.threat.id)}
           />
         ))}
@@ -556,8 +556,6 @@ function BoundaryName({ label, spot }: { label: string; spot: Box }) {
     </g>
   );
 }
-
-type LitState = "lit" | "dim" | "";
 
 interface NodeShapeProps {
   node: MapNode;
