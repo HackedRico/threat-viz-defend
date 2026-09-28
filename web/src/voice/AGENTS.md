@@ -38,7 +38,7 @@ The names and parameters below must match in `tools.ts` and `scripts/elevenlabs_
 
 ## Getting it running
 
-1. Get an ElevenLabs API key from Jonathan and put it in the repo-root `.env` as `ELEVENLABS_API_KEY`. Never commit it.
+1. Create an ElevenLabs API key and put it in the repo-root `.env` as `ELEVENLABS_API_KEY`. Never commit it.
 2. `cd api && uv run python ../scripts/elevenlabs_agent.py --dry-run` prints what it would send. Then run it without `--dry-run`; it prints the agent id.
 3. Put that id in `.env` as `ELEVENLABS_AGENT_ID` and restart the API. `GET /api/config` now reports `voice_enabled: true`.
 4. `./scripts/dev.sh`, sign in with the development account, open the example board, go to Defend, and start the voice coach.

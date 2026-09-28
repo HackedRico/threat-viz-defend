@@ -342,7 +342,7 @@ The whole deployment also has a shared daily limit. When it runs out, everyone w
 
 | Symptom | Cause and fix |
 |---|---|
-| "That invite code is not valid." | Check the code with the organizers. Codes are exact. |
+| "That invite code is not valid." | Check the code with whoever runs the server. Codes are exact. |
 | "This account is locked for 15 minutes after repeated failed sign ins." | Five wrong passwords lock the username. Wait 15 minutes, then sign in. |
 | "Sign ups are closed: this server has reached its account limit." | The deployment is full. Ask the operator. |
 | You are sent back to the sign in screen | Your session expired or was ended. Sign in again. |

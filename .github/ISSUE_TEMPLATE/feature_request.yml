@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest something ThreatViz Defend should do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start from the problem. A clear problem gets a better design than a finished solution does.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+      description: How you picture it working. Screens, commands or an example board all help.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other ways you considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Adding material or importing from GitHub
+        - The map or its layout
+        - Threats or attack paths
+        - Ask
+        - Defend quiz
+        - Voice coach or dictation
+        - Coding agent hook or MCP server
+        - Export
+        - Accounts or settings
+        - Model providers or memory
+        - Deployment or Docker
+        - Something else
+    validations:
+      required: true
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data that leaves the machine
+      description: The app keeps uploads out of storage and sends only masked text to a model. See docs/security.md.
+      options:
+        - label: This changes what is stored, or what reaches a model or another service, and I describe how above.
