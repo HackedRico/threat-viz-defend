@@ -116,12 +116,7 @@ export function newFiles(picked: readonly Picked[], staged: Iterable<string>): P
 /** Apply the file policy to picked files, before any is read. */
 export function collect(files: readonly Picked[], policy: FilePolicy, alreadyBytes = 0, alreadyFiles = 0): Collected {
   // Caps count what is already staged, so two picks together still respect them.
-  const room: FilePolicy = {
-    ...policy,
-    maxFiles: Math.max(0, policy.maxFiles - alreadyFiles),
-    maxUploadBytes: Math.max(0, policy.maxUploadBytes - alreadyBytes),
-  };
-  return planUpload(files, room);
+  return planUpload(files, policy, { files: alreadyFiles, bytes: alreadyBytes });
 }
 
 /** Read accepted files as text, dropping any that turn out to be binary. */
