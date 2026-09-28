@@ -87,6 +87,25 @@ def test_rejected_response_format_falls_back_to_the_prompt() -> None:
     assert "JSON Schema" in calls.calls[1]["messages"][0]["content"]
 
 
+def test_a_provider_that_refuses_the_output_cap_is_asked_again_without_it() -> None:
+    # A model with a smaller output limit, such as one that stops at 4096 tokens, answers every capped call with a 400.
+    request = httpx.Request("POST", "https://x/v1/chat/completions")
+    too_large = openai.BadRequestError(
+        "max_tokens is too large: 16384. This model supports at most 4096 completion tokens",
+        response=httpx.Response(400, request=request),  # type: ignore[arg-type]
+        body=None,
+    )
+    completions = _Completions([too_large, GOOD, GOOD])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = OpenAICompatibleLlm(model="m", api_key="k", base_url="https://x/v1", max_tokens=16384, client=client)  # type: ignore[arg-type]
+    assert llm.generate(REQUEST) == inbox().analysis
+    assert "max_tokens" in completions.calls[0]
+    assert "max_tokens" not in completions.calls[1]
+    # Remembered for the client's life, so later calls do not pay for the refusal again.
+    assert llm.generate(REQUEST) == inbox().analysis
+    assert "max_tokens" not in completions.calls[2]
+
+
 @pytest.mark.parametrize(
     ("base_url", "field", "other"),
     [

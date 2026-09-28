@@ -156,6 +156,12 @@ class OpenAICompatibleLlm:
         try:
             response = self._create(messages, response_format, request.task, deadline)
         except openai.BadRequestError as exc:
+            if self._max_tokens is not None and _about_token_cap(exc):
+                # `LLM_MAX_TOKENS` reaches users' own providers too, and a model with a smaller output limit refuses
+                # it outright; leaving the cap to the provider from now on is what the user could not do themselves.
+                log.warning("[llm] %s refused an output cap of %s tokens; sending none.", self._label, self._max_tokens)
+                self._max_tokens = None
+                return self._complete(messages, request, deadline)
             if response_format is None or not _about_response_format(exc):
                 raise LlmError("unavailable", f"{self._label} rejected the request: {_brief(exc)}") from exc
             # Many compatible servers reject `response_format`; fall back to asking in the prompt from now on.
@@ -261,6 +267,12 @@ def _about_response_format(exc: openai.BadRequestError) -> bool:
     """True when a 400 complains about `response_format` or JSON output, not about the prompt or the model."""
     text = f"{exc} {exc.body}".lower()
     return any(word in text for word in ("response_format", "json_schema", "json_object", "json mode", "schema"))
+
+
+def _about_token_cap(exc: openai.BadRequestError) -> bool:
+    """True when a 400 complains about the output token cap this client sent."""
+    text = f"{exc} {exc.body}".lower()
+    return "max_tokens" in text or "max_completion_tokens" in text
 
 
 def _brief(exc: Exception) -> str:
