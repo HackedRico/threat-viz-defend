@@ -95,7 +95,7 @@ export function Landing({ config, headingRef }: { config: ConfigOut; headingRef:
           </div>
           <p className="landing-note">
             <SparkIcon className="landing-note-icon" />
-            {open ? "Create an account with the invite code from the organizers." : "New accounts are closed right now."}
+            {open ? "Create an account with an invite code from whoever runs this server." : "New accounts are closed right now."}
           </p>
           <a className="landing-more" href="#how">
             See how it works <ArrowRightIcon className="landing-more-icon" />
