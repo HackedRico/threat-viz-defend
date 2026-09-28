@@ -20,6 +20,6 @@ The hackUMBC 2026 pitch for ThreatViz Defend: a 13 slide deck and the talk track
 12. **Impact.** Every developer can defend what they ship: threat modeling for everyone, training the defender, keeping up at agent runtime, secure by design.
 13. **What's next.** A pull request check that flags a new trust boundary crossing or lethal trifecta before it merges, a team view of who can explain which threats, and private repositories through a GitHub app.
 
-The diagrams on slides 8 to 11 are also in the [README](../../README.md#how-it-is-built).
+The diagrams on slides 8 to 11 are also in the [README](../../README.md#how-it-is-built) and [docs/services.md](../services.md).
 
 [docs/images/png/](../images/png/) holds PNG copies of every README diagram, dark theme, for sites that cannot show SVG, such as Devpost.
