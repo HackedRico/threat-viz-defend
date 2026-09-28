@@ -186,10 +186,12 @@ class Boards:
             raise bad_request("A map needs at least one component.")
         # Claimed with one conditional write, as `_begin` does, so a confirm that started since this row was read
         # cannot find threats on one map while this edit saves another under it.
-        claim = update(BoardRow).where(BoardRow.id == row.id, BoardRow.status.not_in(BUSY))
+        claim = update(BoardRow).where(
+            BoardRow.id == row.id, BoardRow.status.not_in(BUSY), BoardRow.revision == row.revision
+        )
         claimed = session.execute(claim.values(status="review").execution_options(synchronize_session=False))
         if cast(CursorResult[tuple[()]], claimed).rowcount != 1:
-            raise conflict("The board is busy. Wait for it to finish, then save your edits.")
+            raise conflict("The board changed or is busy. Reload it, then save your edits again.")
         # Keep the map before the edit so review marks what the person changed.
         before, before_analysis = row.map, _analysis_json(row)
         row.previous_map = row.map
@@ -327,13 +329,17 @@ class Boards:
             restore = _stable_status(row)
             current = read_map(row)
             # One conditional write claims the board, so two requests that both saw it idle, such as a coding
-            # agent's change and a click on confirm, cannot both spend a call and start a job.
-            claim = update(BoardRow).where(BoardRow.id == board_id, BoardRow.status.not_in(BUSY))
+            # agent's change and a click on confirm, cannot both spend a call and start a job. The revision must
+            # also be the one read, or a hand edit that committed in between would be drafted over or pinned to
+            # threats found on the map this read.
+            claim = update(BoardRow).where(
+                BoardRow.id == board_id, BoardRow.status.not_in(BUSY), BoardRow.revision == row.revision
+            )
             claimed = session.execute(
                 claim.values(status=status, error=None).execution_options(synchronize_session=False)
             )
             if cast(CursorResult[tuple[()]], claimed).rowcount != 1:
-                raise conflict("The board is already working. Wait for it to finish, then try again.")
+                raise conflict("The board changed or is already working. Reload it, then try again.")
             self._budget.spend(session, user_id, "model", task, own_key=chosen.own_key)
             row.status = status
             row.error = None

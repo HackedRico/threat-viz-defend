@@ -7,9 +7,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
+from sqlalchemy.orm import object_session
 
 from app.analysis.analyst import DemoAnalyst
 from app.boards import ingest
+from app.boards import service as boards_service
 from app.boards.ingest import Material
 from app.db import utcnow
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
@@ -403,3 +405,27 @@ def test_a_restart_during_a_redraw_never_revives_threats_found_on_an_older_map(s
     # After a hand edit the stored threats describe the older map, so the board goes back to review.
     assert _restart_mid_redraw(signed_in, board_id) == "review"
     assert signed_in.get(f"/api/boards/{board_id}/quiz").json()["questions"] == []
+
+
+def test_a_confirm_is_refused_when_the_map_changed_after_it_was_read(
+    signed_in: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    board_id = signed_in.get("/api/boards").json()[0]["id"]
+    edited = signed_in.get(f"/api/boards/{board_id}").json()["map"]
+    assert signed_in.put(f"/api/boards/{board_id}/map", json={"map": edited}).status_code == 200
+    real_read = boards_service.read_map
+
+    def edit_lands_meanwhile(row: BoardRow) -> SystemMap | None:
+        # Another request commits a hand edit after this confirm read the map and before it claims the board.
+        bump = update(BoardRow).where(BoardRow.id == row.id).values(revision=BoardRow.revision + 1)
+        session = object_session(row)
+        assert session is not None
+        session.execute(bump.execution_options(synchronize_session=False))
+        return real_read(row)
+
+    monkeypatch.setattr(boards_service, "read_map", edit_lands_meanwhile)
+    # Finding threats on the map it read would pin them to the edited map's version.
+    assert signed_in.post(f"/api/boards/{board_id}/confirm").status_code == 409
+    monkeypatch.setattr(boards_service, "read_map", real_read)
+    assert signed_in.get(f"/api/boards/{board_id}").json()["status"] == "review"
+
