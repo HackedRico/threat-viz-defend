@@ -103,16 +103,16 @@ function ThreatCard({
             <div>
               <p className="panel-label">Fixes to start today</p>
               <ul className="fix-list">
-                {threat.fixes.map((fix) => (
-                  <li key={fix}>{fix}</li>
+                {threat.fixes.map((fix, index) => (
+                  <li key={`${fix}-${index}`}>{fix}</li>
                 ))}
               </ul>
             </div>
           )}
           {threat.refs.length > 0 && (
             <p className="threat-refs">
-              {threat.refs.map((ref) => (
-                <span key={ref} className="chip mono">
+              {threat.refs.map((ref, index) => (
+                <span key={`${ref}-${index}`} className="chip mono">
                   {ref}
                 </span>
               ))}

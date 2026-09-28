@@ -2,10 +2,13 @@ import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } fr
 
 import { api, errorMessage } from "../api/client.ts";
 import type { BoardOut, SourceIn } from "../api/types.ts";
+import { useProvider } from "../settings/provider.ts";
 import { CloseIcon } from "../shell/icons.tsx";
+import { routePath, type Route } from "../shell/route.ts";
 import { useSession } from "../shell/session.tsx";
+import { navigate } from "../shell/useRoute.ts";
 import { formatBytes, type Skipped } from "./filePolicy.ts";
-import { collect, fromDrop, fromFileList, readAccepted, type Picked } from "./readFiles.ts";
+import { collect, fromDrop, fromFileList, newFiles, readAccepted, type Picked } from "./readFiles.ts";
 import "./Intake.css";
 
 // =============================================================================
@@ -34,6 +37,11 @@ export function Intake({
 }) {
   const { config } = useSession();
   const policy = config.file_policy;
+  // With no model anywhere the server maps only the built-in example, so say so before anyone pastes their own notes.
+  const { provider, load } = useProvider();
+  useEffect(() => {
+    if (provider === null) void load();
+  }, [provider, load]);
   const ids = useId();
   const [noteName, setNoteName] = useState("");
   const [note, setNote] = useState("");
@@ -67,15 +75,16 @@ export function Intake({
     setBusy("reading");
     setError(null);
     try {
-      const known = new Set(staged.map((source) => source.name));
-      const fresh = picked.filter((file) => !known.has(file.path));
+      const fresh = newFiles(picked, staged.map((source) => source.name));
       // One slot stays free for pasted notes, which travel as one more source.
       const plan = collect(fresh, policy, stagedBytes + noteBytes, staged.length + 1);
       const read = await readAccepted(plan.accepted);
       setStaged((before) => [...before, ...read.sources]);
       setSkipped((before) => [...before, ...preSkipped, ...plan.skipped, ...read.skipped]);
       if (plan.accepted.length === 0 && picked.length > 0 && read.sources.length === 0) {
-        setError("None of those files can be sent. See the skipped list for why.");
+        // Files already staged get no entry in the skipped list, so the message points there only when it holds the reasons.
+        if (fresh.length > 0) setError("None of those files can be sent. See the skipped list for why.");
+        else setError(picked.length === 1 ? "That file is already added." : "Those files are already added.");
       }
     } catch (caught) {
       setError(errorMessage(caught));
@@ -84,9 +93,18 @@ export function Intake({
     }
   };
 
+  // A read checks names and caps against the staged list as it stood when the read began, so a second one
+  // at the same time could stage the same files twice and slip past the caps. Until it ends, drops and picks are ignored.
+  const pick = (list: FileList | null) => {
+    if (list === null || busy !== null) return;
+    const { files, skipped: folders } = fromFileList(list, policy);
+    void take(files, folders);
+  };
+
   const onDrop = async (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragging(false);
+    if (busy !== null) return;
     setBusy("reading");
     try {
       const { files, skipped: dirs } = await fromDrop(event.dataTransfer, policy);
@@ -106,6 +124,10 @@ export function Intake({
     }
     if (note.length > MAX_TEXT_CHARS) {
       setError(`Pasted text is limited to ${MAX_TEXT_CHARS.toLocaleString()} characters. Split it into files.`);
+      return;
+    }
+    if (sources.length > policy.maxFiles) {
+      setError(`Send at most ${policy.maxFiles} files at a time, counting pasted notes as one. Remove some files.`);
       return;
     }
     if (stagedBytes + noteBytes > policy.maxUploadBytes) {
@@ -159,6 +181,7 @@ export function Intake({
             </button>
           )}
         </header>
+        {provider?.source === "demo" && <DemoNote boardId={board.id} />}
 
         <div className="intake-grid">
           <section className="intake-col" aria-labelledby={`${ids}-paste`}>
@@ -205,7 +228,8 @@ export function Intake({
               className={`dropzone ${dragging ? "is-over" : ""}`}
               onDragOver={(e) => {
                 e.preventDefault();
-                setDragging(true);
+                // A drop now would be ignored, so the zone does not light up to invite one.
+                if (busy === null) setDragging(true);
               }}
               onDragLeave={() => setDragging(false)}
               onDrop={(e) => void onDrop(e)}
@@ -230,10 +254,7 @@ export function Intake({
                 hidden
                 aria-label="Choose files"
                 onChange={(e) => {
-                  if (e.target.files) {
-                    const { files, skipped: folders } = fromFileList(e.target.files, policy);
-                    void take(files, folders);
-                  }
+                  pick(e.target.files);
                   e.target.value = "";
                 }}
               />
@@ -245,10 +266,7 @@ export function Intake({
                 aria-label="Choose a code folder"
                 {...{ webkitdirectory: "" }}
                 onChange={(e) => {
-                  if (e.target.files) {
-                    const { files, skipped: folders } = fromFileList(e.target.files, policy);
-                    void take(files, folders);
-                  }
+                  pick(e.target.files);
                   e.target.value = "";
                 }}
               />
@@ -271,8 +289,8 @@ export function Intake({
                   </button>
                 </div>
                 <ul className="staged-list">
-                  {staged.map((source) => (
-                    <li key={source.name}>
+                  {staged.map((source, i) => (
+                    <li key={`${source.name}:${i}`}>
                       <span className={`staged-kind kind-${source.kind}`}>{source.kind}</span>
                       <span className="staged-name mono">{source.name}</span>
                       <span className="staged-size">{formatBytes(source.bytes)}</span>
@@ -358,5 +376,28 @@ export function Intake({
         )}
       </div>
     </div>
+  );
+}
+
+// Demo mode fails on anything but the example's own notes, after spending a call; a model under settings fixes that.
+function DemoNote({ boardId }: { boardId: string }) {
+  const settings: Route = { name: "settings", section: "provider", boardId };
+  return (
+    <p className="banner intake-demo" role="note">
+      <span className="banner-body">
+        <strong>Demo mode.</strong> This server has no model, so it can map only the built-in example. To map your own
+        system, save a model under{" "}
+        <a
+          href={routePath(settings)}
+          onClick={(event) => {
+            event.preventDefault();
+            navigate(settings);
+          }}
+        >
+          Model provider
+        </a>
+        .
+      </span>
+    </p>
   );
 }

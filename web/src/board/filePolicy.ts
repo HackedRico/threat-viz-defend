@@ -43,11 +43,14 @@ export function skipReason(path: string, policy: FilePolicy): string | null {
   return null;
 }
 
-/** Split a pick into files to read and files to skip, keeping to the policy's caps. */
-export function planUpload<T extends PickedFile>(files: readonly T[], policy: FilePolicy): UploadPlan<T> {
+/** Split a pick into files to read and files to skip, keeping to the policy's caps with what is `already` staged counted in. */
+export function planUpload<T extends PickedFile>(files: readonly T[], policy: FilePolicy, already = { files: 0, bytes: 0 }): UploadPlan<T> {
   const accepted: T[] = [];
   const skipped: Skipped[] = [];
   let totalBytes = 0;
+  // Reasons name the limits the drop zone shows, not the room left. Only bytes say whether anything is added:
+  // staged files are never empty, and the file count may also hold a slot kept free for pasted notes.
+  const added = already.bytes > 0 ? " with what is already added" : "";
   // Entry points and manifests first, tests and docs last, then by path, so a cap cuts what matters least
   // and the same folder always keeps the same files.
   const ordered = [...files].sort((a, b) => uploadPriority(a.path) - uploadPriority(b.path) || a.path.localeCompare(b.path));
@@ -59,10 +62,10 @@ export function planUpload<T extends PickedFile>(files: readonly T[], policy: Fi
       skipped.push({ path: file.path, reason: "empty file" });
     } else if (file.size > policy.maxFileBytes) {
       skipped.push({ path: file.path, reason: `larger than ${formatBytes(policy.maxFileBytes)}` });
-    } else if (accepted.length >= policy.maxFiles) {
-      skipped.push({ path: file.path, reason: `over the ${policy.maxFiles} file limit` });
-    } else if (totalBytes + file.size > policy.maxUploadBytes) {
-      skipped.push({ path: file.path, reason: `over the ${formatBytes(policy.maxUploadBytes)} upload limit` });
+    } else if (already.files + accepted.length >= policy.maxFiles) {
+      skipped.push({ path: file.path, reason: `over the ${policy.maxFiles} file limit${added}` });
+    } else if (already.bytes + totalBytes + file.size > policy.maxUploadBytes) {
+      skipped.push({ path: file.path, reason: `over the ${formatBytes(policy.maxUploadBytes)} upload limit${added}` });
     } else {
       accepted.push(file);
       totalBytes += file.size;

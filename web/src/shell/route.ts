@@ -4,6 +4,7 @@
 // The app's few screens as a typed `Route`, read from and written to the URL
 // path. The server answers every unknown path with the app, so links such as
 // the `/boards/<id>` review links coding agents print open the right board.
+// A screen with unsaved work sets `guardLeaving`, and `mayLeave` asks it.
 
 /** A part of the settings screen. */
 export type SettingsSection = "agents" | "provider" | "memory";
@@ -44,6 +45,23 @@ export function routePath(route: Route): string {
       return route.boardId ? `${base}?board=${encodeURIComponent(route.boardId)}` : base;
     }
   }
+}
+
+// Only one board is open at a time, so one screen at most holds unsaved work.
+let leaveGuard: (() => boolean) | null = null;
+
+/** Make `mayLeave` call `ask`, which returns true to go on, until the returned function lets go. */
+export function guardLeaving(ask: () => boolean): () => void {
+  leaveGuard = ask;
+  return () => {
+    // A screen that took over the slot keeps it, whichever order two screens swap in.
+    if (leaveGuard === ask) leaveGuard = null;
+  };
+}
+
+/** True when no screen holds unsaved work, or the user agrees to lose it. */
+export function mayLeave(): boolean {
+  return leaveGuard === null || leaveGuard();
 }
 
 function safeDecode(part: string): string {

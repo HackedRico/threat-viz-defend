@@ -8,7 +8,8 @@ import { rankThreats } from "./severity.ts";
 // Where each threat's numbered pin sits: on the top right corner of its node,
 // or beside its flow's label, on whichever side is clear of nodes, labels and
 // other pins. Pins on one element line up worst first, so the most severe pin
-// is always the one nearest the corner or the label.
+// is always the one nearest the corner or the label. `pinState` keeps a pin
+// bright while its threat or its element is lit.
 
 /** One pin on the canvas. */
 export interface Pin {
@@ -17,6 +18,9 @@ export interface Pin {
   y: number;
   number: string;
 }
+
+/** How a mark shows while part of the map is lit: bright, faded, or plain when nothing is lit. */
+export type LitState = "lit" | "dim" | "";
 
 /** Spacing between pins that share an element. */
 export const PIN_STEP = 28;
@@ -59,18 +63,26 @@ export function placePins(threats: readonly Threat[], layout: MapLayout): Pin[] 
     onIt.forEach((threat, slot) => {
       const spot = spots[slot]!;
       placed.set(threat.id, { threat, ...spot, number: threat.id.replace(/\D/g, "") || threat.id });
-      taken.push(reachOf(spot));
+      taken.push(pinBox(spot));
     });
   }
   // Tab order follows the ranking, so moving through the pins reads the threat list in order.
   return ranked.flatMap((threat) => placed.get(threat.id) ?? []);
 }
 
-function clash(spots: ReadonlyArray<{ x: number; y: number }>, taken: readonly Box[]): number {
-  return spots.reduce((sum, spot) => sum + taken.filter((box) => overlaps(reachOf(spot), box)).length, 0);
+/** How a threat's pin shows while part of the map is lit: bright when its threat or its element is lit. */
+export function pinState(threat: Pick<Threat, "id" | "element">, lit: ReadonlySet<string> | null): LitState {
+  if (lit === null) return "";
+  // A quiz result, an answer or the voice coach lights the element alone, and its pins are what is being discussed.
+  return lit.has(threat.id) || lit.has(threat.element) ? "lit" : "dim";
 }
 
-function reachOf(spot: { x: number; y: number }): Box {
+function clash(spots: ReadonlyArray<{ x: number; y: number }>, taken: readonly Box[]): number {
+  return spots.reduce((sum, spot) => sum + taken.filter((box) => overlaps(pinBox(spot), box)).length, 0);
+}
+
+/** The box a pin centered on `spot` covers, for keeping pins apart and for bringing a focused one into view. */
+export function pinBox(spot: { x: number; y: number }): Box {
   return { x: spot.x - PIN_REACH, y: spot.y - PIN_REACH, width: PIN_REACH * 2, height: PIN_REACH * 2 };
 }
 

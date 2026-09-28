@@ -4,6 +4,7 @@ import type { BoardOut, SystemMap, ThreatAnalysis } from "../api/types.ts";
 import { CloseIcon, SidebarIcon } from "../shell/icons.tsx";
 import { ResizeHandle, useStoredWidth } from "../shell/ResizeHandle.tsx";
 import { clampWidth } from "../shell/resize.ts";
+import { guardLeaving } from "../shell/route.ts";
 import { isBusy } from "../shell/statusText.ts";
 import { ProviderLine } from "../settings/ProviderSettings.tsx";
 import { ActivityLog } from "./ActivityLog.tsx";
@@ -42,6 +43,7 @@ const SOURCE_TEXT: Record<HighlightSource, string> = {
   threat: "Lit by the threat",
 };
 
+const DISCARD_EDITS = "Discard your unsaved map edits?";
 const PANEL_WIDTH_KEY = "panel-width";
 const BRIEF_FOLDED_KEY = "brief-folded";
 const PANEL_DEFAULT = 380;
@@ -83,6 +85,23 @@ export function Workspace({
       if (!dirty) setDraft(serverMap);
     }
   }, [board.revision, serverMap, dirty]);
+
+  // The draft lives only here, so while it holds unsaved edits, going to another screen, adding material
+  // or closing the page asks first. Back and forward move the URL before any code runs, so they cannot ask.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Chrome and Edge before version 119 ask only when this is set.
+      event.returnValue = true;
+    };
+    window.addEventListener("beforeunload", warn);
+    const release = guardLeaving(() => window.confirm(DISCARD_EDITS));
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      release();
+    };
+  }, [dirty]);
 
   const map = review ? draft : serverMap;
   const { layouts, key, error } = useMapLayout(map);

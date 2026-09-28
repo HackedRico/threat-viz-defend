@@ -11,8 +11,9 @@ export function mcpUrl(origin: string): string {
 }
 
 /**
- * The `claude mcp add` command, reading the token from `THREATVIZ_TOKEN` so it stays out of shell history. The
- * `:?` form stops the shell with a message when the token was never exported, instead of saving an empty one.
+ * The `claude mcp add` command, reading the token from `THREATVIZ_TOKEN`, the variable the Cursor config reads too, so
+ * one export line serves either agent. That export line still lands in shell history. The `:?` form stops the shell
+ * with a message when the token was never exported, instead of saving an empty one.
  */
 export function claudeCommand(origin: string): string {
   return `claude mcp add --transport http threatviz ${mcpUrl(origin)} --header "Authorization: Bearer \${THREATVIZ_TOKEN:?run the export line first}"`;

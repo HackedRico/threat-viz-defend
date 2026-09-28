@@ -11,9 +11,9 @@ import "./AccountForm.css";
 // Module Overview
 // =============================================================================
 // The sign in and create account forms, each beside a panel with a motto, which
-// Dawg guards in the hackUMBC theme. Creating an account needs the invite code
-// handed out in person. A `website` honeypot that people never see catches bots
-// that fill every field.
+// Dawg guards in the hackUMBC theme. Creating an account needs an invite code
+// from whoever runs the server. A `website` honeypot that people never see
+// catches bots that fill every field.
 
 /** Which account form to show. */
 export type AccountMode = "signin" | "signup";
@@ -185,7 +185,7 @@ export function AccountForm({
                   required
                 />
                 <span id={`${ids}-invite-hint`} className="field-hint">
-                  Handed out in person at the event.
+                  From whoever runs this server.
                 </span>
               </div>
             )}

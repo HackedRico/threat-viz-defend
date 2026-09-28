@@ -195,6 +195,18 @@
     "What happens if an email tells the agent to forward my mail?": {
       "answer": "The email reaches the Triage agent through the Gmail API, the sync worker and Postgres, and the agent can follow its instructions with send_email (T1), or leak mail through fetch_url (T2). Turning off auto-send and limiting send_email to addresses in the thread breaks the first route.",
       "highlight": ["senders", "google", "sync", "db", "agent", "f14", "f15", "T1", "T2"]
+    },
+    "What should I fix first, and why?": {
+      "answer": "Fix the Triage agent first (T1): it reads private mail, takes instructions from anyone who emails the user, and can send data out with send_email and fetch_url, so one email can make it forward or leak a user's mail (T2). Turn off auto-send, allow send_email only to addresses already in the thread, and fetch only URLs from the original email. Then stop sending full prompts to the Log service (T3).",
+      "highlight": ["agent", "f14", "f15", "f16", "T1", "T2", "T3"]
+    },
+    "What can untrusted input make Triage agent do?": {
+      "answer": "Anyone can email a user, and the message reaches the Triage agent through the Gmail API, the sync worker and Postgres, so the sender's words steer an agent that holds tools. They can make it forward private mail with send_email (T1), put mail in an attacker's URL with fetch_url (T2), or write a summary with an image link that leaks it from the Web app (T5).",
+      "highlight": ["senders", "google", "sync", "db", "agent", "f14", "f15", "f18", "T1", "T2", "T5"]
+    },
+    "What happens if Postgres leaks?": {
+      "answer": "Postgres holds every user's message bodies, summaries and Gmail refresh tokens, so a leak exposes all of that mail at once. The tokens are encrypted with one key from the environment, so whoever also gets that key can read and send mail as every user (T6). Keep the key in a KMS instead, and ask Gmail for the narrowest scopes.",
+      "highlight": ["db", "f6", "f7", "f8", "f11", "T6"]
     }
   }
 }

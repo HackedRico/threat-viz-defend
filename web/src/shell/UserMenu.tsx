@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { UsageOut } from "../api/types.ts";
+import { mayLeave } from "./route.ts";
 import { navigate } from "./useRoute.ts";
 import { LogoutIcon, MemoryIcon, PlugIcon, SparkIcon } from "./icons.tsx";
 import { useSession } from "./session.tsx";
@@ -12,8 +13,8 @@ import "./UserMenu.css";
 // =============================================================================
 // The account menu at the foot of the sidebar: who is signed in, what they have
 // spent today against their limits, the theme picker, ways to connect a coding
-// agent, pick the model and set up memory, and sign out. Usage refreshes each
-// time the menu opens.
+// agent, pick the model and set up memory, and sign out, which says so when it
+// fails. Usage refreshes each time the menu opens.
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
@@ -32,20 +33,46 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
   );
 }
 
-/** Today's usage as meters; dictation shows only where the server offers it. */
-export function UsageMeters({ usage, dictation }: { usage: UsageOut; dictation: boolean }) {
+/** Today's usage as meters; voice and dictation show only where the server offers them. */
+export function UsageMeters({ usage, voice, dictation }: { usage: UsageOut; voice: boolean; dictation: boolean }) {
   return (
     <div className="usage">
       <Meter label="Model calls today" used={usage.model_calls_today} limit={usage.model_calls_limit} />
-      <Meter label="Voice sessions today" used={usage.voice_sessions_today} limit={usage.voice_sessions_limit} />
+      {voice && (
+        <Meter label="Voice sessions today" used={usage.voice_sessions_today} limit={usage.voice_sessions_limit} />
+      )}
       {dictation && <Meter label="Dictations today" used={usage.dictations_today} limit={usage.dictations_limit} />}
     </div>
   );
 }
 
+/** Sign out, or say it failed; rendered inside the menu so the message clears when the menu closes. */
+function SignOutButton() {
+  const { signOut } = useSession();
+  const [failed, setFailed] = useState(false);
+  const leave = () => {
+    // Signing out leaves the open board without `navigate`, so it asks about unsaved work itself.
+    if (!mayLeave()) return;
+    setFailed(false);
+    signOut().catch(() => setFailed(true));
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-ghost user-pop-item" onClick={leave}>
+        <LogoutIcon /> Sign out
+      </button>
+      {failed && (
+        <p className="user-pop-error" role="alert">
+          Could not sign out. Check your connection and try again.
+        </p>
+      )}
+    </>
+  );
+}
+
 /** The account button and its menu; `collapsed` shows only the initial. */
 export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: string | null }) {
-  const { config, me, refreshMe, signOut } = useSession();
+  const { config, me, refreshMe } = useSession();
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -75,7 +102,7 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
           <p className="user-pop-name">
             Signed in as <strong>{name}</strong>
           </p>
-          <UsageMeters usage={me.usage} dictation={config.dictation_enabled} />
+          <UsageMeters usage={me.usage} voice={config.voice_enabled} dictation={config.dictation_enabled} />
           <div className="user-pop-theme">
             {/* The switch's own legend names it for screen readers; this label is for sighted users. */}
             <span aria-hidden="true">Theme</span>
@@ -111,9 +138,7 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
           >
             <MemoryIcon /> Memory
           </button>
-          <button type="button" className="btn btn-ghost user-pop-item" onClick={() => void signOut()}>
-            <LogoutIcon /> Sign out
-          </button>
+          <SignOutButton />
         </div>
       )}
       <button

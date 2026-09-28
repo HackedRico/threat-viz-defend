@@ -19,7 +19,7 @@ import {
 } from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
 import { MapLegend } from "./MapLegend.tsx";
-import { placePins, type Pin } from "./pins.ts";
+import { pinBox, pinState, placePins, type LitState, type Pin } from "./pins.ts";
 import { boundaryOutline, LID, nodeFill, nodeOutline, personGlyph } from "./shapes.ts";
 import { PinMark } from "./PinMark.tsx";
 import { useBoardUi } from "./store.ts";
@@ -33,7 +33,8 @@ import "./MapCanvas.css";
 // the canvas, with threat pins, lethal trifecta rings, crossing flows and
 // highlights on top. The view pans and zooms by pointer, wheel and keyboard, and
 // every element is focusable and selects on Enter, so the map works without a mouse.
-// `MapScene` draws the map itself, so an export draws the very same shapes.
+// `MapScene` draws the map itself, so an export draws the very same shapes, as
+// `still` marks with nothing to press.
 
 interface View {
   x: number;
@@ -415,6 +416,8 @@ export interface MapSceneProps {
   diff: MapDiff | null;
   draft: boolean;
   pinsShown: boolean;
+  /** Marks with nothing to press or focus, for a picture of the map rather than the canvas. */
+  still?: boolean;
   /** The prefix given to `ArrowMarkers` in the same SVG. */
   markers?: string;
   selected?: string | null;
@@ -436,6 +439,7 @@ export const MapScene = memo(function MapScene({
   diff,
   draft,
   pinsShown,
+  still = false,
   markers = "",
   selected = null,
   lit = null,
@@ -483,6 +487,7 @@ export const MapScene = memo(function MapScene({
             diffTag={added.has(flow.id) ? "new" : changed.has(flow.id) ? "edited" : null}
             threatCount={threatsOn.get(flow.id) ?? 0}
             marker={selected === flow.id ? ids.selected : crossingSet.has(flow.id) ? ids.crossing : ids.plain}
+            still={still}
             onActivate={onActivate}
             onReveal={onReveal}
           />
@@ -509,6 +514,7 @@ export const MapScene = memo(function MapScene({
             state={litState(node.id)}
             diffTag={added.has(node.id) ? "new" : changed.has(node.id) ? "edited" : null}
             threatCount={threatsOn.get(node.id) ?? 0}
+            still={still}
             onActivate={onActivate}
             onReveal={onReveal}
           />
@@ -520,8 +526,10 @@ export const MapScene = memo(function MapScene({
           <PinButton
             key={pin.threat.id}
             pin={pin}
-            state={litState(pin.threat.id) || litState(pin.threat.element)}
+            state={pinState(pin.threat, lit)}
+            still={still}
             onOpen={() => onOpenThreat(pin.threat.id)}
+            onReveal={onReveal}
           />
         ))}
     </>
@@ -531,6 +539,25 @@ export const MapScene = memo(function MapScene({
 // =============================================================================
 // Shapes
 // =============================================================================
+
+// What makes a mark on the canvas a button that Enter and Space press. A still picture leaves it off,
+// so the compare dialog and the exports hold no dead tab stops.
+function pressable(label: string, pressed: boolean | undefined, onPress: () => void, onFocus: () => void) {
+  return {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": label,
+    "aria-pressed": pressed,
+    onClick: onPress,
+    onKeyDown: (event: KeyboardEvent<SVGGElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onPress();
+      }
+    },
+    onFocus,
+  };
+}
 
 const BoundaryShape = memo(function BoundaryShape({ id, box }: { id: string; box: Box }) {
   const strokes = useMemo(() => boundaryOutline(box, id), [box, id]);
@@ -557,8 +584,6 @@ function BoundaryName({ label, spot }: { label: string; spot: Box }) {
   );
 }
 
-type LitState = "lit" | "dim" | "";
-
 interface NodeShapeProps {
   node: MapNode;
   box: Box;
@@ -568,11 +593,12 @@ interface NodeShapeProps {
   state: LitState;
   diffTag: "new" | "edited" | null;
   threatCount: number;
+  still: boolean;
   onActivate: (id: string) => void;
   onReveal: (box: Box) => void;
 }
 
-const NodeShape = memo(function NodeShape({ node, box, lethal, inferred, selected, state, diffTag, threatCount, onActivate, onReveal }: NodeShapeProps) {
+const NodeShape = memo(function NodeShape({ node, box, lethal, inferred, selected, state, diffTag, threatCount, still, onActivate, onReveal }: NodeShapeProps) {
   const fill = useMemo(() => nodeFill(node.kind, box), [node.kind, box]);
   const strokes = useMemo(() => nodeOutline(node.kind, box, node.id), [node.kind, box, node.id]);
   const text = useMemo(() => nodeText(node), [node]);
@@ -603,18 +629,7 @@ const NodeShape = memo(function NodeShape({ node, box, lethal, inferred, selecte
     <g
       className={`map-node kind-${node.kind} ${selected ? "is-selected" : ""} ${state ? `is-${state}` : ""} ${diffTag ? `diff-${diffTag}` : ""} ${inferred ? "is-inferred" : ""}`}
       data-el={node.id}
-      role="button"
-      tabIndex={0}
-      aria-label={describe}
-      aria-pressed={selected}
-      onClick={() => onActivate(node.id)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onActivate(node.id);
-        }
-      }}
-      onFocus={() => onReveal(box)}
+      {...(still ? {} : pressable(describe, selected, () => onActivate(node.id), () => onReveal(box)))}
     >
       {cut && <title>{node.tech ? `${node.label} (${node.tech})` : node.label}</title>}
       {state === "lit" && <path d={fill} className="node-highlighter" />}
@@ -690,6 +705,7 @@ interface FlowShapeProps {
   threatCount: number;
   /** The id of the arrowhead marker to end the line in. */
   marker: string;
+  still: boolean;
   onActivate: (id: string) => void;
   onReveal: (box: Box) => void;
 }
@@ -707,6 +723,7 @@ const FlowShape = memo(function FlowShape({
   diffTag,
   threatCount,
   marker,
+  still,
   onActivate,
   onReveal,
 }: FlowShapeProps) {
@@ -729,18 +746,7 @@ const FlowShape = memo(function FlowShape({
     <g
       className={`map-flow ${crossing ? "is-crossing" : ""} ${selected ? "is-selected" : ""} ${state ? `is-${state}` : ""} ${diffTag ? `diff-${diffTag}` : ""} ${inferred ? "is-inferred" : ""}`}
       data-el={flow.id}
-      role="button"
-      tabIndex={0}
-      aria-label={describe}
-      aria-pressed={selected}
-      onClick={() => onActivate(flow.id)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onActivate(flow.id);
-        }
-      }}
-      onFocus={() => onReveal(box)}
+      {...(still ? {} : pressable(describe, selected, () => onActivate(flow.id), () => onReveal(box)))}
     >
       {text !== flow.label && <title>{flow.label}</title>}
       <path d={d} className="flow-hit" />
@@ -765,23 +771,27 @@ const FlowShape = memo(function FlowShape({
   );
 });
 
-function PinButton({ pin, state, onOpen }: { pin: Pin; state: LitState; onOpen: () => void }) {
+function PinButton({
+  pin,
+  state,
+  still,
+  onOpen,
+  onReveal,
+}: {
+  pin: Pin;
+  state: LitState;
+  still: boolean;
+  onOpen: () => void;
+  onReveal: (box: Box) => void;
+}) {
   const { threat } = pin;
+  const label = `Threat ${threat.id}, ${threat.severity}, ${STRIDE[threat.stride].name}: ${threat.title}`;
   return (
     <g
       className={`pin sev-${threat.severity} ${state ? `is-${state}` : ""}`}
       transform={`translate(${pin.x} ${pin.y})`}
       data-el={threat.id}
-      role="button"
-      tabIndex={0}
-      aria-label={`Threat ${threat.id}, ${threat.severity}, ${STRIDE[threat.stride].name}: ${threat.title}`}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
+      {...(still ? {} : pressable(label, undefined, onOpen, () => onReveal(pinBox(pin))))}
     >
       <title>{`${threat.id} ${threat.title} (${threat.severity})`}</title>
       <PinMark severity={threat.severity} label={pin.number} />

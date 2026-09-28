@@ -5,7 +5,7 @@ import type { BoardSummary } from "../api/types.ts";
 import { topSeverity, totalThreats } from "../board/severity.ts";
 import { memoryStatus, useMemory } from "../settings/memory.ts";
 import "../settings/Memory.css";
-import { useBoardList } from "./boards.tsx";
+import { BoardListError, useBoardList } from "./boards.tsx";
 import { BookIcon, MemoryIcon, PlugIcon, PlusIcon, SidebarIcon } from "./icons.tsx";
 import { Mascot } from "./Mascot.tsx";
 import { useSession } from "./session.tsx";
@@ -80,7 +80,7 @@ export function Sidebar({
   activeBoardId: string | null;
 }) {
   const { config } = useSession();
-  const { boards, loaded, refresh } = useBoardList();
+  const { boards, loaded, error: listError, refresh } = useBoardList();
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -200,7 +200,8 @@ export function Sidebar({
 
       <div className="sidebar-scroll">
         {!collapsed && <p className="sidebar-label">Your boards</p>}
-        {loaded && boards.length === 0 && !collapsed && <p className="sidebar-empty">No boards yet.</p>}
+        {boards.length === 0 && !collapsed && listError !== null && <BoardListError className="sidebar-empty" />}
+        {boards.length === 0 && !collapsed && listError === null && loaded && <p className="sidebar-empty">No boards yet.</p>}
         <ul className="board-list">
           {boards.map((board) => (
             <BoardItem key={board.id} board={board} active={board.id === activeBoardId} collapsed={collapsed} />

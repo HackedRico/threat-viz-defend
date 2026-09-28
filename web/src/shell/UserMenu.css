@@ -94,6 +94,11 @@
   width: 100%;
 }
 
+.user-pop-error {
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
 .usage {
   display: flex;
   flex-direction: column;

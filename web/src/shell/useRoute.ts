@@ -1,14 +1,14 @@
 import { useSyncExternalStore } from "react";
 
-import { parseRoute, routePath, type Route } from "./route.ts";
+import { mayLeave, parseRoute, routePath, type Route } from "./route.ts";
 
 // =============================================================================
 // Module Overview
 // =============================================================================
 // Binds `Route` to the browser history. `useRoute` re-renders on back and
-// forward and on `navigate`, which pushes a new entry without a page load.
-// `usePathname` and `navigatePath` do the same with a bare path, for the
-// screens shown before signing in.
+// forward and on `navigate`, which pushes a new entry without a page load once
+// `mayLeave` agrees. `usePathname` and `navigatePath` do the same with a bare
+// path, for the screens shown before signing in.
 
 const CHANGE = "routechange";
 
@@ -37,14 +37,16 @@ export function usePathname(): string {
   return url.split("?")[0] ?? "/";
 }
 
-/** Go to `route`; `replace` swaps the current history entry instead of adding one. */
+/** Go to `route` unless unsaved work keeps the user here; `replace` swaps the current history entry instead of adding one. */
 export function navigate(route: Route, replace = false): void {
   navigatePath(routePath(route), replace);
 }
 
-/** Go to a path such as `/signin`; `replace` swaps the current history entry instead of adding one. */
+/** Go to a path such as `/signin` unless unsaved work keeps the user here; `replace` swaps the current history entry instead of adding one. */
 export function navigatePath(path: string, replace = false): void {
   if (path === snapshot()) return;
+  // A replace only corrects where the user already is, such as home after deleting the board, so it never asks.
+  if (!replace && !mayLeave()) return;
   if (replace) history.replaceState(null, "", path);
   else history.pushState(null, "", path);
   window.dispatchEvent(new Event(CHANGE));

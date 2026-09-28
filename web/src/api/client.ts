@@ -21,8 +21,8 @@ import type {
 // The typed API client. `http` is an openapi-fetch client generated from the
 // server's schema, so a renamed route or changed body fails the typecheck.
 // Every call goes to `API_BASE`, which may be another origin, with the session
-// cookie. `unwrap` turns failures into `ApiError` and tells `onSignedOut`
-// listeners when a call finds the session gone. `api` names each endpoint.
+// cookie. Failures become `ApiError`, and one that finds the session gone tells
+// `onSignedOut` listeners, downloads included. `api` names each endpoint.
 
 const signedOutListeners = new Set<() => void>();
 
@@ -63,12 +63,17 @@ async function unwrap<T>(call: Promise<FetchResult<T>>): Promise<T> {
   }
   const { response } = result;
   if (response.ok) return result.data as T;
-  const error = toApiError(response.status, result.error, response.headers.get("Retry-After"));
+  throw failure(response, result.error);
+}
+
+/** The `ApiError` for a failed response, after telling `onSignedOut` listeners when it means the session is gone. */
+function failure(response: Response, body: unknown): ApiError {
+  const error = toApiError(response.status, body, response.headers.get("Retry-After"));
   // The sign in call answers 401 for a wrong password; that is not a lost session.
   if (error.signedOut && !new URL(response.url, location.origin).pathname.startsWith("/api/auth/")) {
     signedOutListeners.forEach((listener) => listener());
   }
-  throw error;
+  return error;
 }
 
 const path = (board_id: string) => ({ params: { path: { board_id } } });
@@ -140,7 +145,7 @@ async function downloadText(url: string): Promise<Blob> {
   }
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
-    throw toApiError(response.status, body, response.headers.get("Retry-After"));
+    throw failure(response, body);
   }
   return response.blob();
 }

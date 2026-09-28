@@ -3,7 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { api, errorMessage } from "../api/client.ts";
 import type { TokenOut } from "../api/types.ts";
 import { formatTime } from "../board/ActivityLog.tsx";
-import { useBoardList } from "../shell/boards.tsx";
+import { BoardListError, useBoardList } from "../shell/boards.tsx";
 import { CheckIcon, CopyIcon, TrashIcon } from "../shell/icons.tsx";
 import { navigate } from "../shell/useRoute.ts";
 import { apiOrigin } from "../api/base.ts";
@@ -56,11 +56,12 @@ function Snippet({ title, value, label }: { title: string; value: string; label:
 
 /** The connect-a-coding-agent screen. */
 export function ConnectAgent({ boardId }: { boardId: string | null }) {
-  const { boards } = useBoardList();
+  const { boards, loaded, error: listError } = useBoardList();
   const [tokens, setTokens] = useState<TokenOut[] | null>(null);
   const [name, setName] = useState("");
-  const [fresh, setFresh] = useState<{ token: string; name: string } | null>(null);
+  const [fresh, setFresh] = useState<{ id: string; token: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const ids = useId();
   // Agents talk to the API, which may live on another origin than this page.
@@ -79,7 +80,7 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
     setError(null);
     try {
       const created = await api.createToken(label);
-      setFresh({ token: created.token, name: created.info.name });
+      setFresh({ id: created.info.id, token: created.token, name: created.info.name });
       setTokens((before) => [created.info, ...(before ?? [])]);
       setName("");
     } catch (caught) {
@@ -91,11 +92,16 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
 
   const revoke = async (id: string) => {
     setError(null);
+    setRevoking((before) => [...before, id]);
     try {
       await api.deleteToken(id);
       setTokens((before) => (before ?? []).filter((t) => t.id !== id));
+      // A revoked token no longer works, so it must not stay on screen as the one to copy.
+      setFresh((shown) => (shown?.id === id ? null : shown));
     } catch (caught) {
       setError(errorMessage(caught));
+    } finally {
+      setRevoking((before) => before.filter((other) => other !== id));
     }
   };
 
@@ -169,7 +175,13 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
                     <td>{formatTime(t.created_at)}</td>
                     <td>{t.last_used_at ? formatTime(t.last_used_at) : "never"}</td>
                     <td>
-                      <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={() => void revoke(t.id)} aria-label={`Revoke ${t.name}`}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm btn-danger"
+                        onClick={() => void revoke(t.id)}
+                        disabled={revoking.includes(t.id)}
+                        aria-label={`Revoke ${t.name}`}
+                      >
                         <TrashIcon width={15} height={15} /> Revoke
                       </button>
                     </td>
@@ -207,7 +219,11 @@ export function ConnectAgent({ boardId }: { boardId: string | null }) {
             <span className="step-num">3</span> Tell the agent which board
           </h3>
           {boards.length === 0 ? (
-            <p className="muted">Make a board first; agent tools take its id.</p>
+            listError !== null ? (
+              <BoardListError />
+            ) : (
+              loaded && <p className="muted">Make a board first; agent tools take its id.</p>
+            )
           ) : (
             <>
               <label htmlFor={`${ids}-board`} className="field-label">
