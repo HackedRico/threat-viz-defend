@@ -102,17 +102,23 @@ export function DictateButton({ available, onText, onError, disabled = false }: 
     let recorder: MediaRecorder;
     try {
       recorder = new MediaRecorder(mic, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: DICTATION_BITS_PER_SECOND });
+      // Starting throws too, such as when the mic ended before recording began.
+      recorder.start();
     } catch {
       mic.getTracks().forEach((track) => track.stop());
       setPhase("idle");
       onError("This browser cannot record audio here. Type your question instead.");
       return;
     }
+    // A recorder fires its events in later tasks, so handlers set just after `start` still see every one.
     const current: Take = { recorder, stream: mic, chunks: [], keep: true, timer: 0 };
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) current.chunks.push(event.data);
     };
     recorder.onstop = () => {
+      // The browser stops the recorder itself when every track ends, such as an unplugged mic or a revoked
+      // permission. Finish that take as the stop button would, so its timer and mic go with it.
+      if (take.current === current) finish(true);
       current.stream.getTracks().forEach((track) => track.stop());
       if (!current.keep) return;
       const type = recorder.mimeType || mimeType || "";
@@ -120,6 +126,8 @@ export function DictateButton({ available, onText, onError, disabled = false }: 
     };
     const began = performance.now();
     current.timer = window.setInterval(() => {
+      // A timer left from an ended take must not move the clock or stop a later take.
+      if (take.current !== current) return;
       const seconds = (performance.now() - began) / 1000;
       setElapsed(seconds);
       if (seconds >= DICTATION_MAX_SECONDS) finish(true);
@@ -127,7 +135,6 @@ export function DictateButton({ available, onText, onError, disabled = false }: 
     take.current = current;
     setStream(mic);
     setElapsed(0);
-    recorder.start();
     setPhase("recording");
   };
 
