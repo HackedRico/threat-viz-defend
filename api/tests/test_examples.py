@@ -76,3 +76,13 @@ def test_an_example_board_saved_before_details_existed_shows_them() -> None:
     assert shown == inbox().map
     # A board the user drew keeps what is stored, even when it shares the example's name.
     assert read_map(BoardRow(id="b2", example=False, map=old)) != inbox().map
+
+
+def test_the_report_leaves_no_bare_url_www_name_or_email_for_a_viewer_to_link() -> None:
+    # GitHub-flavored viewers link these after reading backslash escapes, so escaping alone cannot stop a poisoned
+    # upload from planting a phishing link; a word joiner, which renders as nothing, breaks each pattern.
+    lure = "Reset it at https://evil.example.com/reset, www.evil.example.com or mail admin@evil.example.com."
+    report = render_report("Inbox", inbox().map.model_copy(update={"summary": lure}), None, None)
+    summary = report.splitlines()[2]
+    assert not re.search(r"https?://|\bwww\.|[\w.+-]@\w", summary)
+    assert re.sub(r"\\(.)", r"\1", summary.replace("⁠", "")) == lure
