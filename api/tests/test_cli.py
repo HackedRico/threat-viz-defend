@@ -6,7 +6,7 @@ from app.cli import main
 from app.config import Settings
 from app.jobs import InlineJobs
 from app.main import create_app
-from tests.conftest import INVITE, PASSWORD
+from tests.conftest import INVITE, PASSWORD, FakeBackboard
 
 
 def test_admin_can_disable_and_delete_accounts(
@@ -55,3 +55,21 @@ def test_a_password_reset_signs_everyone_out(tmp_path: Path, monkeypatch: pytest
         assert main(["create-user", "yuki"]) == 0
         assert client.get("/api/auth/me").status_code == 401
         assert client.get("/api/agent/boards", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+
+def test_deleting_an_account_deletes_its_backboard_notes_too(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi.testclient import TestClient
+
+    url = f"sqlite:///{tmp_path / 'app.db'}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.setenv("BACKBOARD_API_KEY", "server-bb-key")
+    fake = FakeBackboard()
+    settings = Settings(database_url=url, static_dir=None, invite_codes=(INVITE,), backboard_api_key="server-bb-key")
+    with TestClient(create_app(settings, jobs=InlineJobs(), backboard=fake.transport())) as client:
+        client.post("/api/auth/signup", json={"username": "zoe", "password": PASSWORD, "invite_code": INVITE})
+        board = client.get("/api/boards").json()[0]
+        client.post(f"/api/boards/{board['id']}/ask", json={"question": "What happens if Postgres leaks?"})
+        assert fake.kept()
+        # The notes live on Backboard, outside the database, so deleting the rows alone left them there.
+        assert main(["delete", "zoe", "--yes"], backboard=fake.transport()) == 0
+    assert fake.kept() == []

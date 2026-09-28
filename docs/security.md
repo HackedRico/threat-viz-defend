@@ -143,7 +143,7 @@ Uploads, agent diffs, questions and quiz answers are untrusted, and any of them 
 
 ## Data retention
 
-- **Kept until deleted:** accounts, boards with their maps, their last 30 map versions, analyses, source records and activity, quiz answers including open answers in the user's own words, personal tokens, saved providers and usage records. A user can delete boards, revoke tokens, remove their provider and start a quiz over. Deleting an account takes an operator, and deletes everything the account owns.
+- **Kept until deleted:** accounts, boards with their maps, their last 30 map versions, analyses, source records and activity, quiz answers including open answers in the user's own words, personal tokens, saved providers and usage records. A user can delete boards, revoke tokens, remove their provider and start a quiz over. Deleting an account takes an operator, and deletes everything the account owns, including its memory notes on Backboard.
 - **Never kept:** the content of uploads, pasted text, GitHub files and agent diffs, and dictated recordings and their text.
 - **Sessions** stop working after `SESSION_DAYS`. Expired rows stay in the table.
 - **Server logs** hold usernames at sign up, the IP of a request that filled the honeypot, job failure messages, and, when a model reply fails validation, a short excerpt of that reply.
