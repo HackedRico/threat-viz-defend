@@ -19,7 +19,7 @@ import {
 } from "./layout.ts";
 import type { MapDiff } from "./mapDiff.ts";
 import { MapLegend } from "./MapLegend.tsx";
-import { pinState, placePins, type LitState, type Pin } from "./pins.ts";
+import { pinBox, pinState, placePins, type LitState, type Pin } from "./pins.ts";
 import { boundaryOutline, LID, nodeFill, nodeOutline, personGlyph } from "./shapes.ts";
 import { PinMark } from "./PinMark.tsx";
 import { useBoardUi } from "./store.ts";
@@ -522,6 +522,7 @@ export const MapScene = memo(function MapScene({
             pin={pin}
             state={pinState(pin.threat, lit)}
             onOpen={() => onOpenThreat(pin.threat.id)}
+            onReveal={onReveal}
           />
         ))}
     </>
@@ -763,7 +764,7 @@ const FlowShape = memo(function FlowShape({
   );
 });
 
-function PinButton({ pin, state, onOpen }: { pin: Pin; state: LitState; onOpen: () => void }) {
+function PinButton({ pin, state, onOpen, onReveal }: { pin: Pin; state: LitState; onOpen: () => void; onReveal: (box: Box) => void }) {
   const { threat } = pin;
   return (
     <g
@@ -780,6 +781,7 @@ function PinButton({ pin, state, onOpen }: { pin: Pin; state: LitState; onOpen: 
           onOpen();
         }
       }}
+      onFocus={() => onReveal(pinBox(pin))}
     >
       <title>{`${threat.id} ${threat.title} (${threat.severity})`}</title>
       <PinMark severity={threat.severity} label={pin.number} />

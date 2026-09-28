@@ -63,7 +63,7 @@ export function placePins(threats: readonly Threat[], layout: MapLayout): Pin[] 
     onIt.forEach((threat, slot) => {
       const spot = spots[slot]!;
       placed.set(threat.id, { threat, ...spot, number: threat.id.replace(/\D/g, "") || threat.id });
-      taken.push(reachOf(spot));
+      taken.push(pinBox(spot));
     });
   }
   // Tab order follows the ranking, so moving through the pins reads the threat list in order.
@@ -78,10 +78,11 @@ export function pinState(threat: Pick<Threat, "id" | "element">, lit: ReadonlySe
 }
 
 function clash(spots: ReadonlyArray<{ x: number; y: number }>, taken: readonly Box[]): number {
-  return spots.reduce((sum, spot) => sum + taken.filter((box) => overlaps(reachOf(spot), box)).length, 0);
+  return spots.reduce((sum, spot) => sum + taken.filter((box) => overlaps(pinBox(spot), box)).length, 0);
 }
 
-function reachOf(spot: { x: number; y: number }): Box {
+/** The box a pin centered on `spot` covers, for keeping pins apart and for bringing a focused one into view. */
+export function pinBox(spot: { x: number; y: number }): Box {
   return { x: spot.x - PIN_REACH, y: spot.y - PIN_REACH, width: PIN_REACH * 2, height: PIN_REACH * 2 };
 }
 
