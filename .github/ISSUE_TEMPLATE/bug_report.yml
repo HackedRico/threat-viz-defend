@@ -1,0 +1,91 @@
+name: Bug report
+description: Something in ThreatViz Defend does not work the way the docs say it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A security problem goes through [SECURITY.md](https://github.com/HackedRico/threat-viz-defend/blob/main/SECURITY.md), not a public issue.
+
+        Never paste an API key, a personal token (`tvd_...`), a `.env` file or code you would not publish.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including any error message on the page.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: 'Start from a fresh page load. The example board, "Example: Inbox Helper", is the easiest place to reproduce a problem.'
+      placeholder: |
+        1. Open the example board
+        2. Choose Defend
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Adding material or importing from GitHub
+        - The map or its layout
+        - Threats or attack paths
+        - Ask
+        - Defend quiz
+        - Voice coach or dictation
+        - Coding agent hook or MCP server
+        - Export
+        - Accounts or settings
+        - Deployment or Docker
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: runs
+    attributes:
+      label: Where it runs
+      options:
+        - Locally with ./scripts/dev.sh
+        - Locally with docker compose
+        - DigitalOcean App Platform
+        - Another host
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model
+      description: Settings, Model provider shows which one is in use.
+      options:
+        - Demo mode, no model
+        - The server's default model
+        - My own provider from Settings
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and operating system
+      placeholder: Chrome 140 on macOS 26
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The output of `git rev-parse --short HEAD`, if you run from a clone.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: API log lines or browser console errors around the problem. Check them for keys and private code first.
+      render: shell
