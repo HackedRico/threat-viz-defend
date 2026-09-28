@@ -62,6 +62,7 @@ export function MapPicture({
         diff={diff}
         draft={false}
         pinsShown
+        still
         markers={prefix}
       />
     </svg>

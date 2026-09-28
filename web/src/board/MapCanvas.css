@@ -454,6 +454,13 @@
   filter: none;
 }
 
+/* ---------- still pictures ---------- */
+
+/* The compare dialog and the exports draw the marks with nothing to press, so no mark there shows a pointer. */
+.map-picture :is(.map-node, .map-flow, .pin) {
+  cursor: inherit;
+}
+
 /* ---------- dimming around a highlight ---------- */
 
 .has-highlight .is-dim {
