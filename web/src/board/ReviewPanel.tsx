@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { api, errorMessage } from "../api/client.ts";
 import type { BoardOut, SystemMap } from "../api/types.ts";
+import { useSession } from "../shell/session.tsx";
 import { ActivityLog } from "./ActivityLog.tsx";
 import { hasChanges, type MapDiff } from "./mapDiff.ts";
 import { mapProblem } from "./mapEdit.ts";
@@ -28,6 +29,7 @@ interface ReviewPanelProps {
 
 /** Review, edit and confirm a draft map. */
 export function ReviewPanel({ board, draft, dirty, staleEdits, diff, onSaved, onDiscard, onApply }: ReviewPanelProps) {
+  const { refreshMe } = useSession();
   const [busy, setBusy] = useState<"save" | "confirm" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const select = useBoardUi((s) => s.select);
@@ -48,7 +50,11 @@ export function ReviewPanel({ board, draft, dirty, staleEdits, diff, onSaved, on
     setError(null);
     try {
       if (dirty && (await save()) === null) return;
-      if (kind === "confirm") onApply(await api.confirm(board.id));
+      if (kind === "confirm") {
+        onApply(await api.confirm(board.id));
+        // Finding threats spent a model call, and the count beside the user's name should say so.
+        refreshMe();
+      }
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {

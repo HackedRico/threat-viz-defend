@@ -80,6 +80,8 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
     if (provider === null) void load();
   }, [provider, load]);
   const model = provider?.label ?? config.analyst;
+  // Demo mode's label makes a broken sentence here, and what it can answer matters more than its name.
+  const demo = provider?.source === "demo";
   const selected = useBoardUi((s) => s.selected);
   const select = useBoardUi((s) => s.select);
   const setHighlight = useBoardUi((s) => s.setHighlight);
@@ -200,7 +202,7 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
         <div className="ask-head">
           <SparkIcon width={16} height={16} className="ask-mark" />
           <label htmlFor={id} className="panel-label">
-            Ask {model} about this board
+            {demo ? "Ask about this board" : `Ask ${model} about this board`}
           </label>
           {selected && (
             <span className="ask-focus">
@@ -210,7 +212,10 @@ export function AskDock({ board, map, focusSignal }: { board: BoardOut; map: Sys
               </button>
             </span>
           )}
-          <span className="field-hint ask-hint">Uses one model call. Ctrl or Cmd with Enter sends.</span>
+          <span className="field-hint ask-hint">
+            {demo ? "Demo mode answers only the example's recorded questions." : "Uses one model call."} Ctrl or Cmd with
+            Enter sends.
+          </span>
         </div>
         <div className="ask-row">
           <textarea

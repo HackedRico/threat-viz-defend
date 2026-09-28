@@ -27,7 +27,7 @@ import "./BoardView.css";
 
 /** The screen for board `boardId`. */
 export function BoardView({ boardId }: { boardId: string }) {
-  const { config } = useSession();
+  const { config, refreshMe } = useSession();
   const state = useBoard(boardId);
   const { board, loadError, notice, dismissNotice, apply } = state;
   const [adding, setAdding] = useState(false);
@@ -103,6 +103,8 @@ export function BoardView({ boardId }: { boardId: string }) {
             onSubmitted={(next) => {
               setAdding(false);
               apply(next);
+              // Drawing the map spent a model call, and the count beside the user's name should say so.
+              refreshMe();
             }}
             onCancel={board.status === "empty" ? null : () => setAdding(false)}
           />

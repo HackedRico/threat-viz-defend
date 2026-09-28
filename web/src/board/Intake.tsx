@@ -2,8 +2,11 @@ import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } fr
 
 import { api, errorMessage } from "../api/client.ts";
 import type { BoardOut, SourceIn } from "../api/types.ts";
+import { useProvider } from "../settings/provider.ts";
 import { CloseIcon } from "../shell/icons.tsx";
+import { routePath, type Route } from "../shell/route.ts";
 import { useSession } from "../shell/session.tsx";
+import { navigate } from "../shell/useRoute.ts";
 import { formatBytes, type Skipped } from "./filePolicy.ts";
 import { collect, fromDrop, fromFileList, readAccepted, type Picked } from "./readFiles.ts";
 import "./Intake.css";
@@ -34,6 +37,11 @@ export function Intake({
 }) {
   const { config } = useSession();
   const policy = config.file_policy;
+  // With no model anywhere the server maps only the built-in example, so say so before anyone pastes their own notes.
+  const { provider, load } = useProvider();
+  useEffect(() => {
+    if (provider === null) void load();
+  }, [provider, load]);
   const ids = useId();
   const [noteName, setNoteName] = useState("");
   const [note, setNote] = useState("");
@@ -159,6 +167,7 @@ export function Intake({
             </button>
           )}
         </header>
+        {provider?.source === "demo" && <DemoNote boardId={board.id} />}
 
         <div className="intake-grid">
           <section className="intake-col" aria-labelledby={`${ids}-paste`}>
@@ -358,5 +367,28 @@ export function Intake({
         )}
       </div>
     </div>
+  );
+}
+
+// Demo mode fails on anything but the example's own notes, after spending a call; a model under settings fixes that.
+function DemoNote({ boardId }: { boardId: string }) {
+  const settings: Route = { name: "settings", section: "provider", boardId };
+  return (
+    <p className="banner intake-demo" role="note">
+      <span className="banner-body">
+        <strong>Demo mode.</strong> This server has no model, so it can map only the built-in example. To map your own
+        system, save a model under{" "}
+        <a
+          href={routePath(settings)}
+          onClick={(event) => {
+            event.preventDefault();
+            navigate(settings);
+          }}
+        >
+          Model provider
+        </a>
+        .
+      </span>
+    </p>
   );
 }
