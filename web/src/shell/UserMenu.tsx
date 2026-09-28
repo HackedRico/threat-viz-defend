@@ -33,12 +33,14 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
   );
 }
 
-/** Today's usage as meters; dictation shows only where the server offers it. */
-export function UsageMeters({ usage, dictation }: { usage: UsageOut; dictation: boolean }) {
+/** Today's usage as meters; voice and dictation show only where the server offers them. */
+export function UsageMeters({ usage, voice, dictation }: { usage: UsageOut; voice: boolean; dictation: boolean }) {
   return (
     <div className="usage">
       <Meter label="Model calls today" used={usage.model_calls_today} limit={usage.model_calls_limit} />
-      <Meter label="Voice sessions today" used={usage.voice_sessions_today} limit={usage.voice_sessions_limit} />
+      {voice && (
+        <Meter label="Voice sessions today" used={usage.voice_sessions_today} limit={usage.voice_sessions_limit} />
+      )}
       {dictation && <Meter label="Dictations today" used={usage.dictations_today} limit={usage.dictations_limit} />}
     </div>
   );
@@ -100,7 +102,7 @@ export function UserMenu({ collapsed, boardId }: { collapsed: boolean; boardId: 
           <p className="user-pop-name">
             Signed in as <strong>{name}</strong>
           </p>
-          <UsageMeters usage={me.usage} dictation={config.dictation_enabled} />
+          <UsageMeters usage={me.usage} voice={config.voice_enabled} dictation={config.dictation_enabled} />
           <div className="user-pop-theme">
             {/* The switch's own legend names it for screen readers; this label is for sighted users. */}
             <span aria-hidden="true">Theme</span>
