@@ -80,6 +80,7 @@ No inline scripts are allowed. The voice SDK's audio worklets are served from ou
 
 - `APP_SECRET` must be at least 32 characters, and production refuses to start without it. Changing it makes every saved key unreadable; users then save their keys again.
 - Keys never leave the server. Responses show `...` and the last four characters at most. The form never refills a saved key; leaving the field empty keeps it.
+- A key must be printable ASCII with no spaces, as every header value is, so a character pasted in with it by mistake is refused when it is saved rather than failing every call later.
 - Keys are never logged.
 
 ## Server-side request forgery

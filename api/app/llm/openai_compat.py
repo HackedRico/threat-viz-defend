@@ -201,6 +201,11 @@ class OpenAICompatibleLlm:
                 )
             except openai.BadRequestError:
                 raise
+            except UnicodeError as exc:
+                # A key saved before keys were checked can hold a character a header cannot carry.
+                raise LlmError(
+                    "auth", f"The API key for {self._label} holds a character keys never have. Save it again."
+                ) from exc
             except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
                 raise LlmError("auth", f"{self._label} rejected the API key. Check `LLM_API_KEY`.") from exc
             except openai.NotFoundError as exc:

@@ -176,6 +176,9 @@ class BackboardApi:
         """Call Backboard and return its JSON, translating HTTP failures into `LlmError`."""
         try:
             response = self._client.request(method, path, json=body, params=params, headers=self._headers)
+        except UnicodeError as exc:
+            # A key saved before keys were checked can hold a character a header cannot carry.
+            raise LlmError("auth", "The Backboard key holds a character keys never have. Save it again.") from exc
         except httpx.TimeoutException as exc:
             raise LlmError("timeout", f"{self._label} took too long to answer. Try again.") from exc
         except httpx.HTTPError as exc:

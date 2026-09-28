@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain.models import SystemMap, ThreatAnalysis
 from app.domain.quiz import Mastery, QuestionKind, QuestionTopic, QuizEvidence, QuizOption, Result
@@ -24,6 +24,15 @@ class RequestBody(BaseModel):
     """Base for request bodies: unknown keys are rejected so typos fail loudly."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+def plain_key(value: str | None) -> str | None:
+    """`value`, unless it holds a space or a character no API key has."""
+    # A key goes out in a header, which takes printable ASCII only, so a zero-width space pasted with it would save
+    # fine and then fail every call.
+    if value is not None and not (value.isascii() and value.isprintable() and " " not in value):
+        raise ValueError("The key holds a space or a hidden character that API keys never have. Paste it again.")
+    return value
 
 
 # =============================================================================
@@ -436,6 +445,12 @@ class ProviderIn(RequestBody):
     model: str = Field(min_length=1, max_length=120)
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
 
+    @field_validator("api_key")
+    @classmethod
+    def _plain_key(cls, value: str | None) -> str | None:
+        """Refuse a key no provider issues before it is saved."""
+        return plain_key(value)
+
 
 class ProviderOut(BaseModel):
     """Which model analyzes the user's boards. Keys are never returned, only their last four characters."""
@@ -494,6 +509,12 @@ class MemoryIn(RequestBody):
     """A user's own Backboard key for memory, used in place of the server's. `api_key` null keeps the saved key."""
 
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @field_validator("api_key")
+    @classmethod
+    def _plain_key(cls, value: str | None) -> str | None:
+        """Refuse a key no provider issues before it is saved."""
+        return plain_key(value)
 
 
 class MemorySwitchIn(RequestBody):
