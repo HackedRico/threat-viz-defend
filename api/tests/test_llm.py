@@ -12,7 +12,9 @@ from pydantic import ValidationError
 from app.analysis.analyst import LlmAnalyst
 from app.analysis.prompts import fence, find_threats_content, neutralize
 from app.config import load_settings
-from app.domain.models import Answer, SystemMap, ThreatAnalysis
+from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
+from app.domain.quiz import build_quiz
+from app.domain.rules import MAX_REPLY
 from app.llm import openai_compat
 from app.llm.base import LlmError, LlmRequest, parse_json, strict_schema
 from app.llm.openai_compat import OpenAICompatibleLlm
@@ -373,3 +375,16 @@ def test_a_question_stops_waiting_for_a_busy_model_after_its_budget(monkeypatch:
     finally:
         held.release.set()
         first.join(5)
+
+
+def test_answers_and_grades_are_clipped_like_every_other_model_text() -> None:
+    # A user's own provider can reply at any length, and grades are stored and sent back on every quiz load.
+    endless = "word " * 20_000
+    llm, _ = scripted(Answer(answer=endless, highlight=[]).model_dump_json())
+    answer = LlmAnalyst(llm).answer(inbox().map, inbox().analysis, "What should I fix first?", None)
+    assert len(answer.answer) <= MAX_REPLY
+    question = next(q for q in build_quiz(inbox().map, inbox().analysis) if q.kind == "open")
+    graded = OpenGrade.model_validate({"verdict": "partial", "feedback": endless, "highlight": []})
+    llm, _ = scripted(graded.model_dump_json())
+    grade = LlmAnalyst(llm).grade(inbox().map, inbox().analysis, question, "the agent", ())
+    assert len(grade.feedback) <= MAX_REPLY

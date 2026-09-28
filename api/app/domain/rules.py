@@ -38,6 +38,8 @@ MAX_TEXT = 600
 MAX_LABEL = 80
 MAX_DETAILS = 4
 MAX_PATH = 200
+# An answer or a grade's feedback: a few sentences, with room to spare.
+MAX_REPLY = 1500
 
 
 @dataclass(frozen=True)
@@ -466,6 +468,11 @@ def remove_element(system: SystemMap, item_id: str) -> SystemMap:
     )
     used = {node.boundary for node in trimmed.nodes if node.boundary is not None}
     return trimmed.model_copy(update={"boundaries": [b for b in trimmed.boundaries if b.id in used]})
+
+
+def clip(text: str, limit: int) -> str:
+    """`text` cut to `limit` characters, marking the cut, for model text that keeps its line breaks."""
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 def _one_line(text: str, limit: int) -> str:

@@ -5,7 +5,7 @@ from typing import Protocol
 from app.analysis import prompts
 from app.domain.models import Answer, OpenGrade, SystemMap, ThreatAnalysis
 from app.domain.quiz import QuizQuestion
-from app.domain.rules import known_ids, label_of, only_known, sanitize_analysis, sanitize_map
+from app.domain.rules import MAX_REPLY, clip, known_ids, label_of, only_known, sanitize_analysis, sanitize_map
 from app.examples import find_example, load_examples
 from app.llm.base import Llm, LlmError, LlmRequest
 
@@ -90,7 +90,7 @@ class LlmAnalyst:
     def answer(
         self, system: SystemMap, analysis: ThreatAnalysis, question: str, focus: str | None, notes: Sequence[str] = ()
     ) -> Answer:
-        """Answer a question, keeping only highlights that exist on the board."""
+        """Answer a question, clipped, keeping only highlights that exist on the board."""
         reply = self._llm.generate(
             LlmRequest(
                 "answer",
@@ -99,7 +99,10 @@ class LlmAnalyst:
                 Answer,
             )
         )
-        return Answer(answer=reply.answer, highlight=only_known(reply.highlight, known_ids(system, analysis)))
+        # A provider a user chose can reply at any length; every other model text is clipped on the way in too.
+        return Answer(
+            answer=clip(reply.answer, MAX_REPLY), highlight=only_known(reply.highlight, known_ids(system, analysis))
+        )
 
     def grade(
         self,
@@ -109,7 +112,7 @@ class LlmAnalyst:
         text: str,
         notes: Sequence[str] = (),
     ) -> OpenGrade:
-        """Grade an open answer, keeping only highlights that exist on the board."""
+        """Grade an open answer, with clipped feedback, keeping only highlights that exist on the board."""
         grade = self._llm.generate(
             LlmRequest(
                 "grade",
@@ -118,7 +121,13 @@ class LlmAnalyst:
                 OpenGrade,
             )
         )
-        return grade.model_copy(update={"highlight": only_known(grade.highlight, known_ids(system, analysis))})
+        # The feedback is stored with the attempt and sent back on every quiz load, so it is clipped like an answer.
+        return grade.model_copy(
+            update={
+                "feedback": clip(grade.feedback, MAX_REPLY),
+                "highlight": only_known(grade.highlight, known_ids(system, analysis)),
+            }
+        )
 
 
 def _require_nodes(system: SystemMap, label: str) -> SystemMap:

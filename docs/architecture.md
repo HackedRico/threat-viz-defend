@@ -90,7 +90,7 @@ Every model call goes through an `Analyst` ([analysis/analyst.py](../api/app/ana
 - `sanitize_analysis` drops threats pinned to an element the map lacks, sorts by severity, keeps 10, renumbers them `T1`, `T2` and so on, keeps only attack path steps that are nodes on the map, and keeps 5 paths. Like `sanitize_map`, it folds every text field onto one line: threat titles, summaries and fixes, attack path stories and the verdict all reach agents inside lines of the MCP tools' replies.
 - `only_known` drops highlight ids that are not a node, flow or threat on the board.
 
-Text fields are clipped to fixed lengths on the way through.
+Text fields are clipped to fixed lengths on the way through, and so are an answer and a grade's feedback, which `LlmAnalyst` cuts to 1,500 characters.
 
 ## The rules engine
 
